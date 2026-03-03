@@ -46,7 +46,9 @@
     "bench": "bunx --bun vitest bench",
     "bench:standalone": "bun bench/run.ts",
     "bench:compare": "bun bench/compare.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "ci": "bun run typecheck && bun test",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "dependencies": {
     "debug": "^4.4.3"
