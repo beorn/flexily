@@ -42,6 +42,7 @@ export {
   layoutPositioningCalls,
   layoutCacheHits,
   resetLayoutStats,
+  getLayoutStats,
 } from "./layout-stats.js"
 
 // Re-export measureNode for backward compatibility
@@ -62,6 +63,8 @@ import {
   incLayoutSizingCalls,
   incLayoutPositioningCalls,
   incLayoutCacheHits,
+  incFingerprintHit,
+  incFingerprintMiss,
 } from "./layout-stats.js"
 import { measureNode } from "./layout-measure.js"
 import {
@@ -156,6 +159,7 @@ function layoutNode(
     flex.lastDir === direction
   ) {
     // Constraints unchanged - just update position based on offset delta
+    incFingerprintHit()
     _t?.fingerprintHit(_tn, availableWidth, availableHeight)
     const deltaX = offsetX - flex.lastOffsetX
     const deltaY = offsetY - flex.lastOffsetY
@@ -169,6 +173,7 @@ function layoutNode(
     }
     return
   }
+  incFingerprintMiss()
   _t?.fingerprintMiss(_tn, availableWidth, availableHeight, {
     layoutValid: flex.layoutValid,
     isDirty: node.isDirty(),
@@ -231,8 +236,9 @@ function layoutNode(
     nodeHeight = availableHeight - marginTop - marginBottom
   }
 
-  // Apply aspect ratio constraint
-  // If aspectRatio is set and one dimension is auto (NaN), derive it from the other
+  // Apply aspect ratio constraint (CSS aspect-ratio spec)
+  // If aspectRatio is set and one dimension is auto (NaN), derive it from the other.
+  // Re-apply min/max constraints on the derived dimension to respect CSS box model.
   const aspectRatio = style.aspectRatio
   if (!Number.isNaN(aspectRatio) && aspectRatio > 0) {
     const widthIsAuto = Number.isNaN(nodeWidth) || style.width.unit === C.UNIT_AUTO
@@ -241,6 +247,8 @@ function layoutNode(
     if (widthIsAuto && !heightIsAuto && !Number.isNaN(nodeHeight)) {
       // Height is defined, width is auto: width = height * aspectRatio
       nodeWidth = nodeHeight * aspectRatio
+      // Re-apply min/max for derived width
+      nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
     } else if (heightIsAuto && !widthIsAuto && !Number.isNaN(nodeWidth)) {
       // Width is defined, height is auto: height = width / aspectRatio
       nodeHeight = nodeWidth / aspectRatio

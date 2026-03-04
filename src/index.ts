@@ -107,4 +107,5 @@ export {
   layoutPositioningCalls,
   layoutCacheHits,
   resetLayoutStats,
+  getLayoutStats,
 } from "./layout-zero.js"

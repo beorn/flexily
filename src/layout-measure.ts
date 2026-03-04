@@ -84,13 +84,15 @@ export function measureNode(
     nodeHeight = availableHeight - marginTop - marginBottom
   }
 
-  // Apply aspect ratio
+  // Apply aspect ratio (CSS aspect-ratio spec)
+  // Re-apply min/max on the derived dimension to respect CSS box model.
   const aspectRatio = style.aspectRatio
   if (!Number.isNaN(aspectRatio) && aspectRatio > 0) {
     const widthIsAuto = Number.isNaN(nodeWidth) || style.width.unit === C.UNIT_AUTO
     const heightIsAuto = Number.isNaN(nodeHeight) || style.height.unit === C.UNIT_AUTO
     if (widthIsAuto && !heightIsAuto && !Number.isNaN(nodeHeight)) {
       nodeWidth = nodeHeight * aspectRatio
+      nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
     } else if (heightIsAuto && !widthIsAuto && !Number.isNaN(nodeWidth)) {
       nodeHeight = nodeWidth / aspectRatio
     }
