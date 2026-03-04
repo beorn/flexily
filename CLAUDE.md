@@ -117,18 +117,16 @@ See `docs/testing.md` for test methodology, `docs/incremental-layout-bugs.md` fo
 
 ## Cache Diagnostics
 
-```bash
-FLEXX_STATS=1 bun run app   # Enable fingerprint cache hit/miss tracking
-```
+Fingerprint cache hit/miss counters are always tracked. The benchmark prints a summary automatically. For programmatic access:
 
 ```typescript
-import { getLayoutStats } from "flexx"
+import { getLayoutStats, resetLayoutStats } from "flexx"
 
+resetLayoutStats()
+tree.calculateLayout(1000, 1000, DIRECTION_LTR)
 const stats = getLayoutStats()
-// { fingerprintHits: number, fingerprintMisses: number }
+// { hits: number, misses: number, hitRate: number }
 ```
-
-Only active when `FLEXX_STATS=1` — zero overhead in production.
 
 ## Aspect Ratio
 

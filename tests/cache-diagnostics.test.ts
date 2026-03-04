@@ -1,7 +1,7 @@
 /**
  * Cache diagnostics tests
  *
- * Verifies the FLEXX_STATS=1 cache diagnostics API:
+ * Verifies the always-on cache diagnostics API:
  * - getLayoutStats() returns hits, misses, hitRate
  * - resetLayoutStats() clears all counters
  * - Fingerprint hits/misses are tracked correctly
@@ -37,10 +37,8 @@ describe("Cache Diagnostics (getLayoutStats)", () => {
 
     const stats = getLayoutStats()
     // First layout always misses (no fingerprint yet)
-    // Stats only accumulate when FLEXX_STATS=1 is set;
-    // when not set, hits/misses stay at 0 (zero-cost when disabled)
-    expect(stats.hits).toBeGreaterThanOrEqual(0)
-    expect(stats.misses).toBeGreaterThanOrEqual(0)
+    expect(stats.misses).toBeGreaterThan(0)
+    expect(stats.hits).toBe(0)
   })
 
   it("should return valid hitRate between 0 and 1", () => {

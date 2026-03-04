@@ -9,10 +9,6 @@
  * and resetLayoutStats() to access and reset these counters.
  */
 
-// Whether detailed cache stats tracking is enabled (set via FLEXX_STATS=1)
-const STATS_ENABLED =
-  typeof process !== "undefined" && typeof process.env !== "undefined" && process.env.FLEXX_STATS === "1"
-
 // Layout statistics for debugging
 export let layoutNodeCalls = 0
 export let measureNodeCalls = 0
@@ -21,7 +17,7 @@ export let layoutSizingCalls = 0 // Calls for intrinsic sizing (offset=0,0)
 export let layoutPositioningCalls = 0 // Calls for final positioning
 export let layoutCacheHits = 0
 
-// Cache diagnostics (tracked when FLEXX_STATS=1)
+// Cache diagnostics — fingerprint cache effectiveness
 export let fingerprintHits = 0
 export let fingerprintMisses = 0
 
@@ -74,9 +70,9 @@ export function incLayoutCacheHits(): void {
 }
 
 export function incFingerprintHit(): void {
-  if (STATS_ENABLED) fingerprintHits++
+  fingerprintHits++
 }
 
 export function incFingerprintMiss(): void {
-  if (STATS_ENABLED) fingerprintMisses++
+  fingerprintMisses++
 }

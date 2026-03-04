@@ -7,8 +7,9 @@
  * Run: bun bench bench/yoga-compare-warmup.bench.ts
  */
 
-import { bench, describe, beforeAll, beforeEach } from "vitest"
+import { bench, describe, beforeAll, afterAll } from "vitest"
 import * as Flexx from "../src/index.js"
+import { getLayoutStats, resetLayoutStats } from "../src/layout-stats.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -43,6 +44,18 @@ beforeAll(async () => {
     globalThis.gc()
   }
   console.log("[Warmup] Complete\n")
+  resetLayoutStats()
+})
+
+afterAll(() => {
+  const stats = getLayoutStats()
+  const total = stats.hits + stats.misses
+  if (total > 0) {
+    console.log(
+      `\n[Cache Stats] fingerprint hits: ${stats.hits}, misses: ${stats.misses}, ` +
+        `hit rate: ${(stats.hitRate * 100).toFixed(1)}% (${total} total)`,
+    )
+  }
 })
 
 // ============================================================================
