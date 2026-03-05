@@ -22,7 +22,7 @@ function textMeasure(textLen: number) {
   }
 }
 
-function flexxTree(cols: number, cards: number): Flexx.Node {
+function flextureTree(cols: number, cards: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(120)
   root.setHeight(40)
@@ -106,7 +106,7 @@ beforeAll(async () => {
   const wasmBuffer = readFileSync(wasmPath)
   yoga = await initYoga(wasmBuffer)
 
-  ft = flexxTree(5, 20)
+  ft = flextureTree(5, 20)
   ft.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
   ftLeaf = ft.getChild(2)!.getChild(10)!.getChild(0)!.getChild(1)!
 
@@ -114,7 +114,7 @@ beforeAll(async () => {
   yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
   ytLeaf = yt.getChild(2)!.getChild(10)!.getChild(0)!.getChild(1)!
 
-  ftBig = flexxTree(8, 30)
+  ftBig = flextureTree(8, 30)
   ftBig.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
   ftBigLeaf = ftBig.getChild(4)!.getChild(15)!.getChild(0)!.getChild(1)!
 

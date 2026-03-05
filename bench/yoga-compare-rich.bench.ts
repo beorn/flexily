@@ -35,7 +35,7 @@ beforeAll(async () => {
   // Warmup JIT
   console.log("\n[Warmup] Running 500 iterations...")
   for (let i = 0; i < 500; i++) {
-    const ft = flexxTuiTree(5, 10)
+    const ft = flextureTuiTree(5, 10)
     ft.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
     const yt = yogaTuiTree(5, 10)
     yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
@@ -64,7 +64,7 @@ function textMeasure(textLen: number) {
 // Mirrors the actual km TUI structure
 // ============================================================================
 
-function flexxTuiTree(cols: number, cardsPerCol: number): Flexx.Node {
+function flextureTuiTree(cols: number, cardsPerCol: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(120)
   root.setHeight(40)
@@ -159,7 +159,7 @@ function yogaTuiTree(cols: number, cardsPerCol: number) {
 // Tree: Property-rich (uses diverse flex properties)
 // ============================================================================
 
-function flexxPropertyRichTree(nodeCount: number): Flexx.Node {
+function flexturePropertyRichTree(nodeCount: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(200)
   root.setHeight(100)
@@ -244,7 +244,7 @@ describe("TUI Board (create + layout)", () => {
     bench(
       `Flexx: ${cols}×${cards} (~${total} nodes)`,
       () => {
-        const tree = flexxTuiTree(cols, cards)
+        const tree = flextureTuiTree(cols, cards)
         tree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
       },
       opts,
@@ -271,18 +271,18 @@ describe("Incremental re-layout (single leaf dirty)", () => {
     [5, 20],
     [8, 30],
   ] as const) {
-    let flexxTree: Flexx.Node
-    let flexxLeaf: Flexx.Node
+    let flextureTree: Flexx.Node
+    let flextureLeaf: Flexx.Node
     let yogaTree: ReturnType<typeof yoga.Node.create>
     let yogaLeaf: ReturnType<typeof yoga.Node.create>
 
     beforeAll(() => {
-      flexxTree = flexxTuiTree(cols, cards)
-      flexxTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+      flextureTree = flextureTuiTree(cols, cards)
+      flextureTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
       // Get a text leaf node in the middle column
       const midCol = Math.floor(cols / 2)
       const midCard = Math.floor(cards / 2)
-      flexxLeaf = flexxTree
+      flextureLeaf = flextureTree
         .getChild(midCol)!
         .getChild(midCard + 1)!
         .getChild(0)!
@@ -300,8 +300,8 @@ describe("Incremental re-layout (single leaf dirty)", () => {
     bench(
       `Flexx: ${cols}×${cards} leaf dirty`,
       () => {
-        flexxLeaf.markDirty()
-        flexxTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+        flextureLeaf.markDirty()
+        flextureTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
       },
       opts,
     )
@@ -325,12 +325,12 @@ describe("Re-layout with width change", () => {
     [5, 10],
     [5, 20],
   ] as const) {
-    let flexxTree: Flexx.Node
+    let flextureTree: Flexx.Node
     let yogaTree: ReturnType<typeof yoga.Node.create>
 
     beforeAll(() => {
-      flexxTree = flexxTuiTree(cols, cards)
-      flexxTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+      flextureTree = flextureTuiTree(cols, cards)
+      flextureTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
       yogaTree = yogaTuiTree(cols, cards)
       yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
     })
@@ -338,10 +338,10 @@ describe("Re-layout with width change", () => {
     bench(
       `Flexx: ${cols}×${cards} width 120→80`,
       () => {
-        flexxTree.setWidth(80)
-        flexxTree.calculateLayout(80, 40, Flexx.DIRECTION_LTR)
-        flexxTree.setWidth(120)
-        flexxTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+        flextureTree.setWidth(80)
+        flextureTree.calculateLayout(80, 40, Flexx.DIRECTION_LTR)
+        flextureTree.setWidth(120)
+        flextureTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
       },
       opts,
     )
@@ -367,7 +367,7 @@ describe("Property-rich trees (shrink, align, justify, wrap)", () => {
     bench(
       `Flexx: ~${nodeCount} nodes`,
       () => {
-        const tree = flexxPropertyRichTree(nodeCount)
+        const tree = flexturePropertyRichTree(nodeCount)
         tree.calculateLayout(200, 100, Flexx.DIRECTION_LTR)
       },
       opts,
@@ -394,12 +394,12 @@ describe("No-change re-layout (fingerprint cache hit)", () => {
     [5, 20],
     [8, 30],
   ] as const) {
-    let flexxTree: Flexx.Node
+    let flextureTree: Flexx.Node
     let yogaTree: ReturnType<typeof yoga.Node.create>
 
     beforeAll(() => {
-      flexxTree = flexxTuiTree(cols, cards)
-      flexxTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+      flextureTree = flextureTuiTree(cols, cards)
+      flextureTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
       yogaTree = yogaTuiTree(cols, cards)
       yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
     })
@@ -407,7 +407,7 @@ describe("No-change re-layout (fingerprint cache hit)", () => {
     bench(
       `Flexx: ${cols}×${cards} no-change`,
       () => {
-        flexxTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+        flextureTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
       },
       opts,
     )

@@ -45,13 +45,13 @@ interface NodeLayout extends LayoutResult {
   children: NodeLayout[]
 }
 
-function getFlexxLayout(node: Flexx.Node): NodeLayout {
+function getFlextureLayout(node: Flexx.Node): NodeLayout {
   return {
     left: node.getComputedLeft(),
     top: node.getComputedTop(),
     width: node.getComputedWidth(),
     height: node.getComputedHeight(),
-    children: Array.from({ length: node.getChildCount() }, (_, i) => getFlexxLayout(node.getChild(i)!)),
+    children: Array.from({ length: node.getChildCount() }, (_, i) => getFlextureLayout(node.getChild(i)!)),
   }
 }
 
@@ -95,7 +95,7 @@ interface TestResult {
   category: string
   name: string
   passed: boolean
-  flexx?: NodeLayout
+  flexture?: NodeLayout
   yoga?: NodeLayout
   error?: string
 }
@@ -148,13 +148,13 @@ interface ChildConfig extends NodeConfig {
 /**
  * Creates and configures a Flexx node
  */
-function createFlexxNode(config: NodeConfig): Flexx.Node {
+function createFlextureNode(config: NodeConfig): Flexx.Node {
   const node = Flexx.Node.create()
-  applyFlexxConfig(node, config)
+  applyFlextureConfig(node, config)
   return node
 }
 
-function applyFlexxConfig(node: Flexx.Node, config: NodeConfig) {
+function applyFlextureConfig(node: Flexx.Node, config: NodeConfig) {
   if (config.width !== undefined) {
     node.setWidth(config.width)
   }
@@ -351,14 +351,14 @@ function compareLayouts(options: CompareLayoutsOptions): boolean {
   const { category, name, rootConfig, childConfigs = [], customSetup, layoutWidth = 100, layoutHeight = 100 } = options
 
   // Create Flexx tree
-  const fRoot = createFlexxNode(rootConfig)
+  const fRoot = createFlextureNode(rootConfig)
 
   // Create children
   for (let i = 0; i < childConfigs.length; i++) {
     const childConfig = childConfigs[i]!
     const count = childConfig.count ?? 1
     for (let j = 0; j < count; j++) {
-      const child = createFlexxNode(childConfig)
+      const child = createFlextureNode(childConfig)
       fRoot.insertChild(child, fRoot.getChildCount())
     }
   }
@@ -384,17 +384,17 @@ function compareLayouts(options: CompareLayoutsOptions): boolean {
   fRoot.calculateLayout(layoutWidth, layoutHeight, Flexx.DIRECTION_LTR)
   yRoot.calculateLayout(layoutWidth, layoutHeight, yoga.DIRECTION_LTR)
 
-  const flexxLayout = getFlexxLayout(fRoot)
+  const flextureLayout = getFlextureLayout(fRoot)
   const yogaLayout = getYogaLayout(yRoot)
 
   yRoot.freeRecursive()
 
-  const match = layoutsMatch(flexxLayout, yogaLayout)
+  const match = layoutsMatch(flextureLayout, yogaLayout)
   recordResult({
     category,
     name,
     passed: match,
-    flexx: flexxLayout,
+    flexture: flextureLayout,
     yoga: yogaLayout,
   })
 
@@ -627,7 +627,7 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
     fRoot.insertChild(fChild, 0)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -647,12 +647,12 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "AbsolutePositioning",
       name: "absolute-with-margin",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -688,7 +688,7 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
     fRoot.insertChild(fChild2, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -709,12 +709,12 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "MinMaxDimensions",
       name: "min-width-overrides-shrink",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -735,7 +735,7 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
     fRoot.insertChild(fChild2, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -754,12 +754,12 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "MinMaxDimensions",
       name: "max-width-overrides-grow",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -818,7 +818,7 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
     fOuter.insertChild(fInner, 0)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -839,12 +839,12 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "MinMaxDimensions",
       name: "nested-min-max",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -944,7 +944,7 @@ describe("Yoga Comparison: FlexShrink", () => {
     fRoot.insertChild(fChild2, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -964,12 +964,12 @@ describe("Yoga Comparison: FlexShrink", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "FlexShrink",
       name: "shrink-with-basis",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -991,7 +991,7 @@ describe("Yoga Comparison: FlexShrink", () => {
     fRoot.insertChild(fChild2, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1011,12 +1011,12 @@ describe("Yoga Comparison: FlexShrink", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "FlexShrink",
       name: "shrink-different-factors",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1038,7 +1038,7 @@ describe("Yoga Comparison: FlexShrink", () => {
     fRoot.insertChild(fChild2, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1058,12 +1058,12 @@ describe("Yoga Comparison: FlexShrink", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "FlexShrink",
       name: "shrink-zero-no-shrink",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1089,7 +1089,7 @@ describe("Yoga Comparison: FlexGrow", () => {
     fRoot.insertChild(fChild2, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1107,12 +1107,12 @@ describe("Yoga Comparison: FlexGrow", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "FlexGrow",
       name: "grow-with-fixed-sibling",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1136,7 +1136,7 @@ describe("Yoga Comparison: FlexGrow", () => {
     fRoot.insertChild(fChild3, 2)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1158,12 +1158,12 @@ describe("Yoga Comparison: FlexGrow", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "FlexGrow",
       name: "grow-unequal",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1185,7 +1185,7 @@ describe("Yoga Comparison: FlexGrow", () => {
     fRoot.insertChild(fChild2, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1205,12 +1205,12 @@ describe("Yoga Comparison: FlexGrow", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "FlexGrow",
       name: "grow-with-basis",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1246,7 +1246,7 @@ describe("Yoga Comparison: NestedLayouts", () => {
     fRoot.insertChild(fRight, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1274,12 +1274,12 @@ describe("Yoga Comparison: NestedLayouts", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "NestedLayouts",
       name: "nested-flex",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1311,7 +1311,7 @@ describe("Yoga Comparison: NestedLayouts", () => {
     fContent.insertChild(fMain, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1341,12 +1341,12 @@ describe("Yoga Comparison: NestedLayouts", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "NestedLayouts",
       name: "mixed-constraints",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1374,7 +1374,7 @@ describe("Yoga Comparison: PercentValues", () => {
     fOuter.insertChild(fInner, 0)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1394,12 +1394,12 @@ describe("Yoga Comparison: PercentValues", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "PercentValues",
       name: "percent-nested",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1418,7 +1418,7 @@ describe("Yoga Comparison: PercentValues", () => {
     fRoot.insertChild(fChild, 0)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1435,12 +1435,12 @@ describe("Yoga Comparison: PercentValues", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "PercentValues",
       name: "percent-margin",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1485,7 +1485,7 @@ describe("Yoga Comparison: IntentionalDifferences", () => {
     fRoot.insertChild(fChild2, 1)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1505,12 +1505,12 @@ describe("Yoga Comparison: IntentionalDifferences", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "IntentionalDifferences",
       name: "shrink-weighted-by-basis",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     // This test documents the difference - we expect it MAY differ
@@ -1518,7 +1518,7 @@ describe("Yoga Comparison: IntentionalDifferences", () => {
     log.debug?.(`shrink-weighted-by-basis: ${match ? "MATCHES" : "DIFFERS (expected)"}`)
     if (!match) {
       log.debug?.(`  Yoga (CSS spec weighted shrink): ${JSON.stringify(yogaLayout.children.map((c) => c.width))}`)
-      log.debug?.(`  Flexx (proportional shrink): ${JSON.stringify(flexxLayout.children.map((c) => c.width))}`)
+      log.debug?.(`  Flexx (proportional shrink): ${JSON.stringify(flextureLayout.children.map((c) => c.width))}`)
     }
   })
 })
@@ -1595,7 +1595,7 @@ describe("Yoga Comparison: EdgeCases", () => {
     fRoot.insertChild(fRel2, 2)
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1622,12 +1622,12 @@ describe("Yoga Comparison: EdgeCases", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "EdgeCases",
       name: "mixed-absolute-relative",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1648,7 +1648,7 @@ describe("Yoga Comparison: EdgeCases", () => {
     }
 
     fRoot.calculateLayout(100, 100, Flexx.DIRECTION_LTR)
-    const flexxLayout = getFlexxLayout(fRoot)
+    const flextureLayout = getFlextureLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1667,12 +1667,12 @@ describe("Yoga Comparison: EdgeCases", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flexxLayout, yogaLayout)
+    const match = layoutsMatch(flextureLayout, yogaLayout)
     recordResult({
       category: "EdgeCases",
       name: "deeply-nested",
       passed: match,
-      flexx: flexxLayout,
+      flexture: flextureLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1714,11 +1714,11 @@ describe("Summary Report", () => {
         lines.push(`\n### ${category}`)
         for (const test of tests) {
           lines.push(`\n**${test.name}**`)
-          if (test.yoga && test.flexx) {
+          if (test.yoga && test.flexture) {
             lines.push("Expected (Yoga):")
             lines.push(formatLayout(test.yoga))
             lines.push("Actual (Flexx):")
-            lines.push(formatLayout(test.flexx))
+            lines.push(formatLayout(test.flexture))
           }
           if (test.error) {
             lines.push(`Error: ${test.error}`)

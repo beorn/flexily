@@ -24,7 +24,7 @@ const wasmBuffer = readFileSync(wasmPath)
 const yoga: Yoga = await initYoga(wasmBuffer)
 
 // Tree with measure functions (simulates TUI text nodes)
-function createFlexxTree(n: number): Flexx.Node {
+function createFlextureTree(n: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(250)
   root.setHeight(120)
@@ -99,16 +99,16 @@ function createYogaTree(n: number) {
 }
 
 // Benchmark
-const flexxTimes: number[] = []
+const flextureTimes: number[] = []
 const yogaTimes: number[] = []
 
 for (let i = 0; i < iterations; i++) {
   // Flexx
-  const ft = createFlexxTree(nodeCount)
+  const ft = createFlextureTree(nodeCount)
   Flexx.Node.resetMeasureStats()
   const fs = performance.now()
   ft.calculateLayout(250, 120, Flexx.DIRECTION_LTR)
-  flexxTimes.push(performance.now() - fs)
+  flextureTimes.push(performance.now() - fs)
 
   // Yoga
   const yt = createYogaTree(nodeCount)
@@ -119,13 +119,13 @@ for (let i = 0; i < iterations; i++) {
 }
 
 const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length
-const flexxAvg = avg(flexxTimes)
+const flextureAvg = avg(flextureTimes)
 const yogaAvg = avg(yogaTimes)
 
-console.log(`Flexx: ${flexxAvg.toFixed(2)}ms avg (${flexxTimes.map((t) => t.toFixed(1)).join(", ")})`)
+console.log(`Flexx: ${flextureAvg.toFixed(2)}ms avg (${flextureTimes.map((t) => t.toFixed(1)).join(", ")})`)
 console.log(`       measure: calls=${Flexx.Node.measureCalls} hits=${Flexx.Node.measureCacheHits}`)
 console.log(`       layoutNode: calls=${layoutNodeCalls}`)
 console.log(`Yoga:  ${yogaAvg.toFixed(2)}ms avg (${yogaTimes.map((t) => t.toFixed(1)).join(", ")})`)
 console.log(
-  `\nRatio: Flexx is ${(flexxAvg / yogaAvg).toFixed(2)}x ${flexxAvg > yogaAvg ? "slower" : "faster"} than Yoga`,
+  `\nRatio: Flexx is ${(flextureAvg / yogaAvg).toFixed(2)}x ${flextureAvg > yogaAvg ? "slower" : "faster"} than Yoga`,
 )

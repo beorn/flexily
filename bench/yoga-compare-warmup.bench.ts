@@ -30,7 +30,7 @@ beforeAll(async () => {
   // Extensive warmup to stabilize JIT
   console.log("\n[Warmup] Running 1000 iterations to stabilize JIT...")
   for (let i = 0; i < 1000; i++) {
-    const fTree = flexxDeepTree(50)
+    const fTree = flextureDeepTree(50)
     fTree.calculateLayout(1000, 1000, Flexx.DIRECTION_LTR)
 
     const yTree = yogaDeepTree(50)
@@ -49,7 +49,7 @@ beforeAll(async () => {
 // Tree Generators - Flexx
 // ============================================================================
 
-function flexxFlatTree(nodeCount: number): Flexx.Node {
+function flextureFlatTree(nodeCount: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(1000)
   root.setHeight(1000)
@@ -65,7 +65,7 @@ function flexxFlatTree(nodeCount: number): Flexx.Node {
   return root
 }
 
-function flexxDeepTree(depth: number): Flexx.Node {
+function flextureDeepTree(depth: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(1000)
   root.setHeight(1000)
@@ -138,7 +138,7 @@ describe("Flexx vs Yoga - Flat (warmed up)", () => {
     bench(
       `Flexx: ${nodeCount} nodes`,
       () => {
-        const tree = flexxFlatTree(nodeCount)
+        const tree = flextureFlatTree(nodeCount)
         tree.calculateLayout(1000, 1000, Flexx.DIRECTION_LTR)
       },
       benchOptions,
@@ -165,7 +165,7 @@ describe("Flexx vs Yoga - Deep (warmed up)", () => {
     bench(
       `Flexx: ${depth} levels`,
       () => {
-        const tree = flexxDeepTree(depth)
+        const tree = flextureDeepTree(depth)
         tree.calculateLayout(1000, 1000, Flexx.DIRECTION_LTR)
       },
       benchOptions,

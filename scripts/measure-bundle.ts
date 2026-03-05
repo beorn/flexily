@@ -160,34 +160,34 @@ async function main() {
   console.log("")
 
   if (yogaSize) {
-    const flexxFull = results[0]
-    const rawRatio = (yogaSize.raw / flexxFull.minifiedBytes).toFixed(1)
-    const gzipRatio = (yogaSize.gzip / flexxFull.gzipBytes).toFixed(1)
+    const flextureFull = results[0]
+    const rawRatio = (yogaSize.raw / flextureFull.minifiedBytes).toFixed(1)
+    const gzipRatio = (yogaSize.gzip / flextureFull.gzipBytes).toFixed(1)
 
     console.log("## Yoga Comparison\n")
     console.log("|         | Yoga | Flexx | Ratio |")
     console.log("| ------- | ---: | ----: | ----- |")
     console.log(
-      `| Minified | ${formatBytes(yogaSize.raw)} | ${formatBytes(flexxFull.minifiedBytes)} | **${rawRatio}x smaller** |`,
+      `| Minified | ${formatBytes(yogaSize.raw)} | ${formatBytes(flextureFull.minifiedBytes)} | **${rawRatio}x smaller** |`,
     )
     console.log(
-      `| Gzipped | ${formatBytes(yogaSize.gzip)} | ${formatBytes(flexxFull.gzipBytes)} | **${gzipRatio}x smaller** |`,
+      `| Gzipped | ${formatBytes(yogaSize.gzip)} | ${formatBytes(flextureFull.gzipBytes)} | **${gzipRatio}x smaller** |`,
     )
 
     if (debugDelta) {
-      const flexxNoDebugRaw = flexxFull.minifiedBytes - debugDelta.raw
-      const flexxNoDebugGzip = flexxFull.gzipBytes - debugDelta.gzip
-      const rawRatioNoDebug = (yogaSize.raw / flexxNoDebugRaw).toFixed(1)
-      const gzipRatioNoDebug = (yogaSize.gzip / flexxNoDebugGzip).toFixed(1)
+      const flexturenodebugRaw = flextureFull.minifiedBytes - debugDelta.raw
+      const flexturenodebugGzip = flextureFull.gzipBytes - debugDelta.gzip
+      const rawRatioNoDebug = (yogaSize.raw / flexturenodebugRaw).toFixed(1)
+      const gzipRatioNoDebug = (yogaSize.gzip / flexturenodebugGzip).toFixed(1)
       console.log("")
       console.log("Without `debug` dependency (tree-shaken):\n")
       console.log("|         | Yoga | Flexx | Ratio |")
       console.log("| ------- | ---: | ----: | ----- |")
       console.log(
-        `| Minified | ${formatBytes(yogaSize.raw)} | ${formatBytes(flexxNoDebugRaw)} | **${rawRatioNoDebug}x smaller** |`,
+        `| Minified | ${formatBytes(yogaSize.raw)} | ${formatBytes(flexturenodebugRaw)} | **${rawRatioNoDebug}x smaller** |`,
       )
       console.log(
-        `| Gzipped | ${formatBytes(yogaSize.gzip)} | ${formatBytes(flexxNoDebugGzip)} | **${gzipRatioNoDebug}x smaller** |`,
+        `| Gzipped | ${formatBytes(yogaSize.gzip)} | ${formatBytes(flexturenodebugGzip)} | **${gzipRatioNoDebug}x smaller** |`,
       )
     }
 

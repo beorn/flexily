@@ -33,7 +33,7 @@ beforeAll(async () => {
 // Tree Generators - Flexx
 // ============================================================================
 
-function flexxFlatTree(nodeCount: number): Flexx.Node {
+function flextureFlatTree(nodeCount: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(1000)
   root.setHeight(1000)
@@ -49,7 +49,7 @@ function flexxFlatTree(nodeCount: number): Flexx.Node {
   return root
 }
 
-function flexxDeepTree(depth: number): Flexx.Node {
+function flextureDeepTree(depth: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(1000)
   root.setHeight(1000)
@@ -66,7 +66,7 @@ function flexxDeepTree(depth: number): Flexx.Node {
   return root
 }
 
-function flexxKanbanTree(cardsPerColumn: number): Flexx.Node {
+function flextureKanbanTree(cardsPerColumn: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(120)
   root.setHeight(40)
@@ -170,7 +170,7 @@ function yogaKanbanTree(cardsPerColumn: number) {
 describe("Flexx vs Yoga - Flat Hierarchy", () => {
   for (const nodeCount of [100, 500, 1000]) {
     bench(`Flexx: ${nodeCount} nodes - create + layout`, () => {
-      const tree = flexxFlatTree(nodeCount)
+      const tree = flextureFlatTree(nodeCount)
       tree.calculateLayout(1000, 1000, Flexx.DIRECTION_LTR)
     })
 
@@ -185,7 +185,7 @@ describe("Flexx vs Yoga - Flat Hierarchy", () => {
 describe("Flexx vs Yoga - Deep Hierarchy", () => {
   for (const depth of [1, 2, 5, 10, 15, 20, 50, 100]) {
     bench(`Flexx: ${depth} levels deep - create + layout`, () => {
-      const tree = flexxDeepTree(depth)
+      const tree = flextureDeepTree(depth)
       tree.calculateLayout(1000, 1000, Flexx.DIRECTION_LTR)
     })
 
@@ -202,7 +202,7 @@ describe("Flexx vs Yoga - Kanban (TUI Pattern)", () => {
     const totalNodes = 3 + 3 * (1 + cardsPerCol)
 
     bench(`Flexx: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
-      const tree = flexxKanbanTree(cardsPerCol)
+      const tree = flextureKanbanTree(cardsPerCol)
       tree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
     })
 
@@ -219,17 +219,17 @@ describe("Flexx vs Yoga - Kanban (TUI Pattern)", () => {
 // ============================================================================
 
 describe("Flexx vs Yoga - Layout Only (no allocation)", () => {
-  let flexxTree: Flexx.Node
+  let flextureTree: Flexx.Node
   let yogaTree: ReturnType<typeof yogaKanbanTree>
 
   beforeAll(() => {
-    flexxTree = flexxKanbanTree(50)
+    flextureTree = flextureKanbanTree(50)
     yogaTree = yogaKanbanTree(50)
   })
 
   bench("Flexx: Kanban 3×50 - layout only", () => {
-    flexxTree.markDirty()
-    flexxTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+    flextureTree.markDirty()
+    flextureTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
   })
 
   bench("Yoga: Kanban 3×50 - layout only", () => {
@@ -246,7 +246,7 @@ describe("Flexx vs Yoga - Layout Only (no allocation)", () => {
  * Create a tree with measure functions on leaf nodes.
  * This simulates inkx Text nodes which use measure functions for intrinsic sizing.
  */
-function flexxTreeWithMeasure(nodeCount: number): Flexx.Node {
+function flextureTreeWithMeasure(nodeCount: number): Flexx.Node {
   const root = Flexx.Node.create()
   root.setWidth(250)
   root.setHeight(120)
@@ -335,7 +335,7 @@ function yogaTreeWithMeasure(nodeCount: number) {
 describe("Flexx vs Yoga - With Measure Functions", () => {
   for (const nodeCount of [200, 500, 1000, 1500]) {
     bench(`Flexx: ~${nodeCount} nodes with measure - create + layout`, () => {
-      const tree = flexxTreeWithMeasure(nodeCount)
+      const tree = flextureTreeWithMeasure(nodeCount)
       tree.calculateLayout(250, 120, Flexx.DIRECTION_LTR)
     })
 
@@ -352,28 +352,28 @@ describe("Flexx vs Yoga - With Measure Functions", () => {
 // ============================================================================
 
 describe("Flexx vs Yoga - Incremental Update", () => {
-  let flexxTree: Flexx.Node
-  let flexxLeaf: Flexx.Node
+  let flextureTree: Flexx.Node
+  let flextureLeaf: Flexx.Node
   let yogaTree: ReturnType<typeof yogaKanbanTree>
   let yogaLeaf: ReturnType<typeof yoga.Node.create>
 
   beforeAll(() => {
     // Create trees
-    flexxTree = flexxKanbanTree(100)
+    flextureTree = flextureKanbanTree(100)
     yogaTree = yogaKanbanTree(100)
 
     // Get a deep leaf node to mark dirty
-    flexxLeaf = flexxTree.getChild(1)!.getChild(50)!
+    flextureLeaf = flextureTree.getChild(1)!.getChild(50)!
     yogaLeaf = yogaTree.getChild(1)!.getChild(50)!
 
     // Initial layout
-    flexxTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+    flextureTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
     yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
   })
 
   bench("Flexx: Single leaf dirty - relayout", () => {
-    flexxLeaf.markDirty()
-    flexxTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+    flextureLeaf.markDirty()
+    flextureTree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
   })
 
   bench("Yoga: Single leaf dirty - relayout", () => {

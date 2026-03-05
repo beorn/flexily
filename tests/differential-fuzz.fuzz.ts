@@ -80,13 +80,13 @@ interface NodeLayout {
   children: NodeLayout[]
 }
 
-function getFlexxLayout(node: Flexx.Node): NodeLayout {
+function getFlextureLayout(node: Flexx.Node): NodeLayout {
   return {
     left: node.getComputedLeft(),
     top: node.getComputedTop(),
     width: node.getComputedWidth(),
     height: node.getComputedHeight(),
-    children: Array.from({ length: node.getChildCount() }, (_, i) => getFlexxLayout(node.getChild(i)!)),
+    children: Array.from({ length: node.getChildCount() }, (_, i) => getFlextureLayout(node.getChild(i)!)),
   }
 }
 
@@ -292,7 +292,7 @@ function generateNestedTree(ctx: RandomContext, outerChildCount: number, innerCh
 // Tree Building
 // ============================================================================
 
-function applyStyleToFlexxNode(node: Flexx.Node, style: NodeStyle): void {
+function applyStyleToFlextureNode(node: Flexx.Node, style: NodeStyle): void {
   if (style.width !== undefined) node.setWidth(style.width)
   if (style.height !== undefined) node.setHeight(style.height)
   if (style.flexDirection !== undefined) {
@@ -330,11 +330,11 @@ function applyStyleToYogaNode(node: YogaNode, style: NodeStyle): void {
   if (style.gap !== undefined) node.setGap(yoga.GUTTER_ALL, style.gap)
 }
 
-function buildFlexxTree(spec: TreeSpec): Flexx.Node {
+function buildFlextureTree(spec: TreeSpec): Flexx.Node {
   const node = Flexx.Node.create()
-  applyStyleToFlexxNode(node, spec.style)
+  applyStyleToFlextureNode(node, spec.style)
   for (let i = 0; i < spec.children.length; i++) {
-    node.insertChild(buildFlexxTree(spec.children[i]!), i)
+    node.insertChild(buildFlextureTree(spec.children[i]!), i)
   }
   return node
 }
@@ -357,20 +357,20 @@ function runSimpleTest(seed: number, childCount: number, epsilon = EPSILON): { p
   const ctx: RandomContext = { rng }
   const spec = generateSimpleTree(ctx, childCount)
 
-  const flexxRoot = buildFlexxTree(spec)
+  const flextureRoot = buildFlextureTree(spec)
   const yogaRoot = buildYogaTree(spec)
 
   const rootWidth = spec.style.width ?? 300
   const rootHeight = spec.style.height ?? 200
 
-  flexxRoot.calculateLayout(rootWidth, rootHeight, Flexx.DIRECTION_LTR)
+  flextureRoot.calculateLayout(rootWidth, rootHeight, Flexx.DIRECTION_LTR)
   yogaRoot.calculateLayout(rootWidth, rootHeight, yoga.DIRECTION_LTR)
 
-  const flexxLayout = getFlexxLayout(flexxRoot)
+  const flextureLayout = getFlextureLayout(flextureRoot)
   const yogaLayout = getYogaLayout(yogaRoot)
   yogaRoot.freeRecursive()
 
-  const result = layoutsMatch(flexxLayout, yogaLayout, "root", epsilon)
+  const result = layoutsMatch(flextureLayout, yogaLayout, "root", epsilon)
   return { passed: result.match, diff: result.diff }
 }
 
@@ -379,20 +379,20 @@ function runNestedTest(seed: number, outer: number, inner: number): { passed: bo
   const ctx: RandomContext = { rng }
   const spec = generateNestedTree(ctx, outer, inner)
 
-  const flexxRoot = buildFlexxTree(spec)
+  const flextureRoot = buildFlextureTree(spec)
   const yogaRoot = buildYogaTree(spec)
 
   const rootWidth = spec.style.width ?? 300
   const rootHeight = spec.style.height ?? 200
 
-  flexxRoot.calculateLayout(rootWidth, rootHeight, Flexx.DIRECTION_LTR)
+  flextureRoot.calculateLayout(rootWidth, rootHeight, Flexx.DIRECTION_LTR)
   yogaRoot.calculateLayout(rootWidth, rootHeight, yoga.DIRECTION_LTR)
 
-  const flexxLayout = getFlexxLayout(flexxRoot)
+  const flextureLayout = getFlextureLayout(flextureRoot)
   const yogaLayout = getYogaLayout(yogaRoot)
   yogaRoot.freeRecursive()
 
-  const result = layoutsMatch(flexxLayout, yogaLayout)
+  const result = layoutsMatch(flextureLayout, yogaLayout)
   return { passed: result.match, diff: result.diff }
 }
 
@@ -516,20 +516,20 @@ describe("Fuzz: Kanban Layouts", () => {
     const ctx: RandomContext = { rng }
     const spec = generateKanbanTree(ctx, columns, cards)
 
-    const flexxRoot = buildFlexxTree(spec)
+    const flextureRoot = buildFlextureTree(spec)
     const yogaRoot = buildYogaTree(spec)
 
     const rootWidth = spec.style.width ?? 500
     const rootHeight = spec.style.height ?? 400
 
-    flexxRoot.calculateLayout(rootWidth, rootHeight, Flexx.DIRECTION_LTR)
+    flextureRoot.calculateLayout(rootWidth, rootHeight, Flexx.DIRECTION_LTR)
     yogaRoot.calculateLayout(rootWidth, rootHeight, yoga.DIRECTION_LTR)
 
-    const flexxLayout = getFlexxLayout(flexxRoot)
+    const flextureLayout = getFlextureLayout(flextureRoot)
     const yogaLayout = getYogaLayout(yogaRoot)
     yogaRoot.freeRecursive()
 
-    const result = layoutsMatch(flexxLayout, yogaLayout)
+    const result = layoutsMatch(flextureLayout, yogaLayout)
     return { passed: result.match, diff: result.diff }
   }
 
@@ -610,20 +610,20 @@ describe("Fuzz: Dashboard Layouts", () => {
     const ctx: RandomContext = { rng }
     const spec = generateDashboardTree(ctx)
 
-    const flexxRoot = buildFlexxTree(spec)
+    const flextureRoot = buildFlextureTree(spec)
     const yogaRoot = buildYogaTree(spec)
 
     const rootWidth = spec.style.width ?? 500
     const rootHeight = spec.style.height ?? 400
 
-    flexxRoot.calculateLayout(rootWidth, rootHeight, Flexx.DIRECTION_LTR)
+    flextureRoot.calculateLayout(rootWidth, rootHeight, Flexx.DIRECTION_LTR)
     yogaRoot.calculateLayout(rootWidth, rootHeight, yoga.DIRECTION_LTR)
 
-    const flexxLayout = getFlexxLayout(flexxRoot)
+    const flextureLayout = getFlextureLayout(flextureRoot)
     const yogaLayout = getYogaLayout(yogaRoot)
     yogaRoot.freeRecursive()
 
-    const result = layoutsMatch(flexxLayout, yogaLayout)
+    const result = layoutsMatch(flextureLayout, yogaLayout)
     return { passed: result.match, diff: result.diff }
   }
 

@@ -17,7 +17,7 @@ function bench(name: string, fn: () => void, iterations = 500): number {
   return ops
 }
 
-function flexxTree(cards: number) {
+function flextureTree(cards: number) {
   const root = Flexx.Node.create()
   root.setWidth(120)
   root.setHeight(40)
@@ -58,15 +58,15 @@ function yogaTree(cards: number) {
 console.log("\n=== Flexx Zero vs Yoga (WASM) ===\n")
 
 console.log("Create + Layout 50 cards:")
-const flexxOps = bench("  Flexx", () => {
-  const tree = flexxTree(50)
+const flextureOps = bench("  Flexx", () => {
+  const tree = flextureTree(50)
   tree.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
 })
 const yogaOps = bench("  Yoga", () => {
   const tree = yogaTree(50)
   tree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
 })
-const ratio = yogaOps / flexxOps
+const ratio = yogaOps / flextureOps
 if (ratio > 1) {
   console.log("  → Yoga is " + ratio.toFixed(1) + "x faster\n")
 } else {
@@ -74,25 +74,25 @@ if (ratio > 1) {
 }
 
 console.log("Layout Only (with markDirty):")
-const flexxPre = flexxTree(50)
+const flexturePre = flextureTree(50)
 const yogaPre = yogaTree(50)
 // First layout to initialize
-flexxPre.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+flexturePre.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
 yogaPre.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-const flexxDirty = bench("  Flexx (markDirty)", () => {
-  flexxPre.markDirty()
-  flexxPre.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+const flextureDirty = bench("  Flexx (markDirty)", () => {
+  flexturePre.markDirty()
+  flexturePre.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
 })
 console.log("")
 
 console.log("Layout Only (unchanged - fingerprint test):")
-const flexxLayout = bench("  Flexx (cached)", () => {
-  flexxPre.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
+const flextureLayout = bench("  Flexx (cached)", () => {
+  flexturePre.calculateLayout(120, 40, Flexx.DIRECTION_LTR)
 })
 const yogaLayout = bench("  Yoga (cached)", () => {
   yogaPre.calculateLayout(120, 40, yoga.DIRECTION_LTR)
 })
-const layoutRatio = yogaLayout / flexxLayout
+const layoutRatio = yogaLayout / flextureLayout
 if (layoutRatio > 1) {
   console.log("  → Yoga is " + layoutRatio.toFixed(1) + "x faster\n")
 } else {
