@@ -5,7 +5,7 @@
  * Builds minified browser bundles and measures raw + gzipped sizes.
  * Also checks whether the `debug` dependency leaks into production builds.
  *
- * Run: cd vendor/beorn-flexx && bun scripts/measure-bundle.ts
+ * Run: cd vendor/flexture && bun scripts/measure-bundle.ts
  */
 
 import { gzipSync } from "zlib"

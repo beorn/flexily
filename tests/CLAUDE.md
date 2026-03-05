@@ -45,11 +45,11 @@ test("row layout distributes width", () => {
 ## Ad-Hoc Testing
 
 ```bash
-bun vitest run vendor/beorn-flexx/tests/                          # All flexx tests
-bun vitest run vendor/beorn-flexx/tests/layout.test.ts            # Core layout
-bun vitest run vendor/beorn-flexx/tests/yoga-comparison.test.ts   # Yoga compat
-bun vitest run vendor/beorn-flexx/tests/relayout-consistency.test.ts  # Fuzz re-layout
-bun vitest run vendor/beorn-flexx/tests/cache-stress.test.ts      # Cache edge cases
+bun vitest run vendor/flexture/tests/                          # All flexx tests
+bun vitest run vendor/flexture/tests/layout.test.ts            # Core layout
+bun vitest run vendor/flexture/tests/yoga-comparison.test.ts   # Yoga compat
+bun vitest run vendor/flexture/tests/relayout-consistency.test.ts  # Fuzz re-layout
+bun vitest run vendor/flexture/tests/cache-stress.test.ts      # Cache edge cases
 ```
 
 ## Efficiency

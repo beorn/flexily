@@ -15,7 +15,7 @@
  *    returns (flex shrinkage). When shrinkage changes between passes, the stale
  *    overridden value is preserved because NaN===NaN fingerprint matches (km-frod5)
  *
- * Run: bun vitest run vendor/beorn-flexx/tests/relayout-consistency.test.ts
+ * Run: bun vitest run vendor/flexture/tests/relayout-consistency.test.ts
  */
 
 import { describe, expect, it } from "vitest"

@@ -430,7 +430,7 @@ After ANY change to `layout-zero.ts` or `node-zero.ts`:
 top -l 1 -n 5 -stats command,cpu | head -10
 
 # 2. Run benchmark
-cd vendor/beorn-flexx && bun bench bench/yoga-compare-warmup.bench.ts
+cd vendor/flexture && bun bench bench/yoga-compare-warmup.bench.ts
 
 # 3. Compare against baseline:
 #    Flexx should be ~2x Yoga for flat trees
@@ -438,7 +438,7 @@ cd vendor/beorn-flexx && bun bench bench/yoga-compare-warmup.bench.ts
 #    No-change re-layout should be ~5.5x Yoga
 
 # 4. If you changed source, rebuild:
-cd vendor/beorn-flexx && bun run build
+cd vendor/flexture && bun run build
 ```
 
 **Acceptable impact:**

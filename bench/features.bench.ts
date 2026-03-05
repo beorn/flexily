@@ -2,7 +2,7 @@
  * Feature-specific Flexx vs Yoga benchmarks
  *
  * Targets specific flexbox features to identify performance differences.
- * Run: bun bench vendor/beorn-flexx/bench/features.bench.ts
+ * Run: bun bench vendor/flexture/bench/features.bench.ts
  */
 
 import { bench, describe, beforeAll } from "vitest"

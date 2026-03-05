@@ -6,7 +6,7 @@
  * and verifies the fuzz suite catches each mutation. If a mutation passes
  * all tests, that's a coverage gap in the test suite.
  *
- * Run: cd vendor/beorn-flexx && bun scripts/mutation-test.ts
+ * Run: cd vendor/flexture && bun scripts/mutation-test.ts
  */
 
 import { readFileSync, writeFileSync } from "fs"
@@ -216,7 +216,7 @@ async function main() {
       process.stdout.write(`  "${mutation.name}" ... `)
 
       const proc = Bun.spawn(
-        ["bun", "vitest", "run", "vendor/beorn-flexx/tests/relayout-consistency.test.ts", "--reporter=dot"],
+        ["bun", "vitest", "run", "vendor/flexture/tests/relayout-consistency.test.ts", "--reporter=dot"],
         { cwd: kmRoot, stdout: "pipe", stderr: "pipe" },
       )
       const exitCode = await proc.exited

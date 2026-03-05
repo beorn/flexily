@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
  * Quick Classic vs Zero-alloc benchmark for algorithm analysis
- * Run: bun vendor/beorn-flexx/scripts/quick-bench.ts
+ * Run: bun vendor/flexture/scripts/quick-bench.ts
  */
 
 import * as Classic from "../src/index.js"
