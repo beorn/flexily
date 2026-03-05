@@ -150,7 +150,7 @@ Pretty-prints a layout tree for debugging output:
 Verifies that the test suite detects deliberate code changes. Each mutation injects a known-wrong value into cache/invalidation logic, then runs the re-layout fuzz suite.
 
 ```bash
-cd vendor/beorn-flexx && bun scripts/mutation-test.ts
+cd vendor/flexture && bun scripts/mutation-test.ts
 ```
 
 **Results**: 4 caught (real bugs), 4 equivalent (defense-in-depth layers that are redundant with other mechanisms):
