@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from '@beorn/flexx';
+ * import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from 'flexture';
  *
  * const root = Node.create();
  * root.setWidth(80);

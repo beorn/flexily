@@ -4,11 +4,11 @@
  * The classic (allocating) variant of Flexx. Use for debugging, comparison,
  * or when you need reentrancy (concurrent layouts).
  *
- * The main export '@beorn/flexx' uses the faster zero-allocation algorithm.
+ * The main export 'flexture' uses the faster zero-allocation algorithm.
  *
  * @example
  * ```typescript
- * import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from '@beorn/flexx/classic';
+ * import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from 'flexture/classic';
  *
  * const root = Node.create();
  * root.setWidth(80);

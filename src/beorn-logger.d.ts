@@ -1,5 +1,5 @@
 // Optional dependency - resolved via km monorepo workspace, falls back at runtime
-declare module "@beorn/logger" {
+declare module "decant" {
   export function createLogger(namespace: string): {
     debug?: (msg: string) => void
     info?: (msg: string) => void

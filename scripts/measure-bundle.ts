@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Measure bundle sizes for @beorn/flexx entry points.
+ * Measure bundle sizes for flexture entry points.
  *
  * Builds minified browser bundles and measures raw + gzipped sizes.
  * Also checks whether the `debug` dependency leaks into production builds.
@@ -24,17 +24,17 @@ const entries: EntryConfig[] = [
   {
     name: "Full package",
     entrypoint: resolve(ROOT, "src/index.ts"),
-    description: "import { Node, ... } from '@beorn/flexx'",
+    description: "import { Node, ... } from 'flexture'",
   },
   {
     name: "Constants only",
     entrypoint: resolve(ROOT, "src/constants.ts"),
-    description: "import { FLEX_DIRECTION_ROW, ... } from '@beorn/flexx' (constants only)",
+    description: "import { FLEX_DIRECTION_ROW, ... } from 'flexture' (constants only)",
   },
   {
     name: "Classic algorithm",
     entrypoint: resolve(ROOT, "src/index-classic.ts"),
-    description: "import { Node, ... } from '@beorn/flexx/classic'",
+    description: "import { Node, ... } from 'flexture/classic'",
   },
 ]
 
@@ -113,7 +113,7 @@ async function main() {
     naming: "index-no-debug.min.js",
     minify: true,
     target: "browser",
-    external: ["debug", "@beorn/logger"],
+    external: ["debug", "decant"],
   })
 
   let debugDelta: { raw: number; gzip: number } | null = null

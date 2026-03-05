@@ -7,8 +7,8 @@
  *
  * @example
  * ```typescript
- * import { Node, DIRECTION_LTR } from '@beorn/flexx';
- * import { getLayout, diffLayouts, assertLayoutSanity } from '@beorn/flexx/testing';
+ * import { Node, DIRECTION_LTR } from 'flexture';
+ * import { getLayout, diffLayouts, assertLayoutSanity } from 'flexture/testing';
  *
  * const root = Node.create();
  * root.setWidth(80);

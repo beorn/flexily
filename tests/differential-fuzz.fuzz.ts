@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it, beforeAll } from "vitest"
-import { createLogger } from "@beorn/logger"
+import { createLogger } from "decant"
 
 const log = createLogger("flexx:test:fuzz")
 import * as Flexx from "../src/index.js"
