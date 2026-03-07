@@ -91,7 +91,7 @@ bun test tests/differential-fuzz.fuzz.ts
 
 ## Public Testing API (`@beorn/flexture/testing`)
 
-Flexture exports diagnostic helpers for downstream consumers (inkx, km-tui):
+Flexture exports diagnostic helpers for downstream consumers (hightea, km-tui):
 
 ```typescript
 import {

@@ -45,11 +45,11 @@ Most developers should use a framework built on Flexture, not Flexture directly.
 - **Specialized tools** where you need direct control over layout computation
 - **Anyone replacing Yoga** who wants a drop-in pure-JS alternative
 
-> **Building a terminal UI?** Use [inkx](https://github.com/beorn/inkx), which uses Flexture by default. You get React components, hooks, and layout feedback without touching the low-level API.
+> **Building a terminal UI?** Use [hightea](https://github.com/beorn/hightea), which uses Flexture by default. You get React components, hooks, and layout feedback without touching the low-level API.
 
 ## Status
 
-1368 tests passing, including 41/41 Yoga compatibility tests and 1200+ incremental re-layout fuzz tests. Used by [inkx](https://github.com/beorn/inkx) as its default layout engine.
+1368 tests passing, including 41/41 Yoga compatibility tests and 1200+ incremental re-layout fuzz tests. Used by [hightea](https://github.com/beorn/hightea) as its default layout engine.
 
 | Feature                                       | Status   |
 | --------------------------------------------- | -------- |
@@ -77,12 +77,12 @@ npm install @beorn/flexture
 
 Flexture and Yoga each win in different scenarios:
 
-| Scenario                | Winner    | Margin     | Tree Size        |
-| ----------------------- | --------- | ---------- | ---------------- |
+| Scenario                | Winner       | Margin     | Tree Size        |
+| ----------------------- | ------------ | ---------- | ---------------- |
 | **Initial layout**      | Flexture     | 1.5-2.5x   | 64-969 nodes     |
 | **No-change re-layout** | **Flexture** | **5.5x**   | 406-969 nodes    |
-| **Single dirty leaf**   | Yoga      | 2.8-3.4x   | 406-969 nodes    |
-| **Deep nesting (15+)**  | Yoga      | increasing | 1 node per level |
+| **Single dirty leaf**   | Yoga         | 2.8-3.4x   | 406-969 nodes    |
+| **Deep nesting (15+)**  | Yoga         | increasing | 1 node per level |
 
 Benchmarks use TUI-realistic trees: columns × bordered cards with measure functions (e.g., 5 columns × 20 cards = ~406 nodes, 8×30 = ~969 nodes). Typical depth is 3-5 levels (column → card → content → text). See [docs/performance.md](docs/performance.md) for full methodology.
 
@@ -90,12 +90,12 @@ Benchmarks use TUI-realistic trees: columns × bordered cards with measure funct
 
 **Typical interactive TUI operation mix:**
 
-| Operation             | Frequency     | Winner       | Why                                   |
-| --------------------- | ------------- | ------------ | ------------------------------------- |
+| Operation             | Frequency     | Winner          | Why                                   |
+| --------------------- | ------------- | --------------- | ------------------------------------- |
 | Cursor/selection move | Very frequent | Flexture 5.5x   | No layout change → fingerprint cache  |
-| Content edit          | Frequent      | Yoga 3x      | Single dirty leaf in existing tree    |
+| Content edit          | Frequent      | Yoga 3x         | Single dirty leaf in existing tree    |
 | Initial render        | Once          | Flexture 1.5-2x | JS node creation avoids WASM boundary |
-| Window resize         | Occasional    | Yoga 2.7x    | Full re-layout of existing tree       |
+| Window resize         | Occasional    | Yoga 2.7x       | Full re-layout of existing tree       |
 
 Flexture's fingerprint cache makes no-change re-layout essentially free (27ns regardless of tree size). Initial layout wins come from JS node creation avoiding WASM boundary crossings (~8x cheaper per node). Most TUI apps have shallow nesting (3-5 levels) — well below the 15-level crossover where Yoga overtakes Flexture.
 
@@ -134,7 +134,7 @@ See [docs/testing.md](docs/testing.md) for methodology and [docs/incremental-lay
 
 ## Bundle Size
 
-|          | Yoga   | Flexture             | Savings              |
+|          | Yoga   | Flexture          | Savings              |
 | -------- | ------ | ----------------- | -------------------- |
 | Minified | 117 KB | 47 KB (35 KB[^1]) | **2.5-3.4x smaller** |
 | Gzipped  | 39 KB  | 16 KB (11 KB[^1]) | **2.5-3.6x smaller** |
@@ -172,13 +172,13 @@ Same constants, same method names, same behavior.
 
 ## Related Projects
 
-| Project                                                 | Language   | Description                                                                                      |
-| ------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------ |
-| [Yoga](https://yogalayout.dev/)                         | C++/WASM   | Facebook's flexbox engine. Industry standard, used by React Native, Ink, Litho.                  |
-| [Taffy](https://github.com/DioxusLabs/taffy)            | Rust       | High-performance layout library supporting Flexbox and CSS Grid. Used by Dioxus and Bevy.        |
+| Project                                                 | Language   | Description                                                                                         |
+| ------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------- |
+| [Yoga](https://yogalayout.dev/)                         | C++/WASM   | Facebook's flexbox engine. Industry standard, used by React Native, Ink, Litho.                     |
+| [Taffy](https://github.com/DioxusLabs/taffy)            | Rust       | High-performance layout library supporting Flexbox and CSS Grid. Used by Dioxus and Bevy.           |
 | [flexbox.js](https://github.com/Planning-nl/flexbox.js) | JavaScript | Pure JS flexbox engine by Planning-nl. Reference implementation that inspired Flexture's algorithm. |
-| [css-layout](https://www.npmjs.com/package/css-layout)  | JavaScript | Facebook's original pure-JS flexbox, predecessor to Yoga. Deprecated.                            |
-| [inkx](https://github.com/beorn/inkx)                   | TypeScript | React for CLIs with layout feedback. Uses Flexture by default.                                      |
+| [css-layout](https://www.npmjs.com/package/css-layout)  | JavaScript | Facebook's original pure-JS flexbox, predecessor to Yoga. Deprecated.                               |
+| [hightea](https://github.com/beorn/hightea)             | TypeScript | React for CLIs with layout feedback. Uses Flexture by default.                                      |
 
 ## Code Structure
 

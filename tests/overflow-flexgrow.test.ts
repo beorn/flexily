@@ -2,7 +2,7 @@
  * Test: overflow containers with flexGrow should be constrained to flex-allocated size.
  * CSS spec §4.5: overflow:hidden/scroll items have automatic min-size = 0,
  * allowing them to shrink below content size.
- * Bug: km-inkx.scroll-flexgrow
+ * Bug: km-hightea.scroll-flexgrow
  */
 import { describe, test, expect } from "vitest"
 import { Node } from "../src/index.js"

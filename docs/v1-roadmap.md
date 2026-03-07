@@ -88,16 +88,16 @@ After 1.0:
 
 ## Release Sequence
 
-Flexture should reach 1.0 **before** inkx, because:
+Flexture should reach 1.0 **before** hightea, because:
 
 1. Flexture has a smaller, more focused API surface (layout engine only)
 2. Flexture already passes 1368 tests including comprehensive fuzz testing
-3. inkx depends on Flexture -- a stable Flexture simplifies inkx's own 1.0 story
-4. The main blocker (vendor rename + npm publish) is shared with inkx
+3. hightea depends on Flexture -- a stable Flexture simplifies hightea's own 1.0 story
+4. The main blocker (vendor rename + npm publish) is shared with hightea
 
 Suggested order:
 
 1. Complete vendor rename (`km-infra.vendor-rename-impl`)
 2. Run bundle audit, verify all criteria above
 3. Tag and publish `@beorn/flexture@1.0.0`
-4. Update inkx's `peerDependencies` to `@beorn/flexture@^1.0.0`
+4. Update hightea's `peerDependencies` to `@beorn/flexture@^1.0.0`

@@ -1,6 +1,6 @@
 /**
  * Compare Yoga vs Flexture behavior for overflow + flexGrow.
- * Bug: km-inkx.scroll-flexgrow
+ * Bug: km-hightea.scroll-flexgrow
  *
  * Flexture intentionally diverges from Yoga for overflow:hidden/scroll containers:
  * - Yoga: overflow containers expand to full content size (flexShrink=0 default)

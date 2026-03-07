@@ -1,14 +1,14 @@
 /**
- * Flexx Testing Utilities
+ * Flexture Testing Utilities
  *
  * Diagnostic helpers for verifying layout correctness, especially
  * incremental re-layout consistency. Used by downstream consumers
- * (inkx, km-tui) and flexx's own test suite.
+ * (hightea, km-tui) and flexture's own test suite.
  *
  * @example
  * ```typescript
- * import { Node, DIRECTION_LTR } from '@beorn/flexx';
- * import { getLayout, diffLayouts, assertLayoutSanity } from '@beorn/flexx/testing';
+ * import { Node, DIRECTION_LTR } from 'flexture';
+ * import { getLayout, diffLayouts, assertLayoutSanity } from 'flexture/testing';
  *
  * const root = Node.create();
  * root.setWidth(80);

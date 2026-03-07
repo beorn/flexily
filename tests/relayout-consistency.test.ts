@@ -87,7 +87,7 @@ describe("Re-layout Consistency: targeted scenarios", () => {
   })
 
   it("partial dirty: bordered card structure", () => {
-    // Real-world inkx card: border > row > prefix(fixed) + content(flexGrow>text)
+    // Real-world hightea card: border > row > prefix(fixed) + content(flexGrow>text)
     // Mark prefix dirty.
     function buildTree(): BuildTreeResult {
       const root = Node.create()

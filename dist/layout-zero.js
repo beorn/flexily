@@ -1,5 +1,5 @@
 /**
- * Flexx Layout Algorithm — Main Entry Point
+ * Flexture Layout Algorithm — Main Entry Point
  *
  * Core flexbox layout computation. This file contains:
  * - computeLayout(): top-level entry point
@@ -158,8 +158,9 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
     else {
         nodeHeight = availableHeight - marginTop - marginBottom;
     }
-    // Apply aspect ratio constraint
-    // If aspectRatio is set and one dimension is auto (NaN), derive it from the other
+    // Apply aspect ratio constraint (CSS aspect-ratio spec)
+    // If aspectRatio is set and one dimension is auto (NaN), derive it from the other.
+    // Re-apply min/max constraints on the derived dimension to respect CSS box model.
     const aspectRatio = style.aspectRatio;
     if (!Number.isNaN(aspectRatio) && aspectRatio > 0) {
         const widthIsAuto = Number.isNaN(nodeWidth) || style.width.unit === C.UNIT_AUTO;
@@ -167,6 +168,8 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
         if (widthIsAuto && !heightIsAuto && !Number.isNaN(nodeHeight)) {
             // Height is defined, width is auto: width = height * aspectRatio
             nodeWidth = nodeHeight * aspectRatio;
+            // Re-apply min/max for derived width
+            nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth);
         }
         else if (heightIsAuto && !widthIsAuto && !Number.isNaN(nodeWidth)) {
             // Width is defined, height is auto: height = width / aspectRatio
@@ -1025,8 +1028,7 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
             // These must be included in the absolute position BEFORE rounding (Yoga-compatible)
             let posOffsetX = 0;
             let posOffsetY = 0;
-            if (childStyle.positionType === C.POSITION_TYPE_RELATIVE ||
-                childStyle.positionType === C.POSITION_TYPE_STATIC) {
+            if (childStyle.positionType === C.POSITION_TYPE_RELATIVE || childStyle.positionType === C.POSITION_TYPE_STATIC) {
                 const relLeftPos = childStyle.position[0];
                 const relTopPos = childStyle.position[1];
                 const relRightPos = childStyle.position[2];

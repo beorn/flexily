@@ -85,10 +85,10 @@ for (const child of children) {
 ## Benchmark Results
 
 | Scenario       | Flexture Classic | Flexture Zero-alloc | Yoga WASM   |
-| -------------- | ------------- | ---------------- | ----------- |
-| Flat 500 nodes | 1x            | 1.75-2x faster   | ~0.5x       |
-| Deep 50 levels | 1x            | ~1x (similar)    | 1.2x faster |
-| Kanban TUI     | 1x            | ~1.1x faster     | ~0.9x       |
+| -------------- | ---------------- | ------------------- | ----------- |
+| Flat 500 nodes | 1x               | 1.75-2x faster      | ~0.5x       |
+| Deep 50 levels | 1x               | ~1x (similar)       | 1.2x faster |
+| Kanban TUI     | 1x               | ~1.1x faster        | ~0.9x       |
 
 **Key insight**: Zero-alloc excels at flat, wide layouts (the typical TUI structure).
 

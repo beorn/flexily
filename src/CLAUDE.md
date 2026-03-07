@@ -318,20 +318,20 @@ This is Yoga's algorithm. Layout positions stored in `layout.left`/`layout.top` 
 
 `measureNode()` (~240 lines) is a lightweight alternative to `layoutNode()` (~1650 lines). It computes `width` and `height` but NOT `left`/`top`. Used during Phase 5 for intrinsic sizing of auto-sized container children. Save/restore of `layout.width`/`layout.height` is required around `measureNode` calls because it overwrites those fields.
 
-## Integration: How inkx Uses Flexture
+## Integration: How hightea Uses Flexture
 
-inkx uses flexture through an adapter layer:
+hightea uses flexture through an adapter layer:
 
-1. `inkx/src/layout-engine.ts` defines the `LayoutEngine` / `LayoutNode` interfaces
-2. `inkx/src/adapters/flexture-zero-adapter.ts` wraps `Node` in `FlextureZeroNodeAdapter`
+1. `hightea/src/layout-engine.ts` defines the `LayoutEngine` / `LayoutNode` interfaces
+2. `hightea/src/adapters/flexture-zero-adapter.ts` wraps `Node` in `FlextureZeroNodeAdapter`
 3. The adapter is mostly delegation (Flexture already has a Yoga-compatible API)
 4. Measure modes are translated from numeric constants to strings (`"exactly"`, `"at-most"`, `"undefined"`)
 
-inkx calls `calculateLayout()` on every render. The no-change case (cursor movement, selection) is the most common scenario in the km TUI, which is why the 5.5x fingerprint-cache advantage matters.
+hightea calls `calculateLayout()` on every render. The no-change case (cursor movement, selection) is the most common scenario in the km TUI, which is why the 5.5x fingerprint-cache advantage matters.
 
 ## Intentional Divergences from Yoga
 
-| Behavior                                  | Yoga                                     | Flexture                                 | CSS Spec                                       |
+| Behavior                                  | Yoga                                     | Flexture                              | CSS Spec                                       |
 | ----------------------------------------- | ---------------------------------------- | ------------------------------------- | ---------------------------------------------- |
 | `overflow:hidden/scroll` + `flexShrink:0` | Item expands to content (ignores parent) | Item shrinks to fit parent            | 4.5: auto min-size = 0 for overflow containers |
 | Default `flexShrink`                      | 0 (Yoga native default)                  | 0 (matches Yoga)                      | CSS default is 1                               |

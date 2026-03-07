@@ -6,7 +6,7 @@ Flexture is a pure JavaScript flexbox layout engine with a Yoga-compatible API.
 
 ## Status
 
-|                      | Yoga                                                 | Flexture                                |
+|                      | Yoga                                                 | Flexture                             |
 | -------------------- | ---------------------------------------------------- | ------------------------------------ |
 | **Maturity**         | Production, battle-tested (React Native, Ink, Litho) | Production-ready, fully tested       |
 | **Test coverage**    | Extensive (auto-generated from Chrome)               | 1368 tests, 41/41 Yoga compatibility |
@@ -16,7 +16,7 @@ Flexture is a pure JavaScript flexbox layout engine with a Yoga-compatible API.
 
 ## Why Flexture Exists
 
-| Concern            | Yoga                  | Flexture                  |
+| Concern            | Yoga                  | Flexture               |
 | ------------------ | --------------------- | ---------------------- |
 | **Runtime**        | WebAssembly           | Pure JavaScript        |
 | **Initialization** | Async (WASM load)     | Synchronous            |
@@ -25,7 +25,7 @@ Flexture is a pure JavaScript flexbox layout engine with a Yoga-compatible API.
 
 ### Bundle Size
 
-|              | Yoga                           | Flexture             | Savings              |
+|              | Yoga                           | Flexture          | Savings              |
 | ------------ | ------------------------------ | ----------------- | -------------------- |
 | **Minified** | 117 KB (25 KB JS + 89 KB WASM) | 47 KB (35 KB[^1]) | **2.5-3.4x smaller** |
 | **Gzipped**  | 39 KB (9 KB JS + 28 KB WASM)   | 16 KB (11 KB[^1]) | **2.5-3.6x smaller** |
@@ -86,28 +86,28 @@ console.log(child.getComputedWidth()) // Same output
 ## Flexbox Spec Compliance
 
 | Feature                                   | Yoga | Flexture | Notes                     |
-| ----------------------------------------- | ---- | ----- | ------------------------- |
-| **flex-direction** (row, column, reverse) | ✅   | ✅    |                           |
-| **flex-grow**                             | ✅   | ✅    |                           |
-| **flex-shrink**                           | ✅   | ✅    | CSS-spec compliant        |
-| **flex-basis**                            | ✅   | ✅    |                           |
-| **justify-content** (6 values)            | ✅   | ✅    |                           |
-| **align-items** (5 values)                | ✅   | ✅    |                           |
-| **align-self**                            | ✅   | ✅    |                           |
-| **align-content** (6 values)              | ✅   | ✅    |                           |
-| **gap** (row/column)                      | ✅   | ✅    |                           |
-| **padding** (per-edge)                    | ✅   | ✅    |                           |
-| **margin** (per-edge)                     | ✅   | ✅    |                           |
-| **border** (per-edge)                     | ✅   | ✅    |                           |
-| **min/max width/height**                  | ✅   | ✅    |                           |
-| **percent values**                        | ✅   | ✅    |                           |
-| **absolute positioning**                  | ✅   | ✅    |                           |
-| **measure functions**                     | ✅   | ✅    | For text nodes            |
-| **flex-wrap**                             | ✅   | ✅    |                           |
-| **baseline alignment**                    | ✅   | ✅    |                           |
-| **RTL direction**                         | ✅   | ✅    |                           |
-| **EDGE_START/END**                        | ✅   | ✅    | Full logical edge support |
-| **aspect-ratio**                          | ✅   | ✅    |                           |
+| ----------------------------------------- | ---- | -------- | ------------------------- |
+| **flex-direction** (row, column, reverse) | ✅   | ✅       |                           |
+| **flex-grow**                             | ✅   | ✅       |                           |
+| **flex-shrink**                           | ✅   | ✅       | CSS-spec compliant        |
+| **flex-basis**                            | ✅   | ✅       |                           |
+| **justify-content** (6 values)            | ✅   | ✅       |                           |
+| **align-items** (5 values)                | ✅   | ✅       |                           |
+| **align-self**                            | ✅   | ✅       |                           |
+| **align-content** (6 values)              | ✅   | ✅       |                           |
+| **gap** (row/column)                      | ✅   | ✅       |                           |
+| **padding** (per-edge)                    | ✅   | ✅       |                           |
+| **margin** (per-edge)                     | ✅   | ✅       |                           |
+| **border** (per-edge)                     | ✅   | ✅       |                           |
+| **min/max width/height**                  | ✅   | ✅       |                           |
+| **percent values**                        | ✅   | ✅       |                           |
+| **absolute positioning**                  | ✅   | ✅       |                           |
+| **measure functions**                     | ✅   | ✅       | For text nodes            |
+| **flex-wrap**                             | ✅   | ✅       |                           |
+| **baseline alignment**                    | ✅   | ✅       |                           |
+| **RTL direction**                         | ✅   | ✅       |                           |
+| **EDGE_START/END**                        | ✅   | ✅       | Full logical edge support |
+| **aspect-ratio**                          | ✅   | ✅       |                           |
 
 Flexture implements CSS spec's basis-weighted shrink (`flexShrink × flexBasis`).
 
@@ -136,13 +136,13 @@ See [performance.md](performance.md) for detailed benchmarks, methodology, and t
 
 **Summary:** Each engine wins in different scenarios. Both handle terminal UIs (<500 nodes) in under 1ms.
 
-| Scenario                            | Winner    | Margin     | Why                                              |
-| ----------------------------------- | --------- | ---------- | ------------------------------------------------ |
+| Scenario                            | Winner       | Margin     | Why                                              |
+| ----------------------------------- | ------------ | ---------- | ------------------------------------------------ |
 | Initial layout (create + calculate) | Flexture     | 1.5-2.5x   | JS node creation avoids WASM boundary crossings  |
 | **No-change re-layout**             | **Flexture** | **5.5x**   | Fingerprint cache — 27ns regardless of tree size |
-| Incremental re-layout (dirty leaf)  | Yoga      | 2.8-3.4x   | WASM per-node computation is faster              |
-| Full re-layout (constraint change)  | Yoga      | 2.7x       | Same — WASM layout is faster                     |
-| Deep nesting (15+ levels)           | Yoga      | increasing | Flexture overhead compounds at depth                |
+| Incremental re-layout (dirty leaf)  | Yoga         | 2.8-3.4x   | WASM per-node computation is faster              |
+| Full re-layout (constraint change)  | Yoga         | 2.7x       | Same — WASM layout is faster                     |
+| Deep nesting (15+ levels)           | Yoga         | increasing | Flexture overhead compounds at depth             |
 
 **Key insight**: Flexture wins at node creation and cache hits. Yoga wins at raw layout computation. For interactive TUIs where most keystrokes don't change layout, Flexture's fingerprint cache is the key advantage.
 

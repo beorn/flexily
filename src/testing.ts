@@ -3,7 +3,7 @@
  *
  * Diagnostic helpers for verifying layout correctness, especially
  * incremental re-layout consistency. Used by downstream consumers
- * (inkx, km-tui) and flexture's own test suite.
+ * (hightea, km-tui) and flexture's own test suite.
  *
  * @example
  * ```typescript

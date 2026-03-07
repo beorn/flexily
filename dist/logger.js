@@ -20,7 +20,7 @@ function createFallbackLogger(namespace) {
 }
 async function detectLogger(namespace) {
     try {
-        const { createLogger } = await import("@beorn/logger");
+        const { createLogger } = await import("decant");
         const logger = createLogger(namespace);
         // Wrap @beorn/logger to accept printf-style args
         if (logger.debug) {
@@ -51,7 +51,7 @@ async function detectLogger(namespace) {
 }
 // Eagerly initialize (top-level await)
 // This runs once at module load time
-_logger = await detectLogger("flexx:layout");
+_logger = await detectLogger("flexture:layout");
 /** Logger instance - use with optional chaining: `log.debug?.('message')` */
 export const log = {
     get debug() {

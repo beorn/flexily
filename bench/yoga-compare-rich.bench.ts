@@ -171,7 +171,11 @@ function flexturePropertyRichTree(nodeCount: number): Flexture.Node {
     const row = Flexture.Node.create()
     row.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
     row.setJustifyContent(
-      r % 3 === 0 ? Flexture.JUSTIFY_FLEX_START : r % 3 === 1 ? Flexture.JUSTIFY_SPACE_BETWEEN : Flexture.JUSTIFY_CENTER,
+      r % 3 === 0
+        ? Flexture.JUSTIFY_FLEX_START
+        : r % 3 === 1
+          ? Flexture.JUSTIFY_SPACE_BETWEEN
+          : Flexture.JUSTIFY_CENTER,
     )
     row.setAlignItems(r % 2 === 0 ? Flexture.ALIGN_CENTER : Flexture.ALIGN_FLEX_END)
     row.setFlexWrap(r % 4 === 0 ? Flexture.WRAP_WRAP : Flexture.WRAP_NO_WRAP)

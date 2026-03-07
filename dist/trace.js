@@ -10,7 +10,7 @@
  *
  * @example
  * ```typescript
- * import { enableTrace, disableTrace, diffTraces } from '@beorn/flexx/trace';
+ * import { enableTrace, disableTrace, diffTraces } from 'flexture/trace';
  *
  * const t1 = enableTrace();
  * root.calculateLayout(80, 24, DIRECTION_LTR);

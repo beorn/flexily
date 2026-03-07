@@ -244,7 +244,7 @@ describe("Flexture vs Yoga - Layout Only (no allocation)", () => {
 
 /**
  * Create a tree with measure functions on leaf nodes.
- * This simulates inkx Text nodes which use measure functions for intrinsic sizing.
+ * This simulates hightea Text nodes which use measure functions for intrinsic sizing.
  */
 function flextureTreeWithMeasure(nodeCount: number): Flexture.Node {
   const root = Flexture.Node.create()

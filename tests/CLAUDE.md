@@ -17,9 +17,9 @@
 
 ## What NOT to Test Here
 
-- How layout integrates with inkx rendering — that's inkx tests
-- Terminal output or ANSI codes — that's inkx or chalkx
-- React component layout — that's inkx component tests
+- How layout integrates with hightea rendering — that's hightea tests
+- Terminal output or ANSI codes — that's hightea or ansi
+- React component layout — that's hightea component tests
 
 ## Helpers
 

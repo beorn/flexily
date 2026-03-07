@@ -1,6 +1,6 @@
 # Getting Started with Flexture
 
-> **Building a terminal UI?** Use [inkx](https://github.com/beorn/inkx), which uses Flexture by default. You get React components, hooks, and layout feedback without touching the low-level API below.
+> **Building a terminal UI?** Use [hightea](https://github.com/beorn/hightea), which uses Flexture by default. You get React components, hooks, and layout feedback without touching the low-level API below.
 >
 > This guide is for developers who need the Flexture API directly — framework authors, canvas renderers, or anyone replacing Yoga.
 
