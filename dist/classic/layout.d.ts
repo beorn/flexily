@@ -1,5 +1,5 @@
 /**
- * Flexture Layout Algorithm
+ * Flexily Layout Algorithm
  *
  * Core flexbox layout computation extracted from node.ts.
  * Based on Planning-nl/flexbox.js reference implementation.

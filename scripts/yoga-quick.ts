@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import * as Flexture from "../src/index.js"
+import * as Flexily from "../src/index.js"
 import initYoga from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
 
@@ -17,17 +17,17 @@ function bench(name: string, fn: () => void, iterations = 500): number {
   return ops
 }
 
-function flextureTree(cards: number) {
-  const root = Flexture.Node.create()
+function flexilyTree(cards: number) {
+  const root = Flexily.Node.create()
   root.setWidth(120)
   root.setHeight(40)
-  root.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+  root.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
   for (let col = 0; col < 3; col++) {
-    const column = Flexture.Node.create()
+    const column = Flexily.Node.create()
     column.setFlexGrow(1)
-    column.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+    column.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
     for (let i = 0; i < cards; i++) {
-      const card = Flexture.Node.create()
+      const card = Flexily.Node.create()
       card.setHeight(3)
       column.insertChild(card, i)
     }
@@ -55,46 +55,46 @@ function yogaTree(cards: number) {
   return root
 }
 
-console.log("\n=== Flexture Zero vs Yoga (WASM) ===\n")
+console.log("\n=== Flexily Zero vs Yoga (WASM) ===\n")
 
 console.log("Create + Layout 50 cards:")
-const flextureOps = bench("  Flexture", () => {
-  const tree = flextureTree(50)
-  tree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+const flexilyOps = bench("  Flexily", () => {
+  const tree = flexilyTree(50)
+  tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
 })
 const yogaOps = bench("  Yoga", () => {
   const tree = yogaTree(50)
   tree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
 })
-const ratio = yogaOps / flextureOps
+const ratio = yogaOps / flexilyOps
 if (ratio > 1) {
   console.log("  → Yoga is " + ratio.toFixed(1) + "x faster\n")
 } else {
-  console.log("  → Flexture is " + (1 / ratio).toFixed(1) + "x faster\n")
+  console.log("  → Flexily is " + (1 / ratio).toFixed(1) + "x faster\n")
 }
 
 console.log("Layout Only (with markDirty):")
-const flexturePre = flextureTree(50)
+const flexilyPre = flexilyTree(50)
 const yogaPre = yogaTree(50)
 // First layout to initialize
-flexturePre.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+flexilyPre.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
 yogaPre.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-const flextureDirty = bench("  Flexture (markDirty)", () => {
-  flexturePre.markDirty()
-  flexturePre.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+const flexilyDirty = bench("  Flexily (markDirty)", () => {
+  flexilyPre.markDirty()
+  flexilyPre.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
 })
 console.log("")
 
 console.log("Layout Only (unchanged - fingerprint test):")
-const flextureLayout = bench("  Flexture (cached)", () => {
-  flexturePre.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+const flexilyLayout = bench("  Flexily (cached)", () => {
+  flexilyPre.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
 })
 const yogaLayout = bench("  Yoga (cached)", () => {
   yogaPre.calculateLayout(120, 40, yoga.DIRECTION_LTR)
 })
-const layoutRatio = yogaLayout / flextureLayout
+const layoutRatio = yogaLayout / flexilyLayout
 if (layoutRatio > 1) {
   console.log("  → Yoga is " + layoutRatio.toFixed(1) + "x faster\n")
 } else {
-  console.log("  → Flexture is " + (1 / layoutRatio).toFixed(1) + "x faster\n")
+  console.log("  → Flexily is " + (1 / layoutRatio).toFixed(1) + "x faster\n")
 }

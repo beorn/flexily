@@ -1,12 +1,12 @@
 /**
- * Flexture - Pure JavaScript Flexbox Layout Engine
+ * Flexily - Pure JavaScript Flexbox Layout Engine
  *
  * A Yoga-compatible layout engine for terminal UIs and other environments
  * where WebAssembly is not available or desirable.
  *
  * @example
  * ```typescript
- * import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from 'flexture';
+ * import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from 'flexily';
  *
  * const root = Node.create();
  * root.setWidth(80);

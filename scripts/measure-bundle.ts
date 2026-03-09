@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 /**
- * Measure bundle sizes for flexture entry points.
+ * Measure bundle sizes for flexily entry points.
  *
  * Builds minified browser bundles and measures raw + gzipped sizes.
  * Also checks whether the `debug` dependency leaks into production builds.
  *
- * Run: cd vendor/flexture && bun scripts/measure-bundle.ts
+ * Run: cd vendor/flexily && bun scripts/measure-bundle.ts
  */
 
 import { gzipSync } from "zlib"
@@ -24,17 +24,17 @@ const entries: EntryConfig[] = [
   {
     name: "Full package",
     entrypoint: resolve(ROOT, "src/index.ts"),
-    description: "import { Node, ... } from 'flexture'",
+    description: "import { Node, ... } from 'flexily'",
   },
   {
     name: "Constants only",
     entrypoint: resolve(ROOT, "src/constants.ts"),
-    description: "import { FLEX_DIRECTION_ROW, ... } from 'flexture' (constants only)",
+    description: "import { FLEX_DIRECTION_ROW, ... } from 'flexily' (constants only)",
   },
   {
     name: "Classic algorithm",
     entrypoint: resolve(ROOT, "src/index-classic.ts"),
-    description: "import { Node, ... } from 'flexture/classic'",
+    description: "import { Node, ... } from 'flexily/classic'",
   },
 ]
 
@@ -113,7 +113,7 @@ async function main() {
     naming: "index-no-debug.min.js",
     minify: true,
     target: "browser",
-    external: ["debug", "decant"],
+    external: ["debug", "loggily"],
   })
 
   let debugDelta: { raw: number; gzip: number } | null = null
@@ -145,7 +145,7 @@ async function main() {
   rmSync(outDir, { recursive: true })
 
   // Output results
-  console.log("# Flexture Bundle Size Audit\n")
+  console.log("# Flexily Bundle Size Audit\n")
 
   console.log("## Entry Points\n")
   console.log("| Entry point | Minified | Gzipped | `debug` included? |")
@@ -160,34 +160,34 @@ async function main() {
   console.log("")
 
   if (yogaSize) {
-    const flextureFull = results[0]
-    const rawRatio = (yogaSize.raw / flextureFull.minifiedBytes).toFixed(1)
-    const gzipRatio = (yogaSize.gzip / flextureFull.gzipBytes).toFixed(1)
+    const flexilyFull = results[0]
+    const rawRatio = (yogaSize.raw / flexilyFull.minifiedBytes).toFixed(1)
+    const gzipRatio = (yogaSize.gzip / flexilyFull.gzipBytes).toFixed(1)
 
     console.log("## Yoga Comparison\n")
-    console.log("|         | Yoga | Flexture | Ratio |")
+    console.log("|         | Yoga | Flexily | Ratio |")
     console.log("| ------- | ---: | ----: | ----- |")
     console.log(
-      `| Minified | ${formatBytes(yogaSize.raw)} | ${formatBytes(flextureFull.minifiedBytes)} | **${rawRatio}x smaller** |`,
+      `| Minified | ${formatBytes(yogaSize.raw)} | ${formatBytes(flexilyFull.minifiedBytes)} | **${rawRatio}x smaller** |`,
     )
     console.log(
-      `| Gzipped | ${formatBytes(yogaSize.gzip)} | ${formatBytes(flextureFull.gzipBytes)} | **${gzipRatio}x smaller** |`,
+      `| Gzipped | ${formatBytes(yogaSize.gzip)} | ${formatBytes(flexilyFull.gzipBytes)} | **${gzipRatio}x smaller** |`,
     )
 
     if (debugDelta) {
-      const flexturenodebugRaw = flextureFull.minifiedBytes - debugDelta.raw
-      const flexturenodebugGzip = flextureFull.gzipBytes - debugDelta.gzip
-      const rawRatioNoDebug = (yogaSize.raw / flexturenodebugRaw).toFixed(1)
-      const gzipRatioNoDebug = (yogaSize.gzip / flexturenodebugGzip).toFixed(1)
+      const flexilynodebugRaw = flexilyFull.minifiedBytes - debugDelta.raw
+      const flexilynodebugGzip = flexilyFull.gzipBytes - debugDelta.gzip
+      const rawRatioNoDebug = (yogaSize.raw / flexilynodebugRaw).toFixed(1)
+      const gzipRatioNoDebug = (yogaSize.gzip / flexilynodebugGzip).toFixed(1)
       console.log("")
       console.log("Without `debug` dependency (tree-shaken):\n")
-      console.log("|         | Yoga | Flexture | Ratio |")
+      console.log("|         | Yoga | Flexily | Ratio |")
       console.log("| ------- | ---: | ----: | ----- |")
       console.log(
-        `| Minified | ${formatBytes(yogaSize.raw)} | ${formatBytes(flexturenodebugRaw)} | **${rawRatioNoDebug}x smaller** |`,
+        `| Minified | ${formatBytes(yogaSize.raw)} | ${formatBytes(flexilynodebugRaw)} | **${rawRatioNoDebug}x smaller** |`,
       )
       console.log(
-        `| Gzipped | ${formatBytes(yogaSize.gzip)} | ${formatBytes(flexturenodebugGzip)} | **${gzipRatioNoDebug}x smaller** |`,
+        `| Gzipped | ${formatBytes(yogaSize.gzip)} | ${formatBytes(flexilynodebugGzip)} | **${gzipRatioNoDebug}x smaller** |`,
       )
     }
 

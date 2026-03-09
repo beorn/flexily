@@ -1,12 +1,12 @@
-# Flexture vs Yoga: Layout Engine Comparison
+# Flexily vs Yoga: Layout Engine Comparison
 
-Flexture is a pure JavaScript flexbox layout engine with a Yoga-compatible API.
+Flexily is a pure JavaScript flexbox layout engine with a Yoga-compatible API.
 
-**TL;DR:** Flexture is **1.5-2.5x faster for initial layout**, **5.5x faster for no-change re-layout**, and **2.5-3.5x smaller** than Yoga, with a synchronous API and pure JavaScript. Yoga is faster at per-node layout computation during incremental re-layout and deep nesting.
+**TL;DR:** Flexily is **1.5-2.5x faster for initial layout**, **5.5x faster for no-change re-layout**, and **2.5-3.5x smaller** than Yoga, with a synchronous API and pure JavaScript. Yoga is faster at per-node layout computation during incremental re-layout and deep nesting.
 
 ## Status
 
-|                      | Yoga                                                 | Flexture                             |
+|                      | Yoga                                                 | Flexily                              |
 | -------------------- | ---------------------------------------------------- | ------------------------------------ |
 | **Maturity**         | Production, battle-tested (React Native, Ink, Litho) | Production-ready, fully tested       |
 | **Test coverage**    | Extensive (auto-generated from Chrome)               | 1368 tests, 41/41 Yoga compatibility |
@@ -14,9 +14,9 @@ Flexture is a pure JavaScript flexbox layout engine with a Yoga-compatible API.
 
 ---
 
-## Why Flexture Exists
+## Why Flexily Exists
 
-| Concern            | Yoga                  | Flexture               |
+| Concern            | Yoga                  | Flexily                |
 | ------------------ | --------------------- | ---------------------- |
 | **Runtime**        | WebAssembly           | Pure JavaScript        |
 | **Initialization** | Async (WASM load)     | Synchronous            |
@@ -25,7 +25,7 @@ Flexture is a pure JavaScript flexbox layout engine with a Yoga-compatible API.
 
 ### Bundle Size
 
-|              | Yoga                           | Flexture          | Savings              |
+|              | Yoga                           | Flexily           | Savings              |
 | ------------ | ------------------------------ | ----------------- | -------------------- |
 | **Minified** | 117 KB (25 KB JS + 89 KB WASM) | 47 KB (35 KB[^1]) | **2.5-3.4x smaller** |
 | **Gzipped**  | 39 KB (9 KB JS + 28 KB WASM)   | 16 KB (11 KB[^1]) | **2.5-3.6x smaller** |
@@ -34,13 +34,13 @@ Flexture is a pure JavaScript flexbox layout engine with a Yoga-compatible API.
 
 Measured with `bun scripts/measure-bundle.ts` (Bun.build minified, zlib gzip).
 
-Flexture is **2.5-3.5x smaller** than Yoga, which matters for:
+Flexily is **2.5-3.5x smaller** than Yoga, which matters for:
 
 - CLI tools where startup time matters
 - Edge runtimes with size limits
 - Bundlers that struggle with WASM
 
-**Use Flexture when:**
+**Use Flexily when:**
 
 - You want synchronous initialization (no async `await init()`)
 - You're in an environment where WASM is awkward (older bundlers, edge runtimes)
@@ -58,11 +58,11 @@ Flexture is **2.5-3.5x smaller** than Yoga, which matters for:
 
 ## API Compatibility
 
-Flexture is designed as a **drop-in replacement** for Yoga's JavaScript API:
+Flexily is designed as a **drop-in replacement** for Yoga's JavaScript API:
 
 ```typescript
 // Same constants
-import { FLEX_DIRECTION_ROW, JUSTIFY_CENTER, ALIGN_STRETCH } from "@beorn/flexture"
+import { FLEX_DIRECTION_ROW, JUSTIFY_CENTER, ALIGN_STRETCH } from "@beorn/flexily"
 
 // Same Node API
 const root = Node.create()
@@ -85,31 +85,31 @@ console.log(child.getComputedWidth()) // Same output
 
 ## Flexbox Spec Compliance
 
-| Feature                                   | Yoga | Flexture | Notes                     |
-| ----------------------------------------- | ---- | -------- | ------------------------- |
-| **flex-direction** (row, column, reverse) | ✅   | ✅       |                           |
-| **flex-grow**                             | ✅   | ✅       |                           |
-| **flex-shrink**                           | ✅   | ✅       | CSS-spec compliant        |
-| **flex-basis**                            | ✅   | ✅       |                           |
-| **justify-content** (6 values)            | ✅   | ✅       |                           |
-| **align-items** (5 values)                | ✅   | ✅       |                           |
-| **align-self**                            | ✅   | ✅       |                           |
-| **align-content** (6 values)              | ✅   | ✅       |                           |
-| **gap** (row/column)                      | ✅   | ✅       |                           |
-| **padding** (per-edge)                    | ✅   | ✅       |                           |
-| **margin** (per-edge)                     | ✅   | ✅       |                           |
-| **border** (per-edge)                     | ✅   | ✅       |                           |
-| **min/max width/height**                  | ✅   | ✅       |                           |
-| **percent values**                        | ✅   | ✅       |                           |
-| **absolute positioning**                  | ✅   | ✅       |                           |
-| **measure functions**                     | ✅   | ✅       | For text nodes            |
-| **flex-wrap**                             | ✅   | ✅       |                           |
-| **baseline alignment**                    | ✅   | ✅       |                           |
-| **RTL direction**                         | ✅   | ✅       |                           |
-| **EDGE_START/END**                        | ✅   | ✅       | Full logical edge support |
-| **aspect-ratio**                          | ✅   | ✅       |                           |
+| Feature                                   | Yoga | Flexily | Notes                     |
+| ----------------------------------------- | ---- | ------- | ------------------------- |
+| **flex-direction** (row, column, reverse) | ✅   | ✅      |                           |
+| **flex-grow**                             | ✅   | ✅      |                           |
+| **flex-shrink**                           | ✅   | ✅      | CSS-spec compliant        |
+| **flex-basis**                            | ✅   | ✅      |                           |
+| **justify-content** (6 values)            | ✅   | ✅      |                           |
+| **align-items** (5 values)                | ✅   | ✅      |                           |
+| **align-self**                            | ✅   | ✅      |                           |
+| **align-content** (6 values)              | ✅   | ✅      |                           |
+| **gap** (row/column)                      | ✅   | ✅      |                           |
+| **padding** (per-edge)                    | ✅   | ✅      |                           |
+| **margin** (per-edge)                     | ✅   | ✅      |                           |
+| **border** (per-edge)                     | ✅   | ✅      |                           |
+| **min/max width/height**                  | ✅   | ✅      |                           |
+| **percent values**                        | ✅   | ✅      |                           |
+| **absolute positioning**                  | ✅   | ✅      |                           |
+| **measure functions**                     | ✅   | ✅      | For text nodes            |
+| **flex-wrap**                             | ✅   | ✅      |                           |
+| **baseline alignment**                    | ✅   | ✅      |                           |
+| **RTL direction**                         | ✅   | ✅      |                           |
+| **EDGE_START/END**                        | ✅   | ✅      | Full logical edge support |
+| **aspect-ratio**                          | ✅   | ✅      |                           |
 
-Flexture implements CSS spec's basis-weighted shrink (`flexShrink × flexBasis`).
+Flexily implements CSS spec's basis-weighted shrink (`flexShrink × flexBasis`).
 
 ---
 
@@ -136,15 +136,15 @@ See [performance.md](performance.md) for detailed benchmarks, methodology, and t
 
 **Summary:** Each engine wins in different scenarios. Both handle terminal UIs (<500 nodes) in under 1ms.
 
-| Scenario                            | Winner       | Margin     | Why                                              |
-| ----------------------------------- | ------------ | ---------- | ------------------------------------------------ |
-| Initial layout (create + calculate) | Flexture     | 1.5-2.5x   | JS node creation avoids WASM boundary crossings  |
-| **No-change re-layout**             | **Flexture** | **5.5x**   | Fingerprint cache — 27ns regardless of tree size |
-| Incremental re-layout (dirty leaf)  | Yoga         | 2.8-3.4x   | WASM per-node computation is faster              |
-| Full re-layout (constraint change)  | Yoga         | 2.7x       | Same — WASM layout is faster                     |
-| Deep nesting (15+ levels)           | Yoga         | increasing | Flexture overhead compounds at depth             |
+| Scenario                            | Winner      | Margin     | Why                                              |
+| ----------------------------------- | ----------- | ---------- | ------------------------------------------------ |
+| Initial layout (create + calculate) | Flexily     | 1.5-2.5x   | JS node creation avoids WASM boundary crossings  |
+| **No-change re-layout**             | **Flexily** | **5.5x**   | Fingerprint cache — 27ns regardless of tree size |
+| Incremental re-layout (dirty leaf)  | Yoga        | 2.8-3.4x   | WASM per-node computation is faster              |
+| Full re-layout (constraint change)  | Yoga        | 2.7x       | Same — WASM layout is faster                     |
+| Deep nesting (15+ levels)           | Yoga        | increasing | Flexily overhead compounds at depth              |
 
-**Key insight**: Flexture wins at node creation and cache hits. Yoga wins at raw layout computation. For interactive TUIs where most keystrokes don't change layout, Flexture's fingerprint cache is the key advantage.
+**Key insight**: Flexily wins at node creation and cache hits. Yoga wins at raw layout computation. For interactive TUIs where most keystrokes don't change layout, Flexily's fingerprint cache is the key advantage.
 
 Run benchmarks:
 
@@ -166,13 +166,13 @@ bun bench bench/incremental.bench.ts          # No-change, dirty leaf, resize
 
 ## Migration Guide
 
-### From Yoga to Flexture
+### From Yoga to Flexily
 
 ```diff
 - import Yoga from 'yoga-wasm-web';
 - const yoga = await Yoga.init();
 - const root = yoga.Node.create();
-+ import { Node } from '@beorn/flexture';
++ import { Node } from '@beorn/flexily';
 + const root = Node.create();  // Synchronous!
 
 // Rest of the API is identical
@@ -184,13 +184,13 @@ root.setFlexDirection(FLEX_DIRECTION_ROW);
 ### Key Changes
 
 1. **No async init** — Remove `await Yoga.init()`
-2. **Import from package** — `import { Node, FLEX_DIRECTION_ROW } from '@beorn/flexture'`
+2. **Import from package** — `import { Node, FLEX_DIRECTION_ROW } from '@beorn/flexily'`
 
 ---
 
 ## Test Coverage
 
-Flexture includes 1368 tests covering:
+Flexily includes 1368 tests covering:
 
 - ✅ Basic layout (single node, column, row)
 - ✅ Flex grow distribution

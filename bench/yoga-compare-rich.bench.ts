@@ -1,5 +1,5 @@
 /**
- * Rich Flexture vs Yoga Comparison Benchmarks
+ * Rich Flexily vs Yoga Comparison Benchmarks
  *
  * Goes beyond flat/deep to test dimensions that matter for real applications:
  * - Measure functions (text nodes)
@@ -13,7 +13,7 @@
  */
 
 import { bench, describe, beforeAll } from "vitest"
-import * as Flexture from "../src/index.js"
+import * as Flexily from "../src/index.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -35,8 +35,8 @@ beforeAll(async () => {
   // Warmup JIT
   console.log("\n[Warmup] Running 500 iterations...")
   for (let i = 0; i < 500; i++) {
-    const ft = flextureTuiTree(5, 10)
-    ft.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+    const ft = flexilyTuiTree(5, 10)
+    ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
     const yt = yogaTuiTree(5, 10)
     yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
     yt.freeRecursive()
@@ -64,40 +64,40 @@ function textMeasure(textLen: number) {
 // Mirrors the actual km TUI structure
 // ============================================================================
 
-function flextureTuiTree(cols: number, cardsPerCol: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function flexilyTuiTree(cols: number, cardsPerCol: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(120)
   root.setHeight(40)
-  root.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-  root.setGap(Flexture.GUTTER_ALL, 1)
+  root.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+  root.setGap(Flexily.GUTTER_ALL, 1)
 
   for (let c = 0; c < cols; c++) {
-    const col = Flexture.Node.create()
+    const col = Flexily.Node.create()
     col.setFlexGrow(1)
     col.setFlexShrink(1)
-    col.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+    col.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
     // Column header
-    const header = Flexture.Node.create()
+    const header = Flexily.Node.create()
     header.setHeight(1)
     col.insertChild(header, 0)
 
     for (let i = 0; i < cardsPerCol; i++) {
       // Card border container
-      const card = Flexture.Node.create()
-      card.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
-      card.setBorder(Flexture.EDGE_ALL, 1)
-      card.setPadding(Flexture.EDGE_RIGHT, 1)
+      const card = Flexily.Node.create()
+      card.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+      card.setBorder(Flexily.EDGE_ALL, 1)
+      card.setPadding(Flexily.EDGE_RIGHT, 1)
 
       // Card row: icon + text
-      const row = Flexture.Node.create()
-      row.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+      const row = Flexily.Node.create()
+      row.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-      const icon = Flexture.Node.create()
+      const icon = Flexily.Node.create()
       icon.setWidth(3)
       row.insertChild(icon, 0)
 
-      const text = Flexture.Node.create()
+      const text = Flexily.Node.create()
       text.setFlexGrow(1)
       text.setFlexShrink(1)
       text.setMeasureFunc(textMeasure(15 + (i % 20)))
@@ -159,37 +159,33 @@ function yogaTuiTree(cols: number, cardsPerCol: number) {
 // Tree: Property-rich (uses diverse flex properties)
 // ============================================================================
 
-function flexturePropertyRichTree(nodeCount: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function flexilyPropertyRichTree(nodeCount: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(200)
   root.setHeight(100)
-  root.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
-  root.setAlignItems(Flexture.ALIGN_STRETCH)
+  root.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+  root.setAlignItems(Flexily.ALIGN_STRETCH)
 
   const rows = Math.ceil(nodeCount / 5)
   for (let r = 0; r < rows; r++) {
-    const row = Flexture.Node.create()
-    row.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    const row = Flexily.Node.create()
+    row.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
     row.setJustifyContent(
-      r % 3 === 0
-        ? Flexture.JUSTIFY_FLEX_START
-        : r % 3 === 1
-          ? Flexture.JUSTIFY_SPACE_BETWEEN
-          : Flexture.JUSTIFY_CENTER,
+      r % 3 === 0 ? Flexily.JUSTIFY_FLEX_START : r % 3 === 1 ? Flexily.JUSTIFY_SPACE_BETWEEN : Flexily.JUSTIFY_CENTER,
     )
-    row.setAlignItems(r % 2 === 0 ? Flexture.ALIGN_CENTER : Flexture.ALIGN_FLEX_END)
-    row.setFlexWrap(r % 4 === 0 ? Flexture.WRAP_WRAP : Flexture.WRAP_NO_WRAP)
+    row.setAlignItems(r % 2 === 0 ? Flexily.ALIGN_CENTER : Flexily.ALIGN_FLEX_END)
+    row.setFlexWrap(r % 4 === 0 ? Flexily.WRAP_WRAP : Flexily.WRAP_NO_WRAP)
     row.setFlexGrow(1)
 
     for (let c = 0; c < 5; c++) {
-      const child = Flexture.Node.create()
+      const child = Flexily.Node.create()
       child.setFlexGrow(c % 3 === 0 ? 1 : 0)
       child.setFlexShrink(c % 2 === 0 ? 1 : 0)
       child.setWidth(20 + c * 5)
       child.setHeight(5)
-      child.setMargin(Flexture.EDGE_ALL, 1)
+      child.setMargin(Flexily.EDGE_ALL, 1)
       if (c % 3 === 2) {
-        child.setAlignSelf(Flexture.ALIGN_FLEX_START)
+        child.setAlignSelf(Flexily.ALIGN_FLEX_START)
       }
       row.insertChild(child, c)
     }
@@ -246,10 +242,10 @@ describe("TUI Board (create + layout)", () => {
   ] as const) {
     const total = cols * (1 + cards * 4) + 1 // root + cols*(header + cards*(border+row+icon+text))
     bench(
-      `Flexture: ${cols}×${cards} (~${total} nodes)`,
+      `Flexily: ${cols}×${cards} (~${total} nodes)`,
       () => {
-        const tree = flextureTuiTree(cols, cards)
-        tree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+        const tree = flexilyTuiTree(cols, cards)
+        tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       },
       opts,
     )
@@ -275,18 +271,18 @@ describe("Incremental re-layout (single leaf dirty)", () => {
     [5, 20],
     [8, 30],
   ] as const) {
-    let flextureTree: Flexture.Node
-    let flextureLeaf: Flexture.Node
+    let flexilyTree: Flexily.Node
+    let flexilyLeaf: Flexily.Node
     let yogaTree: ReturnType<typeof yoga.Node.create>
     let yogaLeaf: ReturnType<typeof yoga.Node.create>
 
     beforeAll(() => {
-      flextureTree = flextureTuiTree(cols, cards)
-      flextureTree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+      flexilyTree = flexilyTuiTree(cols, cards)
+      flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       // Get a text leaf node in the middle column
       const midCol = Math.floor(cols / 2)
       const midCard = Math.floor(cards / 2)
-      flextureLeaf = flextureTree
+      flexilyLeaf = flexilyTree
         .getChild(midCol)!
         .getChild(midCard + 1)!
         .getChild(0)!
@@ -302,10 +298,10 @@ describe("Incremental re-layout (single leaf dirty)", () => {
     })
 
     bench(
-      `Flexture: ${cols}×${cards} leaf dirty`,
+      `Flexily: ${cols}×${cards} leaf dirty`,
       () => {
-        flextureLeaf.markDirty()
-        flextureTree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+        flexilyLeaf.markDirty()
+        flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       },
       opts,
     )
@@ -329,23 +325,23 @@ describe("Re-layout with width change", () => {
     [5, 10],
     [5, 20],
   ] as const) {
-    let flextureTree: Flexture.Node
+    let flexilyTree: Flexily.Node
     let yogaTree: ReturnType<typeof yoga.Node.create>
 
     beforeAll(() => {
-      flextureTree = flextureTuiTree(cols, cards)
-      flextureTree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+      flexilyTree = flexilyTuiTree(cols, cards)
+      flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       yogaTree = yogaTuiTree(cols, cards)
       yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
     })
 
     bench(
-      `Flexture: ${cols}×${cards} width 120→80`,
+      `Flexily: ${cols}×${cards} width 120→80`,
       () => {
-        flextureTree.setWidth(80)
-        flextureTree.calculateLayout(80, 40, Flexture.DIRECTION_LTR)
-        flextureTree.setWidth(120)
-        flextureTree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+        flexilyTree.setWidth(80)
+        flexilyTree.calculateLayout(80, 40, Flexily.DIRECTION_LTR)
+        flexilyTree.setWidth(120)
+        flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       },
       opts,
     )
@@ -369,10 +365,10 @@ describe("Re-layout with width change", () => {
 describe("Property-rich trees (shrink, align, justify, wrap)", () => {
   for (const nodeCount of [100, 300, 600]) {
     bench(
-      `Flexture: ~${nodeCount} nodes`,
+      `Flexily: ~${nodeCount} nodes`,
       () => {
-        const tree = flexturePropertyRichTree(nodeCount)
-        tree.calculateLayout(200, 100, Flexture.DIRECTION_LTR)
+        const tree = flexilyPropertyRichTree(nodeCount)
+        tree.calculateLayout(200, 100, Flexily.DIRECTION_LTR)
       },
       opts,
     )
@@ -389,7 +385,7 @@ describe("Property-rich trees (shrink, align, justify, wrap)", () => {
 })
 
 // ============================================================================
-// 5. No-change re-layout (best case for Flexture fingerprint cache)
+// 5. No-change re-layout (best case for Flexily fingerprint cache)
 // ============================================================================
 
 describe("No-change re-layout (fingerprint cache hit)", () => {
@@ -398,20 +394,20 @@ describe("No-change re-layout (fingerprint cache hit)", () => {
     [5, 20],
     [8, 30],
   ] as const) {
-    let flextureTree: Flexture.Node
+    let flexilyTree: Flexily.Node
     let yogaTree: ReturnType<typeof yoga.Node.create>
 
     beforeAll(() => {
-      flextureTree = flextureTuiTree(cols, cards)
-      flextureTree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+      flexilyTree = flexilyTuiTree(cols, cards)
+      flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       yogaTree = yogaTuiTree(cols, cards)
       yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
     })
 
     bench(
-      `Flexture: ${cols}×${cards} no-change`,
+      `Flexily: ${cols}×${cards} no-change`,
       () => {
-        flextureTree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+        flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       },
       opts,
     )

@@ -1,15 +1,15 @@
 /**
- * Flexture vs Yoga Comparison Benchmarks
+ * Flexily vs Yoga Comparison Benchmarks
  *
  * Compares layout performance between:
- * - Flexture (pure JavaScript)
+ * - Flexily (pure JavaScript)
  * - Yoga (WebAssembly via yoga-wasm-web)
  *
- * Run: bun bench (from flexture or monorepo root)
+ * Run: bun bench (from flexily or monorepo root)
  */
 
 import { bench, describe, beforeAll } from "vitest"
-import * as Flexture from "../src/index.js"
+import * as Flexily from "../src/index.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -30,17 +30,17 @@ beforeAll(async () => {
 })
 
 // ============================================================================
-// Tree Generators - Flexture
+// Tree Generators - Flexily
 // ============================================================================
 
-function flextureFlatTree(nodeCount: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function flexilyFlatTree(nodeCount: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(1000)
   root.setHeight(1000)
-  root.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+  root.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
   for (let i = 0; i < nodeCount; i++) {
-    const child = Flexture.Node.create()
+    const child = Flexily.Node.create()
     child.setHeight(10)
     child.setFlexGrow(1)
     root.insertChild(child, i)
@@ -49,16 +49,16 @@ function flextureFlatTree(nodeCount: number): Flexture.Node {
   return root
 }
 
-function flextureDeepTree(depth: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function flexilyDeepTree(depth: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(1000)
   root.setHeight(1000)
 
   let current = root
   for (let i = 0; i < depth; i++) {
-    const child = Flexture.Node.create()
+    const child = Flexily.Node.create()
     child.setFlexGrow(1)
-    child.setPadding(Flexture.EDGE_LEFT, 1)
+    child.setPadding(Flexily.EDGE_LEFT, 1)
     current.insertChild(child, 0)
     current = child
   }
@@ -66,27 +66,27 @@ function flextureDeepTree(depth: number): Flexture.Node {
   return root
 }
 
-function flextureKanbanTree(cardsPerColumn: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function flexilyKanbanTree(cardsPerColumn: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(120)
   root.setHeight(40)
-  root.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-  root.setGap(Flexture.GUTTER_ALL, 1)
+  root.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+  root.setGap(Flexily.GUTTER_ALL, 1)
 
   for (let col = 0; col < 3; col++) {
-    const column = Flexture.Node.create()
+    const column = Flexily.Node.create()
     column.setFlexGrow(1)
-    column.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
-    column.setGap(Flexture.GUTTER_ALL, 1)
+    column.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+    column.setGap(Flexily.GUTTER_ALL, 1)
 
-    const header = Flexture.Node.create()
+    const header = Flexily.Node.create()
     header.setHeight(1)
     column.insertChild(header, 0)
 
     for (let card = 0; card < cardsPerColumn; card++) {
-      const cardNode = Flexture.Node.create()
+      const cardNode = Flexily.Node.create()
       cardNode.setHeight(3)
-      cardNode.setPadding(Flexture.EDGE_LEFT, 1)
+      cardNode.setPadding(Flexily.EDGE_LEFT, 1)
       column.insertChild(cardNode, card + 1)
     }
 
@@ -167,11 +167,11 @@ function yogaKanbanTree(cardsPerColumn: number) {
 // Benchmarks - Create + Layout (fair comparison)
 // ============================================================================
 
-describe("Flexture vs Yoga - Flat Hierarchy", () => {
+describe("Flexily vs Yoga - Flat Hierarchy", () => {
   for (const nodeCount of [100, 500, 1000]) {
-    bench(`Flexture: ${nodeCount} nodes - create + layout`, () => {
-      const tree = flextureFlatTree(nodeCount)
-      tree.calculateLayout(1000, 1000, Flexture.DIRECTION_LTR)
+    bench(`Flexily: ${nodeCount} nodes - create + layout`, () => {
+      const tree = flexilyFlatTree(nodeCount)
+      tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
     })
 
     bench(`Yoga: ${nodeCount} nodes - create + layout`, () => {
@@ -182,11 +182,11 @@ describe("Flexture vs Yoga - Flat Hierarchy", () => {
   }
 })
 
-describe("Flexture vs Yoga - Deep Hierarchy", () => {
+describe("Flexily vs Yoga - Deep Hierarchy", () => {
   for (const depth of [1, 2, 5, 10, 15, 20, 50, 100]) {
-    bench(`Flexture: ${depth} levels deep - create + layout`, () => {
-      const tree = flextureDeepTree(depth)
-      tree.calculateLayout(1000, 1000, Flexture.DIRECTION_LTR)
+    bench(`Flexily: ${depth} levels deep - create + layout`, () => {
+      const tree = flexilyDeepTree(depth)
+      tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
     })
 
     bench(`Yoga: ${depth} levels deep - create + layout`, () => {
@@ -197,13 +197,13 @@ describe("Flexture vs Yoga - Deep Hierarchy", () => {
   }
 })
 
-describe("Flexture vs Yoga - Kanban (TUI Pattern)", () => {
+describe("Flexily vs Yoga - Kanban (TUI Pattern)", () => {
   for (const cardsPerCol of [10, 50, 100]) {
     const totalNodes = 3 + 3 * (1 + cardsPerCol)
 
-    bench(`Flexture: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
-      const tree = flextureKanbanTree(cardsPerCol)
-      tree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+    bench(`Flexily: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
+      const tree = flexilyKanbanTree(cardsPerCol)
+      tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
     })
 
     bench(`Yoga: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
@@ -218,18 +218,18 @@ describe("Flexture vs Yoga - Kanban (TUI Pattern)", () => {
 // Benchmarks - Layout Only (pre-created trees)
 // ============================================================================
 
-describe("Flexture vs Yoga - Layout Only (no allocation)", () => {
-  let flextureTree: Flexture.Node
+describe("Flexily vs Yoga - Layout Only (no allocation)", () => {
+  let flexilyTree: Flexily.Node
   let yogaTree: ReturnType<typeof yogaKanbanTree>
 
   beforeAll(() => {
-    flextureTree = flextureKanbanTree(50)
+    flexilyTree = flexilyKanbanTree(50)
     yogaTree = yogaKanbanTree(50)
   })
 
-  bench("Flexture: Kanban 3×50 - layout only", () => {
-    flextureTree.markDirty()
-    flextureTree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+  bench("Flexily: Kanban 3×50 - layout only", () => {
+    flexilyTree.markDirty()
+    flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
   })
 
   bench("Yoga: Kanban 3×50 - layout only", () => {
@@ -246,29 +246,29 @@ describe("Flexture vs Yoga - Layout Only (no allocation)", () => {
  * Create a tree with measure functions on leaf nodes.
  * This simulates silvery Text nodes which use measure functions for intrinsic sizing.
  */
-function flextureTreeWithMeasure(nodeCount: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function flexilyTreeWithMeasure(nodeCount: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(250)
   root.setHeight(120)
-  root.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+  root.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
   // Create columns (like TUI columns view)
   const numCols = 5
   const itemsPerCol = Math.floor(nodeCount / numCols / 2) // /2 because each item has a text child
 
   for (let col = 0; col < numCols; col++) {
-    const column = Flexture.Node.create()
+    const column = Flexily.Node.create()
     column.setFlexGrow(1)
-    column.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+    column.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
     for (let item = 0; item < itemsPerCol; item++) {
       // Item container
-      const itemNode = Flexture.Node.create()
-      itemNode.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-      itemNode.setPadding(Flexture.EDGE_LEFT, 1)
+      const itemNode = Flexily.Node.create()
+      itemNode.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+      itemNode.setPadding(Flexily.EDGE_LEFT, 1)
 
       // Text node with measure function
-      const textNode = Flexture.Node.create()
+      const textNode = Flexily.Node.create()
       const textContent = `Item ${col}-${item} with some text content`
       textNode.setMeasureFunc((width, _widthMode, _height, _heightMode) => {
         // Simulate text measurement (simplified)
@@ -332,11 +332,11 @@ function yogaTreeWithMeasure(nodeCount: number) {
 // Benchmarks - With Measure Functions (real-world TUI pattern)
 // ============================================================================
 
-describe("Flexture vs Yoga - With Measure Functions", () => {
+describe("Flexily vs Yoga - With Measure Functions", () => {
   for (const nodeCount of [200, 500, 1000, 1500]) {
-    bench(`Flexture: ~${nodeCount} nodes with measure - create + layout`, () => {
-      const tree = flextureTreeWithMeasure(nodeCount)
-      tree.calculateLayout(250, 120, Flexture.DIRECTION_LTR)
+    bench(`Flexily: ~${nodeCount} nodes with measure - create + layout`, () => {
+      const tree = flexilyTreeWithMeasure(nodeCount)
+      tree.calculateLayout(250, 120, Flexily.DIRECTION_LTR)
     })
 
     bench(`Yoga: ~${nodeCount} nodes with measure - create + layout`, () => {
@@ -351,29 +351,29 @@ describe("Flexture vs Yoga - With Measure Functions", () => {
 // Benchmarks - Incremental Updates (single node dirty)
 // ============================================================================
 
-describe("Flexture vs Yoga - Incremental Update", () => {
-  let flextureTree: Flexture.Node
-  let flextureLeaf: Flexture.Node
+describe("Flexily vs Yoga - Incremental Update", () => {
+  let flexilyTree: Flexily.Node
+  let flexilyLeaf: Flexily.Node
   let yogaTree: ReturnType<typeof yogaKanbanTree>
   let yogaLeaf: ReturnType<typeof yoga.Node.create>
 
   beforeAll(() => {
     // Create trees
-    flextureTree = flextureKanbanTree(100)
+    flexilyTree = flexilyKanbanTree(100)
     yogaTree = yogaKanbanTree(100)
 
     // Get a deep leaf node to mark dirty
-    flextureLeaf = flextureTree.getChild(1)!.getChild(50)!
+    flexilyLeaf = flexilyTree.getChild(1)!.getChild(50)!
     yogaLeaf = yogaTree.getChild(1)!.getChild(50)!
 
     // Initial layout
-    flextureTree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+    flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
     yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
   })
 
-  bench("Flexture: Single leaf dirty - relayout", () => {
-    flextureLeaf.markDirty()
-    flextureTree.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+  bench("Flexily: Single leaf dirty - relayout", () => {
+    flexilyLeaf.markDirty()
+    flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
   })
 
   bench("Yoga: Single leaf dirty - relayout", () => {
@@ -386,34 +386,34 @@ describe("Flexture vs Yoga - Incremental Update", () => {
 // Benchmarks - Large Scale (1500+ nodes like real km app)
 // ============================================================================
 
-describe("Flexture vs Yoga - Large Scale TUI", () => {
+describe("Flexily vs Yoga - Large Scale TUI", () => {
   // Simulate a large TUI with multiple columns and many items
-  function createLargeTUI(engine: "flexture" | "yoga", nodeCount: number) {
+  function createLargeTUI(engine: "flexily" | "yoga", nodeCount: number) {
     const cols = 8
     const itemsPerCol = Math.floor(nodeCount / cols / 3) // 3 nodes per item: container + icon + text
 
-    if (engine === "flexture") {
-      const root = Flexture.Node.create()
+    if (engine === "flexily") {
+      const root = Flexily.Node.create()
       root.setWidth(250)
       root.setHeight(120)
-      root.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-      root.setGap(Flexture.GUTTER_ALL, 1)
+      root.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+      root.setGap(Flexily.GUTTER_ALL, 1)
 
       for (let c = 0; c < cols; c++) {
-        const col = Flexture.Node.create()
+        const col = Flexily.Node.create()
         col.setFlexGrow(1)
-        col.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+        col.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
         for (let i = 0; i < itemsPerCol; i++) {
-          const item = Flexture.Node.create()
-          item.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+          const item = Flexily.Node.create()
+          item.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
           item.setHeight(1)
 
-          const icon = Flexture.Node.create()
+          const icon = Flexily.Node.create()
           icon.setWidth(2)
           item.insertChild(icon, 0)
 
-          const text = Flexture.Node.create()
+          const text = Flexily.Node.create()
           text.setFlexGrow(1)
           item.insertChild(text, 1)
 
@@ -456,9 +456,9 @@ describe("Flexture vs Yoga - Large Scale TUI", () => {
   }
 
   for (const nodeCount of [500, 1000, 1500, 2000]) {
-    bench(`Flexture: Large TUI ~${nodeCount} nodes`, () => {
-      const tree = createLargeTUI("flexture", nodeCount) as Flexture.Node
-      tree.calculateLayout(250, 120, Flexture.DIRECTION_LTR)
+    bench(`Flexily: Large TUI ~${nodeCount} nodes`, () => {
+      const tree = createLargeTUI("flexily", nodeCount) as Flexily.Node
+      tree.calculateLayout(250, 120, Flexily.DIRECTION_LTR)
     })
 
     bench(`Yoga: Large TUI ~${nodeCount} nodes`, () => {

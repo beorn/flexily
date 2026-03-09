@@ -1,17 +1,17 @@
 /**
  * Yoga Compatibility Tests
  *
- * Systematically compares Flexture output against Yoga (the reference implementation)
+ * Systematically compares Flexily output against Yoga (the reference implementation)
  * to identify discrepancies and edge cases.
  *
  * Run: bun test tests/yoga-comparison.test.ts
  */
 
 import { describe, expect, it, beforeAll } from "vitest"
-import { createLogger } from "decant"
+import { createLogger } from "loggily"
 
-const log = createLogger("flexture:test:compat")
-import * as Flexture from "../src/index.js"
+const log = createLogger("flexily:test:compat")
+import * as Flexily from "../src/index.js"
 import initYoga, { type Yoga, type Node as YogaNode } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -45,13 +45,13 @@ interface NodeLayout extends LayoutResult {
   children: NodeLayout[]
 }
 
-function getFlextureLayout(node: Flexture.Node): NodeLayout {
+function getFlexilyLayout(node: Flexily.Node): NodeLayout {
   return {
     left: node.getComputedLeft(),
     top: node.getComputedTop(),
     width: node.getComputedWidth(),
     height: node.getComputedHeight(),
-    children: Array.from({ length: node.getChildCount() }, (_, i) => getFlextureLayout(node.getChild(i)!)),
+    children: Array.from({ length: node.getChildCount() }, (_, i) => getFlexilyLayout(node.getChild(i)!)),
   }
 }
 
@@ -95,7 +95,7 @@ interface TestResult {
   category: string
   name: string
   passed: boolean
-  flexture?: NodeLayout
+  flexily?: NodeLayout
   yoga?: NodeLayout
   error?: string
 }
@@ -146,15 +146,15 @@ interface ChildConfig extends NodeConfig {
 }
 
 /**
- * Creates and configures a Flexture node
+ * Creates and configures a Flexily node
  */
-function createFlextureNode(config: NodeConfig): Flexture.Node {
-  const node = Flexture.Node.create()
-  applyFlextureConfig(node, config)
+function createFlexilyNode(config: NodeConfig): Flexily.Node {
+  const node = Flexily.Node.create()
+  applyFlexilyConfig(node, config)
   return node
 }
 
-function applyFlextureConfig(node: Flexture.Node, config: NodeConfig) {
+function applyFlexilyConfig(node: Flexily.Node, config: NodeConfig) {
   if (config.width !== undefined) {
     node.setWidth(config.width)
   }
@@ -195,16 +195,16 @@ function applyFlextureConfig(node: Flexture.Node, config: NodeConfig) {
     node.setGap(config.gap.gutter, config.gap.value)
   }
   if (config.gapRow !== undefined) {
-    node.setGap(Flexture.GUTTER_ROW, config.gapRow)
+    node.setGap(Flexily.GUTTER_ROW, config.gapRow)
   }
   if (config.gapColumn !== undefined) {
-    node.setGap(Flexture.GUTTER_COLUMN, config.gapColumn)
+    node.setGap(Flexily.GUTTER_COLUMN, config.gapColumn)
   }
   if (config.padding !== undefined) {
-    node.setPadding(Flexture.EDGE_ALL, config.padding)
+    node.setPadding(Flexily.EDGE_ALL, config.padding)
   }
   if (config.paddingPercent !== undefined) {
-    node.setPaddingPercent(Flexture.EDGE_ALL, config.paddingPercent)
+    node.setPaddingPercent(Flexily.EDGE_ALL, config.paddingPercent)
   }
   if (config.margin !== undefined) {
     node.setMargin(config.margin.edge, config.margin.value)
@@ -339,26 +339,26 @@ interface CompareLayoutsOptions {
   rootConfig: NodeConfig
   childConfigs?: ChildConfig[]
   /** Custom setup for nodes that need special configuration */
-  customSetup?: (fRoot: Flexture.Node, yRoot: YogaNode) => void
+  customSetup?: (fRoot: Flexily.Node, yRoot: YogaNode) => void
   layoutWidth?: number
   layoutHeight?: number
 }
 
 /**
- * Main comparison helper - creates Flexture and Yoga trees, compares layouts
+ * Main comparison helper - creates Flexily and Yoga trees, compares layouts
  */
 function compareLayouts(options: CompareLayoutsOptions): boolean {
   const { category, name, rootConfig, childConfigs = [], customSetup, layoutWidth = 100, layoutHeight = 100 } = options
 
-  // Create Flexture tree
-  const fRoot = createFlextureNode(rootConfig)
+  // Create Flexily tree
+  const fRoot = createFlexilyNode(rootConfig)
 
   // Create children
   for (let i = 0; i < childConfigs.length; i++) {
     const childConfig = childConfigs[i]!
     const count = childConfig.count ?? 1
     for (let j = 0; j < count; j++) {
-      const child = createFlextureNode(childConfig)
+      const child = createFlexilyNode(childConfig)
       fRoot.insertChild(child, fRoot.getChildCount())
     }
   }
@@ -381,20 +381,20 @@ function compareLayouts(options: CompareLayoutsOptions): boolean {
   }
 
   // Calculate layouts
-  fRoot.calculateLayout(layoutWidth, layoutHeight, Flexture.DIRECTION_LTR)
+  fRoot.calculateLayout(layoutWidth, layoutHeight, Flexily.DIRECTION_LTR)
   yRoot.calculateLayout(layoutWidth, layoutHeight, yoga.DIRECTION_LTR)
 
-  const flextureLayout = getFlextureLayout(fRoot)
+  const flexilyLayout = getFlexilyLayout(fRoot)
   const yogaLayout = getYogaLayout(yRoot)
 
   yRoot.freeRecursive()
 
-  const match = layoutsMatch(flextureLayout, yogaLayout)
+  const match = layoutsMatch(flexilyLayout, yogaLayout)
   recordResult({
     category,
     name,
     passed: match,
-    flexture: flextureLayout,
+    flexily: flexilyLayout,
     yoga: yogaLayout,
   })
 
@@ -413,7 +413,7 @@ describe("Yoga Comparison: FlexWrap", () => {
       childCount: 3,
       childWidth: 40,
       childHeight: 20,
-      flexWrap: Flexture.WRAP_WRAP,
+      flexWrap: Flexily.WRAP_WRAP,
     },
     {
       name: "wrap-reverse",
@@ -421,7 +421,7 @@ describe("Yoga Comparison: FlexWrap", () => {
       childCount: 3,
       childWidth: 40,
       childHeight: 20,
-      flexWrap: Flexture.WRAP_WRAP_REVERSE,
+      flexWrap: Flexily.WRAP_WRAP_REVERSE,
     },
   ])("$name: $description", ({ name, childCount, childWidth, childHeight, flexWrap }) => {
     const match = compareLayouts({
@@ -430,7 +430,7 @@ describe("Yoga Comparison: FlexWrap", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
         flexWrap,
       },
       childConfigs: [{ width: childWidth, height: childHeight, count: childCount }],
@@ -445,8 +445,8 @@ describe("Yoga Comparison: FlexWrap", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
-        flexWrap: Flexture.WRAP_WRAP,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
+        flexWrap: Flexily.WRAP_WRAP,
         gapColumn: 10,
         gapRow: 5,
       },
@@ -462,8 +462,8 @@ describe("Yoga Comparison: FlexWrap", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
-        flexWrap: Flexture.WRAP_WRAP,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
+        flexWrap: Flexily.WRAP_WRAP,
       },
       childConfigs: [{ width: 40, height: 20, flexGrow: 1, count: 3 }],
     })
@@ -477,8 +477,8 @@ describe("Yoga Comparison: FlexWrap", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_COLUMN,
-        flexWrap: Flexture.WRAP_WRAP,
+        flexDirection: Flexily.FLEX_DIRECTION_COLUMN,
+        flexWrap: Flexily.WRAP_WRAP,
       },
       childConfigs: [{ width: 30, height: 40, count: 6 }],
     })
@@ -494,32 +494,32 @@ describe("Yoga Comparison: AlignContent", () => {
   const alignContentCases = [
     {
       name: "flex-start",
-      align: Flexture.ALIGN_FLEX_START,
+      align: Flexily.ALIGN_FLEX_START,
       description: "lines packed at start",
     },
     {
       name: "center",
-      align: Flexture.ALIGN_CENTER,
+      align: Flexily.ALIGN_CENTER,
       description: "lines packed at center",
     },
     {
       name: "flex-end",
-      align: Flexture.ALIGN_FLEX_END,
+      align: Flexily.ALIGN_FLEX_END,
       description: "lines packed at end",
     },
     {
       name: "space-between",
-      align: Flexture.ALIGN_SPACE_BETWEEN,
+      align: Flexily.ALIGN_SPACE_BETWEEN,
       description: "lines spaced evenly",
     },
     {
       name: "space-around",
-      align: Flexture.ALIGN_SPACE_AROUND,
+      align: Flexily.ALIGN_SPACE_AROUND,
       description: "lines with space around",
     },
     {
       name: "stretch",
-      align: Flexture.ALIGN_STRETCH,
+      align: Flexily.ALIGN_STRETCH,
       description: "lines stretch to fill",
     },
   ]
@@ -531,8 +531,8 @@ describe("Yoga Comparison: AlignContent", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
-        flexWrap: Flexture.WRAP_WRAP,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
+        flexWrap: Flexily.WRAP_WRAP,
         alignContent: align,
       },
       childConfigs: [{ width: 40, height: 20, count: 4 }],
@@ -557,10 +557,10 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
       },
       childConfigs: [
         {
-          positionType: Flexture.POSITION_TYPE_ABSOLUTE,
+          positionType: Flexily.POSITION_TYPE_ABSOLUTE,
           position: [
-            { edge: Flexture.EDGE_LEFT, value: 0 },
-            { edge: Flexture.EDGE_TOP, value: 0 },
+            { edge: Flexily.EDGE_LEFT, value: 0 },
+            { edge: Flexily.EDGE_TOP, value: 0 },
           ],
           width: 50,
           height: 50,
@@ -577,12 +577,12 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
       rootConfig: { width: 100, height: 100 },
       childConfigs: [
         {
-          positionType: Flexture.POSITION_TYPE_ABSOLUTE,
+          positionType: Flexily.POSITION_TYPE_ABSOLUTE,
           position: [
-            { edge: Flexture.EDGE_LEFT, value: 10 },
-            { edge: Flexture.EDGE_TOP, value: 10 },
-            { edge: Flexture.EDGE_RIGHT, value: 10 },
-            { edge: Flexture.EDGE_BOTTOM, value: 10 },
+            { edge: Flexily.EDGE_LEFT, value: 10 },
+            { edge: Flexily.EDGE_TOP, value: 10 },
+            { edge: Flexily.EDGE_RIGHT, value: 10 },
+            { edge: Flexily.EDGE_BOTTOM, value: 10 },
           ],
         },
       ],
@@ -597,10 +597,10 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
       rootConfig: { width: 100, height: 100 },
       childConfigs: [
         {
-          positionType: Flexture.POSITION_TYPE_ABSOLUTE,
+          positionType: Flexily.POSITION_TYPE_ABSOLUTE,
           positionPercent: [
-            { edge: Flexture.EDGE_LEFT, value: 10 },
-            { edge: Flexture.EDGE_TOP, value: 10 },
+            { edge: Flexily.EDGE_LEFT, value: 10 },
+            { edge: Flexily.EDGE_TOP, value: 10 },
           ],
           width: 50,
           height: 50,
@@ -612,22 +612,22 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
 
   it("absolute-with-margin: absolute with margin offset", () => {
     // This test needs custom setup for setting margin on specific edges
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
     fRoot.setHeight(100)
 
-    const fChild = Flexture.Node.create()
-    fChild.setPositionType(Flexture.POSITION_TYPE_ABSOLUTE)
-    fChild.setPosition(Flexture.EDGE_LEFT, 0)
-    fChild.setPosition(Flexture.EDGE_TOP, 0)
-    fChild.setMargin(Flexture.EDGE_LEFT, 10)
-    fChild.setMargin(Flexture.EDGE_TOP, 10)
+    const fChild = Flexily.Node.create()
+    fChild.setPositionType(Flexily.POSITION_TYPE_ABSOLUTE)
+    fChild.setPosition(Flexily.EDGE_LEFT, 0)
+    fChild.setPosition(Flexily.EDGE_TOP, 0)
+    fChild.setMargin(Flexily.EDGE_LEFT, 10)
+    fChild.setMargin(Flexily.EDGE_TOP, 10)
     fChild.setWidth(50)
     fChild.setHeight(50)
     fRoot.insertChild(fChild, 0)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -647,20 +647,20 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "AbsolutePositioning",
       name: "absolute-with-margin",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
   })
 
-  // Note: Flexture centers absolute children with auto margins, Yoga does not.
-  // This is a Flexture extension that follows CSS behavior more closely.
-  it.skip("absolute-centering: center absolute child with auto margins (Flexture extension)", () => {
+  // Note: Flexily centers absolute children with auto margins, Yoga does not.
+  // This is a Flexily extension that follows CSS behavior more closely.
+  it.skip("absolute-centering: center absolute child with auto margins (Flexily extension)", () => {
     // Intentionally skipped - documents known difference
   })
 })
@@ -672,23 +672,23 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
 describe("Yoga Comparison: MinMaxDimensions", () => {
   it("min-width-overrides-shrink: minWidth prevents shrinking", () => {
     // Custom setup needed for two children with different configs
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexture.Node.create()
+    const fChild1 = Flexily.Node.create()
     fChild1.setWidth(80)
     fChild1.setMinWidth(60)
     fChild1.setFlexShrink(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexture.Node.create()
+    const fChild2 = Flexily.Node.create()
     fChild2.setWidth(80)
     fChild2.setFlexShrink(1)
     fRoot.insertChild(fChild2, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -709,33 +709,33 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "MinMaxDimensions",
       name: "min-width-overrides-shrink",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
   })
 
   it("max-width-overrides-grow: maxWidth caps growth", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexture.Node.create()
+    const fChild1 = Flexily.Node.create()
     fChild1.setFlexGrow(1)
     fChild1.setMaxWidth(30)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexture.Node.create()
+    const fChild2 = Flexily.Node.create()
     fChild2.setFlexGrow(1)
     fRoot.insertChild(fChild2, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -754,12 +754,12 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "MinMaxDimensions",
       name: "max-width-overrides-grow",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -772,7 +772,7 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
       },
       childConfigs: [
         {
@@ -802,23 +802,23 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
 
   it("nested-min-max: nested containers with constraints", () => {
     // Custom setup for nested structure
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
     fRoot.setHeight(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fOuter = Flexture.Node.create()
+    const fOuter = Flexily.Node.create()
     fOuter.setFlexGrow(1)
     fOuter.setMaxWidth(60)
     fRoot.insertChild(fOuter, 0)
 
-    const fInner = Flexture.Node.create()
+    const fInner = Flexily.Node.create()
     fInner.setFlexGrow(1)
     fInner.setMinWidth(40)
     fOuter.insertChild(fInner, 0)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -839,12 +839,12 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "MinMaxDimensions",
       name: "nested-min-max",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -861,7 +861,7 @@ describe("Yoga Comparison: Gap", () => {
       name: "row-gap-only",
       description: "gap between rows in wrapped content",
       gapRow: 10,
-      flexWrap: Flexture.WRAP_WRAP,
+      flexWrap: Flexily.WRAP_WRAP,
       childCount: 4,
       childWidth: 40,
       childHeight: 30,
@@ -881,7 +881,7 @@ describe("Yoga Comparison: Gap", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
         flexWrap,
         gapRow,
         gapColumn,
@@ -898,7 +898,7 @@ describe("Yoga Comparison: Gap", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
         gapColumn: 10,
       },
       childConfigs: [{ flexGrow: 1, height: 30, count: 3 }],
@@ -913,9 +913,9 @@ describe("Yoga Comparison: Gap", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
-        flexWrap: Flexture.WRAP_WRAP,
-        gap: { gutter: Flexture.GUTTER_ALL, value: 10 },
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
+        flexWrap: Flexily.WRAP_WRAP,
+        gap: { gutter: Flexily.GUTTER_ALL, value: 10 },
       },
       childConfigs: [{ width: 25, height: 25, count: 6 }],
     })
@@ -929,22 +929,22 @@ describe("Yoga Comparison: Gap", () => {
 
 describe("Yoga Comparison: FlexShrink", () => {
   it("shrink-with-basis: different basis values", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexture.Node.create()
+    const fChild1 = Flexily.Node.create()
     fChild1.setFlexBasis(100)
     fChild1.setFlexShrink(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexture.Node.create()
+    const fChild2 = Flexily.Node.create()
     fChild2.setFlexBasis(50)
     fChild2.setFlexShrink(1)
     fRoot.insertChild(fChild2, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -964,34 +964,34 @@ describe("Yoga Comparison: FlexShrink", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "FlexShrink",
       name: "shrink-with-basis",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
   })
 
   it("shrink-different-factors: unequal shrink factors", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexture.Node.create()
+    const fChild1 = Flexily.Node.create()
     fChild1.setWidth(100)
     fChild1.setFlexShrink(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexture.Node.create()
+    const fChild2 = Flexily.Node.create()
     fChild2.setWidth(100)
     fChild2.setFlexShrink(2)
     fRoot.insertChild(fChild2, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1011,34 +1011,34 @@ describe("Yoga Comparison: FlexShrink", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "FlexShrink",
       name: "shrink-different-factors",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
   })
 
   it("shrink-zero-no-shrink: shrink 0 prevents shrinking", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexture.Node.create()
+    const fChild1 = Flexily.Node.create()
     fChild1.setWidth(80)
     fChild1.setFlexShrink(0)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexture.Node.create()
+    const fChild2 = Flexily.Node.create()
     fChild2.setWidth(80)
     fChild2.setFlexShrink(1)
     fRoot.insertChild(fChild2, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1058,12 +1058,12 @@ describe("Yoga Comparison: FlexShrink", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "FlexShrink",
       name: "shrink-zero-no-shrink",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1076,20 +1076,20 @@ describe("Yoga Comparison: FlexShrink", () => {
 
 describe("Yoga Comparison: FlexGrow", () => {
   it("grow-with-fixed-sibling: grow next to fixed width", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexture.Node.create()
+    const fChild1 = Flexily.Node.create()
     fChild1.setWidth(30)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexture.Node.create()
+    const fChild2 = Flexily.Node.create()
     fChild2.setFlexGrow(1)
     fRoot.insertChild(fChild2, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1107,36 +1107,36 @@ describe("Yoga Comparison: FlexGrow", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "FlexGrow",
       name: "grow-with-fixed-sibling",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
   })
 
   it("grow-unequal: unequal grow factors", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexture.Node.create()
+    const fChild1 = Flexily.Node.create()
     fChild1.setFlexGrow(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexture.Node.create()
+    const fChild2 = Flexily.Node.create()
     fChild2.setFlexGrow(2)
     fRoot.insertChild(fChild2, 1)
 
-    const fChild3 = Flexture.Node.create()
+    const fChild3 = Flexily.Node.create()
     fChild3.setFlexGrow(1)
     fRoot.insertChild(fChild3, 2)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1158,34 +1158,34 @@ describe("Yoga Comparison: FlexGrow", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "FlexGrow",
       name: "grow-unequal",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
   })
 
   it("grow-with-basis: flex-grow with flex-basis", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexture.Node.create()
+    const fChild1 = Flexily.Node.create()
     fChild1.setFlexBasis(20)
     fChild1.setFlexGrow(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexture.Node.create()
+    const fChild2 = Flexily.Node.create()
     fChild2.setFlexBasis(20)
     fChild2.setFlexGrow(1)
     fRoot.insertChild(fChild2, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1205,12 +1205,12 @@ describe("Yoga Comparison: FlexGrow", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "FlexGrow",
       name: "grow-with-basis",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1223,30 +1223,30 @@ describe("Yoga Comparison: FlexGrow", () => {
 
 describe("Yoga Comparison: NestedLayouts", () => {
   it("nested-flex: multiple nesting levels", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
     fRoot.setHeight(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fLeft = Flexture.Node.create()
+    const fLeft = Flexily.Node.create()
     fLeft.setFlexGrow(1)
-    fLeft.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+    fLeft.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
     fRoot.insertChild(fLeft, 0)
 
-    const fLeftTop = Flexture.Node.create()
+    const fLeftTop = Flexily.Node.create()
     fLeftTop.setFlexGrow(1)
     fLeft.insertChild(fLeftTop, 0)
 
-    const fLeftBottom = Flexture.Node.create()
+    const fLeftBottom = Flexily.Node.create()
     fLeftBottom.setFlexGrow(1)
     fLeft.insertChild(fLeftBottom, 1)
 
-    const fRight = Flexture.Node.create()
+    const fRight = Flexily.Node.create()
     fRight.setFlexGrow(2)
     fRoot.insertChild(fRight, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1274,44 +1274,44 @@ describe("Yoga Comparison: NestedLayouts", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "NestedLayouts",
       name: "nested-flex",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
   })
 
   it("mixed-constraints: nested with various constraints", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
     fRoot.setHeight(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
-    fRoot.setPadding(Flexture.EDGE_ALL, 5)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+    fRoot.setPadding(Flexily.EDGE_ALL, 5)
 
-    const fHeader = Flexture.Node.create()
+    const fHeader = Flexily.Node.create()
     fHeader.setHeight(20)
     fRoot.insertChild(fHeader, 0)
 
-    const fContent = Flexture.Node.create()
+    const fContent = Flexily.Node.create()
     fContent.setFlexGrow(1)
-    fContent.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-    fContent.setGap(Flexture.GUTTER_COLUMN, 5)
+    fContent.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+    fContent.setGap(Flexily.GUTTER_COLUMN, 5)
     fRoot.insertChild(fContent, 1)
 
-    const fSidebar = Flexture.Node.create()
+    const fSidebar = Flexily.Node.create()
     fSidebar.setWidth(20)
     fContent.insertChild(fSidebar, 0)
 
-    const fMain = Flexture.Node.create()
+    const fMain = Flexily.Node.create()
     fMain.setFlexGrow(1)
     fContent.insertChild(fMain, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1341,12 +1341,12 @@ describe("Yoga Comparison: NestedLayouts", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "NestedLayouts",
       name: "mixed-constraints",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1359,22 +1359,22 @@ describe("Yoga Comparison: NestedLayouts", () => {
 
 describe("Yoga Comparison: PercentValues", () => {
   it("percent-nested: percent in nested container", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
     fRoot.setHeight(100)
 
-    const fOuter = Flexture.Node.create()
+    const fOuter = Flexily.Node.create()
     fOuter.setWidthPercent(50)
     fOuter.setHeightPercent(50)
     fRoot.insertChild(fOuter, 0)
 
-    const fInner = Flexture.Node.create()
+    const fInner = Flexily.Node.create()
     fInner.setWidthPercent(50)
     fInner.setHeightPercent(50)
     fOuter.insertChild(fInner, 0)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1394,31 +1394,31 @@ describe("Yoga Comparison: PercentValues", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "PercentValues",
       name: "percent-nested",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
   })
 
   it("percent-margin: percent margin values", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
     fRoot.setHeight(100)
 
-    const fChild = Flexture.Node.create()
+    const fChild = Flexily.Node.create()
     fChild.setWidth(50)
     fChild.setHeight(50)
-    fChild.setMarginPercent(Flexture.EDGE_LEFT, 10)
-    fChild.setMarginPercent(Flexture.EDGE_TOP, 10)
+    fChild.setMarginPercent(Flexily.EDGE_LEFT, 10)
+    fChild.setMarginPercent(Flexily.EDGE_TOP, 10)
     fRoot.insertChild(fChild, 0)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1435,12 +1435,12 @@ describe("Yoga Comparison: PercentValues", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "PercentValues",
       name: "percent-margin",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1467,25 +1467,25 @@ describe("Yoga Comparison: PercentValues", () => {
 
 describe("Yoga Comparison: IntentionalDifferences", () => {
   it("shrink-weighted-by-basis: CSS spec weighted shrink", () => {
-    // Both Flexture and Yoga use CSS spec: shrink proportional to (flexShrink * flexBasis)
-    // This test verifies Flexture matches Yoga's behavior.
+    // Both Flexily and Yoga use CSS spec: shrink proportional to (flexShrink * flexBasis)
+    // This test verifies Flexily matches Yoga's behavior.
 
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexture.Node.create()
+    const fChild1 = Flexily.Node.create()
     fChild1.setFlexBasis(200) // Large basis
     fChild1.setFlexShrink(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexture.Node.create()
+    const fChild2 = Flexily.Node.create()
     fChild2.setFlexBasis(100) // Small basis
     fChild2.setFlexShrink(1)
     fRoot.insertChild(fChild2, 1)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1505,12 +1505,12 @@ describe("Yoga Comparison: IntentionalDifferences", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "IntentionalDifferences",
       name: "shrink-weighted-by-basis",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     // This test documents the difference - we expect it MAY differ
@@ -1518,7 +1518,7 @@ describe("Yoga Comparison: IntentionalDifferences", () => {
     log.debug?.(`shrink-weighted-by-basis: ${match ? "MATCHES" : "DIFFERS (expected)"}`)
     if (!match) {
       log.debug?.(`  Yoga (CSS spec weighted shrink): ${JSON.stringify(yogaLayout.children.map((c) => c.width))}`)
-      log.debug?.(`  Flexture (proportional shrink): ${JSON.stringify(flextureLayout.children.map((c) => c.width))}`)
+      log.debug?.(`  Flexily (proportional shrink): ${JSON.stringify(flexilyLayout.children.map((c) => c.width))}`)
     }
   })
 })
@@ -1535,7 +1535,7 @@ describe("Yoga Comparison: EdgeCases", () => {
       rootConfig: {
         width: 0,
         height: 0,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
       },
       childConfigs: [{ width: 50, height: 50 }],
       layoutWidth: 0,
@@ -1551,8 +1551,8 @@ describe("Yoga Comparison: EdgeCases", () => {
       rootConfig: {
         width: 100,
         height: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
-        flexWrap: Flexture.WRAP_WRAP,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
+        flexWrap: Flexily.WRAP_WRAP,
       },
       childConfigs: [{ width: 50, height: 50 }],
     })
@@ -1565,7 +1565,7 @@ describe("Yoga Comparison: EdgeCases", () => {
       name: "overflow-no-shrink",
       rootConfig: {
         width: 100,
-        flexDirection: Flexture.FLEX_DIRECTION_ROW,
+        flexDirection: Flexily.FLEX_DIRECTION_ROW,
       },
       childConfigs: [{ width: 50, height: 50, flexShrink: 0, count: 3 }],
     })
@@ -1573,29 +1573,29 @@ describe("Yoga Comparison: EdgeCases", () => {
   })
 
   it("mixed-absolute-relative: absolute and relative siblings", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
     fRoot.setHeight(100)
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
-    const fRel1 = Flexture.Node.create()
+    const fRel1 = Flexily.Node.create()
     fRel1.setHeight(30)
     fRoot.insertChild(fRel1, 0)
 
-    const fAbs = Flexture.Node.create()
-    fAbs.setPositionType(Flexture.POSITION_TYPE_ABSOLUTE)
-    fAbs.setPosition(Flexture.EDGE_RIGHT, 10)
-    fAbs.setPosition(Flexture.EDGE_TOP, 10)
+    const fAbs = Flexily.Node.create()
+    fAbs.setPositionType(Flexily.POSITION_TYPE_ABSOLUTE)
+    fAbs.setPosition(Flexily.EDGE_RIGHT, 10)
+    fAbs.setPosition(Flexily.EDGE_TOP, 10)
     fAbs.setWidth(20)
     fAbs.setHeight(20)
     fRoot.insertChild(fAbs, 1)
 
-    const fRel2 = Flexture.Node.create()
+    const fRel2 = Flexily.Node.create()
     fRel2.setFlexGrow(1)
     fRoot.insertChild(fRel2, 2)
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1622,33 +1622,33 @@ describe("Yoga Comparison: EdgeCases", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "EdgeCases",
       name: "mixed-absolute-relative",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
   })
 
   it("deeply-nested: 5 levels of nesting", () => {
-    const fRoot = Flexture.Node.create()
+    const fRoot = Flexily.Node.create()
     fRoot.setWidth(100)
     fRoot.setHeight(100)
 
     let fCurrent = fRoot
     for (let i = 0; i < 5; i++) {
-      const child = Flexture.Node.create()
+      const child = Flexily.Node.create()
       child.setFlexGrow(1)
-      child.setPadding(Flexture.EDGE_ALL, 5)
+      child.setPadding(Flexily.EDGE_ALL, 5)
       fCurrent.insertChild(child, 0)
       fCurrent = child
     }
 
-    fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
-    const flextureLayout = getFlextureLayout(fRoot)
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
 
     const yRoot = yoga.Node.create()
     yRoot.setWidth(100)
@@ -1667,12 +1667,12 @@ describe("Yoga Comparison: EdgeCases", () => {
     const yogaLayout = getYogaLayout(yRoot)
     yRoot.freeRecursive()
 
-    const match = layoutsMatch(flextureLayout, yogaLayout)
+    const match = layoutsMatch(flexilyLayout, yogaLayout)
     recordResult({
       category: "EdgeCases",
       name: "deeply-nested",
       passed: match,
-      flexture: flextureLayout,
+      flexily: flexilyLayout,
       yoga: yogaLayout,
     })
     expect(match).toBe(true)
@@ -1714,11 +1714,11 @@ describe("Summary Report", () => {
         lines.push(`\n### ${category}`)
         for (const test of tests) {
           lines.push(`\n**${test.name}**`)
-          if (test.yoga && test.flexture) {
+          if (test.yoga && test.flexily) {
             lines.push("Expected (Yoga):")
             lines.push(formatLayout(test.yoga))
-            lines.push("Actual (Flexture):")
-            lines.push(formatLayout(test.flexture))
+            lines.push("Actual (Flexily):")
+            lines.push(formatLayout(test.flexily))
           }
           if (test.error) {
             lines.push(`Error: ${test.error}`)

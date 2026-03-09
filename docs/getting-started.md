@@ -1,15 +1,15 @@
-# Getting Started with Flexture
+# Getting Started with Flexily
 
-> **Building a terminal UI?** Use [silvery](https://github.com/beorn/silvery), which uses Flexture by default. You get React components, hooks, and layout feedback without touching the low-level API below.
+> **Building a terminal UI?** Use [silvery](https://github.com/beorn/silvery), which uses Flexily by default. You get React components, hooks, and layout feedback without touching the low-level API below.
 >
-> This guide is for developers who need the Flexture API directly — framework authors, canvas renderers, or anyone replacing Yoga.
+> This guide is for developers who need the Flexily API directly — framework authors, canvas renderers, or anyone replacing Yoga.
 
 ## Installation
 
 ```bash
-bun add @beorn/flexture
+bun add @beorn/flexily
 # or
-npm install @beorn/flexture
+npm install @beorn/flexily
 ```
 
 ## Your First Layout
@@ -17,7 +17,7 @@ npm install @beorn/flexture
 Create a simple row with two children:
 
 ```typescript
-import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from "@beorn/flexture"
+import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from "@beorn/flexily"
 
 // Create the root node
 const root = Node.create()
@@ -145,7 +145,7 @@ root.calculateLayout(200, undefined, DIRECTION_LTR)
 
 ## Dirty Tracking
 
-Flexture tracks which nodes have changed, so relayout only recalculates what's needed:
+Flexily tracks which nodes have changed, so relayout only recalculates what's needed:
 
 ```typescript
 root.calculateLayout(200, 100, DIRECTION_LTR) // Full calculation

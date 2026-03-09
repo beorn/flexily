@@ -1,5 +1,5 @@
 /**
- * Flexture vs Yoga Comparison Benchmarks (with warmup)
+ * Flexily vs Yoga Comparison Benchmarks (with warmup)
  *
  * Same as yoga-compare.bench.ts but with explicit warmup to reduce
  * JIT compilation and GC variance.
@@ -8,7 +8,7 @@
  */
 
 import { bench, describe, beforeAll } from "vitest"
-import * as Flexture from "../src/index.js"
+import * as Flexily from "../src/index.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -30,8 +30,8 @@ beforeAll(async () => {
   // Extensive warmup to stabilize JIT
   console.log("\n[Warmup] Running 1000 iterations to stabilize JIT...")
   for (let i = 0; i < 1000; i++) {
-    const fTree = flextureDeepTree(50)
-    fTree.calculateLayout(1000, 1000, Flexture.DIRECTION_LTR)
+    const fTree = flexilyDeepTree(50)
+    fTree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
 
     const yTree = yogaDeepTree(50)
     yTree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
@@ -46,17 +46,17 @@ beforeAll(async () => {
 })
 
 // ============================================================================
-// Tree Generators - Flexture
+// Tree Generators - Flexily
 // ============================================================================
 
-function flextureFlatTree(nodeCount: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function flexilyFlatTree(nodeCount: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(1000)
   root.setHeight(1000)
-  root.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+  root.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
   for (let i = 0; i < nodeCount; i++) {
-    const child = Flexture.Node.create()
+    const child = Flexily.Node.create()
     child.setHeight(10)
     child.setFlexGrow(1)
     root.insertChild(child, i)
@@ -65,16 +65,16 @@ function flextureFlatTree(nodeCount: number): Flexture.Node {
   return root
 }
 
-function flextureDeepTree(depth: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function flexilyDeepTree(depth: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(1000)
   root.setHeight(1000)
 
   let current = root
   for (let i = 0; i < depth; i++) {
-    const child = Flexture.Node.create()
+    const child = Flexily.Node.create()
     child.setFlexGrow(1)
-    child.setPadding(Flexture.EDGE_LEFT, 1)
+    child.setPadding(Flexily.EDGE_LEFT, 1)
     current.insertChild(child, 0)
     current = child
   }
@@ -133,13 +133,13 @@ const benchOptions = {
 // Benchmarks - Flat Hierarchy
 // ============================================================================
 
-describe("Flexture vs Yoga - Flat (warmed up)", () => {
+describe("Flexily vs Yoga - Flat (warmed up)", () => {
   for (const nodeCount of [100, 500, 1000, 2000, 5000]) {
     bench(
-      `Flexture: ${nodeCount} nodes`,
+      `Flexily: ${nodeCount} nodes`,
       () => {
-        const tree = flextureFlatTree(nodeCount)
-        tree.calculateLayout(1000, 1000, Flexture.DIRECTION_LTR)
+        const tree = flexilyFlatTree(nodeCount)
+        tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
       },
       benchOptions,
     )
@@ -160,13 +160,13 @@ describe("Flexture vs Yoga - Flat (warmed up)", () => {
 // Benchmarks - Deep Hierarchy
 // ============================================================================
 
-describe("Flexture vs Yoga - Deep (warmed up)", () => {
+describe("Flexily vs Yoga - Deep (warmed up)", () => {
   for (const depth of [1, 2, 5, 10, 15, 20, 50, 100]) {
     bench(
-      `Flexture: ${depth} levels`,
+      `Flexily: ${depth} levels`,
       () => {
-        const tree = flextureDeepTree(depth)
-        tree.calculateLayout(1000, 1000, Flexture.DIRECTION_LTR)
+        const tree = flexilyDeepTree(depth)
+        tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
       },
       benchOptions,
     )

@@ -1,6 +1,6 @@
 # Zero-Allocation Layout Engine
 
-This document describes the zero-allocation optimization in Flexture and its trade-offs.
+This document describes the zero-allocation optimization in Flexily and its trade-offs.
 
 ## Motivation
 
@@ -84,11 +84,11 @@ for (const child of children) {
 
 ## Benchmark Results
 
-| Scenario       | Flexture Classic | Flexture Zero-alloc | Yoga WASM   |
-| -------------- | ---------------- | ------------------- | ----------- |
-| Flat 500 nodes | 1x               | 1.75-2x faster      | ~0.5x       |
-| Deep 50 levels | 1x               | ~1x (similar)       | 1.2x faster |
-| Kanban TUI     | 1x               | ~1.1x faster        | ~0.9x       |
+| Scenario       | Flexily Classic | Flexily Zero-alloc | Yoga WASM   |
+| -------------- | --------------- | ------------------ | ----------- |
+| Flat 500 nodes | 1x              | 1.75-2x faster     | ~0.5x       |
+| Deep 50 levels | 1x              | ~1x (similar)      | 1.2x faster |
+| Kanban TUI     | 1x              | ~1.1x faster       | ~0.9x       |
 
 **Key insight**: Zero-alloc excels at flat, wide layouts (the typical TUI structure).
 
@@ -122,10 +122,10 @@ Both algorithms now have complete feature parity:
 
 ```typescript
 // Default: Zero-allocation algorithm (recommended)
-import { Node } from "@beorn/flexture"
+import { Node } from "@beorn/flexily"
 
 // Classic algorithm (for debugging or comparison)
-import { Node } from "@beorn/flexture/classic"
+import { Node } from "@beorn/flexily/classic"
 ```
 
 Both exports have identical APIs - only the internal algorithm differs.

@@ -21,7 +21,7 @@ A 1.0 release signals: the public API is stable, the layout algorithm is correct
 ### API Stability
 
 - [x] Yoga-compatible API surface (same constants, same method names)
-- [x] Two entry points: `flexture` (zero-alloc) and `flexture/classic` (allocating)
+- [x] Two entry points: `flexily` (zero-alloc) and `flexily/classic` (allocating)
 - [ ] API surface audit
 - [ ] TypeScript declaration files build cleanly
 - [ ] No planned breaking changes
@@ -38,7 +38,7 @@ A 1.0 release signals: the public API is stable, the layout algorithm is correct
 - [x] `package.json` has `engines` field
 - [x] `package.json` has correct `exports` map
 - [x] `files` field limits published content
-- [ ] Published on npm as `flexture`
+- [ ] Published on npm as `flexily`
 - [x] MIT license
 
 ### Documentation
@@ -53,7 +53,7 @@ A 1.0 release signals: the public API is stable, the layout algorithm is correct
 
 ## What's NOT in 1.0
 
-- **CSS Grid** -- Flexture is a flexbox engine
+- **CSS Grid** -- Flexily is a flexbox engine
 - **Text layout** -- Consumers handle text measurement via measure functions
 - **Multi-thread / worker support** -- Synchronous by design
 - **Browser build** -- Targets Node.js/Bun (ESM works in browsers but not a gate)

@@ -2,7 +2,7 @@
  * Debug wrap-reverse layout.
  */
 
-import * as Flexture from "../src/index.js"
+import * as Flexily from "../src/index.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -13,23 +13,23 @@ const wasmPath = join(__dirname, "../node_modules/yoga-wasm-web/dist/yoga.wasm")
 const wasmBuffer = readFileSync(wasmPath)
 const yoga: Yoga = await initYoga(wasmBuffer)
 
-// Flexture
-const fRoot = Flexture.Node.create()
+// Flexily
+const fRoot = Flexily.Node.create()
 fRoot.setWidth(100)
 fRoot.setHeight(100)
-fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-fRoot.setFlexWrap(Flexture.WRAP_WRAP_REVERSE)
+fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+fRoot.setFlexWrap(Flexily.WRAP_WRAP_REVERSE)
 
 for (let i = 0; i < 3; i++) {
-  const child = Flexture.Node.create()
+  const child = Flexily.Node.create()
   child.setWidth(40)
   child.setHeight(20)
   fRoot.insertChild(child, i)
 }
-fRoot.calculateLayout(100, 100, Flexture.DIRECTION_LTR)
+fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
 
 console.log("=== wrap-reverse debug ===")
-console.log("\nFlexture layout:")
+console.log("\nFlexily layout:")
 console.log("Root:", {
   left: fRoot.getComputedLeft(),
   top: fRoot.getComputedTop(),

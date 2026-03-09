@@ -1,15 +1,15 @@
 # Getting Started
 
-> **Building a terminal UI?** Use [Silvery](https://beorn.github.io/silvery/), which uses Flexture by default. You get React components, hooks, and layout feedback without touching the low-level API.
+> **Building a terminal UI?** Use [Silvery](https://beorn.github.io/silvery/), which uses Flexily by default. You get React components, hooks, and layout feedback without touching the low-level API.
 >
-> This guide is for developers who need the Flexture API directly -- framework authors, canvas renderers, or anyone replacing Yoga.
+> This guide is for developers who need the Flexily API directly -- framework authors, canvas renderers, or anyone replacing Yoga.
 
 ## Installation
 
 ```bash
-bun add flexture
+bun add flexily
 # or
-npm install flexture
+npm install flexily
 ```
 
 ## Your First Layout
@@ -17,7 +17,7 @@ npm install flexture
 Create a simple row with two children:
 
 ```typescript
-import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from "flexture"
+import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from "flexily"
 
 // Create the root node
 const root = Node.create()
@@ -145,7 +145,7 @@ root.calculateLayout(200, undefined, DIRECTION_LTR)
 
 ## Dirty Tracking
 
-Flexture tracks which nodes have changed, so relayout only recalculates what's needed:
+Flexily tracks which nodes have changed, so relayout only recalculates what's needed:
 
 ```typescript
 root.calculateLayout(200, 100, DIRECTION_LTR) // Full calculation
@@ -159,11 +159,11 @@ root.calculateLayout(200, 100, DIRECTION_LTR) // Only recalculates dirty subtree
 
 ## Two Algorithm Variants
 
-Flexture provides two layout implementations that produce identical output:
+Flexily provides two layout implementations that produce identical output:
 
 ```typescript
-import { Node } from "flexture" // zero-allocation (default)
-import { Node } from "flexture/classic" // allocating (debugging)
+import { Node } from "flexily" // zero-allocation (default)
+import { Node } from "flexily/classic" // allocating (debugging)
 ```
 
 **Zero-allocation** (default): Mutates `FlexInfo` structs on nodes instead of allocating temporary objects. Faster for flat/wide trees typical of TUI layouts.

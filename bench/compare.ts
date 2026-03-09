@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 /**
- * Flexture vs Yoga Comparison Benchmarks
+ * Flexily vs Yoga Comparison Benchmarks
  *
  * Run: bun bench/compare.ts
  *
  * Compares layout performance between:
- * - Flexture (pure JavaScript)
+ * - Flexily (pure JavaScript)
  * - Yoga (WebAssembly via yoga-wasm-web)
  */
 
-import * as Flexture from "../dist/index.js"
+import * as Flexily from "../dist/index.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import os from "node:os"
 import { readFileSync } from "node:fs"
@@ -60,19 +60,19 @@ function benchmark(name: string, fn: () => void, options: { iterations?: number;
 }
 
 function formatComparison(
-  flexture: BenchResult,
+  flexily: BenchResult,
   yoga: BenchResult,
-): { flextureStr: string; yogaStr: string; winner: string; ratio: string } {
-  const flextureStr = `${flexture.avgUs.toFixed(2)} µs`
+): { flexilyStr: string; yogaStr: string; winner: string; ratio: string } {
+  const flexilyStr = `${flexily.avgUs.toFixed(2)} µs`
   const yogaStr = `${yoga.avgUs.toFixed(2)} µs`
 
-  const ratio = flexture.avgUs / yoga.avgUs
+  const ratio = flexily.avgUs / yoga.avgUs
   let winner: string
   let ratioStr: string
 
   if (ratio < 0.95) {
-    winner = "Flexture"
-    ratioStr = `Flexture ${(1 / ratio).toFixed(2)}x faster`
+    winner = "Flexily"
+    ratioStr = `Flexily ${(1 / ratio).toFixed(2)}x faster`
   } else if (ratio > 1.05) {
     winner = "Yoga"
     ratioStr = `Yoga ${ratio.toFixed(2)}x faster`
@@ -81,7 +81,7 @@ function formatComparison(
     ratioStr = "~equal"
   }
 
-  return { flextureStr, yogaStr, winner, ratio: ratioStr }
+  return { flexilyStr, yogaStr, winner, ratio: ratioStr }
 }
 
 // ============================================================================
@@ -89,21 +89,21 @@ function formatComparison(
 // (This is the fair comparison - both must create and layout)
 // ============================================================================
 
-function benchFlextureFlat(nodeCount: number): () => void {
+function benchFlexilyFlat(nodeCount: number): () => void {
   return () => {
-    const root = Flexture.Node.create()
+    const root = Flexily.Node.create()
     root.setWidth(1000)
     root.setHeight(1000)
-    root.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+    root.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
     for (let i = 0; i < nodeCount; i++) {
-      const child = Flexture.Node.create()
+      const child = Flexily.Node.create()
       child.setHeight(10)
       child.setFlexGrow(1)
       root.insertChild(child, i)
     }
 
-    root.calculateLayout(1000, 1000, Flexture.DIRECTION_LTR)
+    root.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
   }
 }
 
@@ -126,22 +126,22 @@ function benchYogaFlat(yoga: Yoga, nodeCount: number): () => void {
   }
 }
 
-function benchFlextureDeep(depth: number): () => void {
+function benchFlexilyDeep(depth: number): () => void {
   return () => {
-    const root = Flexture.Node.create()
+    const root = Flexily.Node.create()
     root.setWidth(1000)
     root.setHeight(1000)
 
     let current = root
     for (let i = 0; i < depth; i++) {
-      const child = Flexture.Node.create()
+      const child = Flexily.Node.create()
       child.setFlexGrow(1)
-      child.setPadding(Flexture.EDGE_LEFT, 1)
+      child.setPadding(Flexily.EDGE_LEFT, 1)
       current.insertChild(child, 0)
       current = child
     }
 
-    root.calculateLayout(1000, 1000, Flexture.DIRECTION_LTR)
+    root.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
   }
 }
 
@@ -165,35 +165,35 @@ function benchYogaDeep(yoga: Yoga, depth: number): () => void {
   }
 }
 
-function benchFlextureKanban(cardsPerColumn: number): () => void {
+function benchFlexilyKanban(cardsPerColumn: number): () => void {
   return () => {
-    const root = Flexture.Node.create()
+    const root = Flexily.Node.create()
     root.setWidth(120)
     root.setHeight(40)
-    root.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-    root.setGap(Flexture.GUTTER_ALL, 1)
+    root.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+    root.setGap(Flexily.GUTTER_ALL, 1)
 
     for (let col = 0; col < 3; col++) {
-      const column = Flexture.Node.create()
+      const column = Flexily.Node.create()
       column.setFlexGrow(1)
-      column.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
-      column.setGap(Flexture.GUTTER_ALL, 1)
+      column.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+      column.setGap(Flexily.GUTTER_ALL, 1)
 
-      const header = Flexture.Node.create()
+      const header = Flexily.Node.create()
       header.setHeight(1)
       column.insertChild(header, 0)
 
       for (let card = 0; card < cardsPerColumn; card++) {
-        const cardNode = Flexture.Node.create()
+        const cardNode = Flexily.Node.create()
         cardNode.setHeight(3)
-        cardNode.setPadding(Flexture.EDGE_LEFT, 1)
+        cardNode.setPadding(Flexily.EDGE_LEFT, 1)
         column.insertChild(cardNode, card + 1)
       }
 
       root.insertChild(column, col)
     }
 
-    root.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+    root.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
   }
 }
 
@@ -235,7 +235,7 @@ function benchYogaKanban(yoga: Yoga, cardsPerColumn: number): () => void {
 // ============================================================================
 
 async function main() {
-  console.log("# Flexture vs Yoga Comparison Benchmarks")
+  console.log("# Flexily vs Yoga Comparison Benchmarks")
   console.log("")
   console.log("## Hardware")
   console.log(`- Platform: ${os.platform()} ${os.arch()}`)
@@ -258,7 +258,7 @@ async function main() {
 
   const results: Array<{
     benchmark: string
-    flexture: BenchResult
+    flexily: BenchResult
     yoga: BenchResult
   }> = []
 
@@ -268,7 +268,7 @@ async function main() {
   console.log("Running flat hierarchy benchmarks...")
 
   for (const nodeCount of [100, 500, 1000]) {
-    const flextureResult = benchmark(`Flexture flat ${nodeCount}`, benchFlextureFlat(nodeCount), {
+    const flexilyResult = benchmark(`Flexily flat ${nodeCount}`, benchFlexilyFlat(nodeCount), {
       iterations: 500,
     })
 
@@ -278,7 +278,7 @@ async function main() {
 
     results.push({
       benchmark: `Flat ${nodeCount} nodes`,
-      flexture: flextureResult,
+      flexily: flexilyResult,
       yoga: yogaResult,
     })
   }
@@ -289,7 +289,7 @@ async function main() {
   console.log("Running deep hierarchy benchmarks...")
 
   for (const depth of [20, 50, 100]) {
-    const flextureResult = benchmark(`Flexture deep ${depth}`, benchFlextureDeep(depth), {
+    const flexilyResult = benchmark(`Flexily deep ${depth}`, benchFlexilyDeep(depth), {
       iterations: 500,
     })
 
@@ -299,7 +299,7 @@ async function main() {
 
     results.push({
       benchmark: `Deep ${depth} levels`,
-      flexture: flextureResult,
+      flexily: flexilyResult,
       yoga: yogaResult,
     })
   }
@@ -311,7 +311,7 @@ async function main() {
 
   for (const cardsPerCol of [10, 50, 100]) {
     const totalNodes = 3 + 3 * (1 + cardsPerCol)
-    const flextureResult = benchmark(`Flexture kanban 3x${cardsPerCol}`, benchFlextureKanban(cardsPerCol), {
+    const flexilyResult = benchmark(`Flexily kanban 3x${cardsPerCol}`, benchFlexilyKanban(cardsPerCol), {
       iterations: 500,
     })
 
@@ -321,7 +321,7 @@ async function main() {
 
     results.push({
       benchmark: `Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`,
-      flexture: flextureResult,
+      flexily: flexilyResult,
       yoga: yogaResult,
     })
   }
@@ -332,32 +332,32 @@ async function main() {
   console.log("")
   console.log("## Results")
   console.log("")
-  console.log("| Benchmark | Flexture | Yoga | Comparison |")
+  console.log("| Benchmark | Flexily | Yoga | Comparison |")
   console.log("|-----------|-------|------|------------|")
 
-  for (const { benchmark: name, flexture, yoga: yogaResult } of results) {
-    const cmp = formatComparison(flexture, yogaResult)
-    console.log(`| ${name.padEnd(28)} | ${cmp.flextureStr.padStart(10)} | ${cmp.yogaStr.padStart(10)} | ${cmp.ratio} |`)
+  for (const { benchmark: name, flexily, yoga: yogaResult } of results) {
+    const cmp = formatComparison(flexily, yogaResult)
+    console.log(`| ${name.padEnd(28)} | ${cmp.flexilyStr.padStart(10)} | ${cmp.yogaStr.padStart(10)} | ${cmp.ratio} |`)
   }
 
   console.log("")
   console.log("## Summary")
   console.log("")
 
-  const flextureWins = results.filter((r) => r.flexture.avgUs < r.yoga.avgUs * 0.95).length
-  const yogaWins = results.filter((r) => r.yoga.avgUs < r.flexture.avgUs * 0.95).length
-  const ties = results.length - flextureWins - yogaWins
+  const flexilyWins = results.filter((r) => r.flexily.avgUs < r.yoga.avgUs * 0.95).length
+  const yogaWins = results.filter((r) => r.yoga.avgUs < r.flexily.avgUs * 0.95).length
+  const ties = results.length - flexilyWins - yogaWins
 
-  console.log(`- Flexture faster: ${flextureWins} benchmarks`)
+  console.log(`- Flexily faster: ${flexilyWins} benchmarks`)
   console.log(`- Yoga faster: ${yogaWins} benchmarks`)
   console.log(`- Roughly equal: ${ties} benchmarks`)
   console.log("")
 
   // Calculate average ratio
-  const avgRatio = results.reduce((sum, r) => sum + r.flexture.avgUs / r.yoga.avgUs, 0) / results.length
+  const avgRatio = results.reduce((sum, r) => sum + r.flexily.avgUs / r.yoga.avgUs, 0) / results.length
 
   if (avgRatio < 0.9) {
-    console.log(`**Overall: Flexture is ~${(1 / avgRatio).toFixed(1)}x faster on average**`)
+    console.log(`**Overall: Flexily is ~${(1 / avgRatio).toFixed(1)}x faster on average**`)
   } else if (avgRatio > 1.1) {
     console.log(`**Overall: Yoga is ~${avgRatio.toFixed(1)}x faster on average**`)
   } else {

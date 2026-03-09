@@ -1,14 +1,14 @@
 /**
- * Flexture Testing Utilities
+ * Flexily Testing Utilities
  *
  * Diagnostic helpers for verifying layout correctness, especially
  * incremental re-layout consistency. Used by downstream consumers
- * (silvery, km-tui) and flexture's own test suite.
+ * (silvery, km-tui) and flexily's own test suite.
  *
  * @example
  * ```typescript
- * import { Node, DIRECTION_LTR } from 'flexture';
- * import { getLayout, diffLayouts, assertLayoutSanity } from 'flexture/testing';
+ * import { Node, DIRECTION_LTR } from 'flexily';
+ * import { getLayout, diffLayouts, assertLayoutSanity } from 'flexily/testing';
  *
  * const root = Node.create();
  * root.setWidth(80);

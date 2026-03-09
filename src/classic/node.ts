@@ -1,5 +1,5 @@
 /**
- * Flexture Node
+ * Flexily Node
  *
  * Yoga-compatible Node class for flexbox layout.
  */

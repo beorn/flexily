@@ -1,5 +1,5 @@
 /**
- * Flexture Layout Algorithm — Main Entry Point
+ * Flexily Layout Algorithm — Main Entry Point
  *
  * Core flexbox layout computation. This file contains:
  * - computeLayout(): top-level entry point

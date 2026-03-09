@@ -1,6 +1,6 @@
 # Incremental Layout Bugs
 
-A knowledge base on the correctness challenges of incremental layout in flexbox engines -- drawing from Chrome's LayoutNG, Yoga, PanGui, and Flexture's own experience.
+A knowledge base on the correctness challenges of incremental layout in flexbox engines -- drawing from Chrome's LayoutNG, Yoga, PanGui, and Flexily's own experience.
 
 ## The Fundamental Tension
 
@@ -78,9 +78,9 @@ Use the same tree instance across multiple `calculateLayout()` calls with varyin
 
 Deliberately inject known-wrong values into cache logic. If no test fails, that indicates a coverage gap.
 
-## Flexture's Approach
+## Flexily's Approach
 
-Flexture combines aggressive caching with extensive correctness testing:
+Flexily combines aggressive caching with extensive correctness testing:
 
 **Caching layers:**
 

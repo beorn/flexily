@@ -29,7 +29,7 @@ function createFallbackLogger(namespace: string): ConditionalLogger {
 
 async function detectLogger(namespace: string): Promise<ConditionalLogger> {
   try {
-    const { createLogger } = await import("decant")
+    const { createLogger } = await import("loggily")
     const logger = createLogger(namespace)
     // Wrap @beorn/logger to accept printf-style args
     if (logger.debug) {
@@ -57,7 +57,7 @@ async function detectLogger(namespace: string): Promise<ConditionalLogger> {
 
 // Eagerly initialize (top-level await)
 // This runs once at module load time
-_logger = await detectLogger("flexture:layout")
+_logger = await detectLogger("flexily:layout")
 
 /** Logger instance - use with optional chaining: `log.debug?.('message')` */
 export const log: ConditionalLogger = {

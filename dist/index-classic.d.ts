@@ -1,14 +1,14 @@
 /**
- * Flexture Classic - Allocating Layout Engine
+ * Flexily Classic - Allocating Layout Engine
  *
- * The classic (allocating) variant of Flexture. Use for debugging, comparison,
+ * The classic (allocating) variant of Flexily. Use for debugging, comparison,
  * or when you need reentrancy (concurrent layouts).
  *
- * The main export 'flexture' uses the faster zero-allocation algorithm.
+ * The main export 'flexily' uses the faster zero-allocation algorithm.
  *
  * @example
  * ```typescript
- * import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from 'flexture/classic';
+ * import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from 'flexily/classic';
  *
  * const root = Node.create();
  * root.setWidth(80);

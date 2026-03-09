@@ -15,7 +15,7 @@
  *    returns (flex shrinkage). When shrinkage changes between passes, the stale
  *    overridden value is preserved because NaN===NaN fingerprint matches (km-frod5)
  *
- * Run: bun vitest run vendor/flexture/tests/relayout-consistency.test.ts
+ * Run: bun vitest run vendor/flexily/tests/relayout-consistency.test.ts
  */
 
 import { describe, expect, it } from "vitest"
@@ -515,7 +515,7 @@ describe("Re-layout Consistency: resize stability", () => {
   })
 
   it("column direction: measure function height constrained by parent", () => {
-    // km-flexture.measure-height regression: in column layouts, measure func
+    // km-flexily.measure-height regression: in column layouts, measure func
     // height should be constrained by parent main axis size
     const root = Node.create()
     root.setWidth(40)

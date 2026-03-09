@@ -2,7 +2,7 @@
 layout: home
 
 hero:
-  name: "Flexture"
+  name: "Flexily"
   text: "Pure JavaScript Flexbox Layout"
   tagline: "Yoga-compatible API. 1.5-2.5x faster initial layout. 5.5x faster re-layout. 2.5-3.5x smaller. No WASM."
   actions:
@@ -11,7 +11,7 @@ hero:
       link: /guide/getting-started
     - theme: alt
       text: View on GitHub
-      link: https://github.com/beorn/flexture
+      link: https://github.com/beorn/flexily
 
 features:
   - icon: "\u26A1"
@@ -37,13 +37,13 @@ features:
 ## Quick Start
 
 ```bash
-bun add flexture
+bun add flexily
 # or
-npm install flexture
+npm install flexily
 ```
 
 ```typescript
-import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from "flexture"
+import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from "flexily"
 
 const root = Node.create()
 root.setWidth(100)
@@ -57,13 +57,13 @@ root.calculateLayout(100, 100, DIRECTION_LTR)
 console.log(child.getComputedWidth()) // 100
 ```
 
-## Who Should Use Flexture
+## Who Should Use Flexily
 
-Most developers should use a framework built on Flexture, not Flexture directly. Flexture is for:
+Most developers should use a framework built on Flexily, not Flexily directly. Flexily is for:
 
 - **Framework authors** building a TUI or layout framework that needs a JS layout engine
 - **Canvas/game developers** who need flexbox for non-DOM rendering
 - **Specialized tools** where you need direct control over layout computation
 - **Anyone replacing Yoga** who wants a drop-in pure-JS alternative
 
-> **Building a terminal UI?** Use [Silvery](https://beorn.github.io/silvery/), which uses Flexture by default. You get React components, hooks, and layout feedback without touching the low-level API.
+> **Building a terminal UI?** Use [Silvery](https://beorn.github.io/silvery/), which uses Flexily by default. You get React components, hooks, and layout feedback without touching the low-level API.

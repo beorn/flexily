@@ -5,7 +5,7 @@
 ### Creating Nodes
 
 ```typescript
-import { Node } from "flexture"
+import { Node } from "flexily"
 
 const node = Node.create()
 ```
@@ -58,7 +58,7 @@ import {
   ALIGN_FLEX_END,
   ALIGN_STRETCH,
   ALIGN_BASELINE,
-} from "flexture"
+} from "flexily"
 
 node.setFlexDirection(FLEX_DIRECTION_ROW)
 node.setFlexWrap(WRAP_WRAP)
@@ -85,7 +85,7 @@ import {
   GUTTER_ALL,
   GUTTER_ROW,
   GUTTER_COLUMN,
-} from "flexture"
+} from "flexily"
 
 // Padding
 node.setPadding(EDGE_ALL, 10)
@@ -107,7 +107,7 @@ node.setGap(GUTTER_COLUMN, 5)
 ### Positioning
 
 ```typescript
-import { POSITION_TYPE_ABSOLUTE, POSITION_TYPE_RELATIVE } from "flexture"
+import { POSITION_TYPE_ABSOLUTE, POSITION_TYPE_RELATIVE } from "flexily"
 
 node.setPositionType(POSITION_TYPE_ABSOLUTE)
 node.setPosition(EDGE_TOP, 10)
@@ -142,7 +142,7 @@ node.setBaselineFunc((width, height) => {
 ### Layout Calculation
 
 ```typescript
-import { DIRECTION_LTR, DIRECTION_RTL } from "flexture"
+import { DIRECTION_LTR, DIRECTION_RTL } from "flexily"
 
 node.calculateLayout(availableWidth, availableHeight, DIRECTION_LTR)
 ```
@@ -179,7 +179,7 @@ node.freeRecursive() // Free this node and all children
 
 ## Constants
 
-All constants are Yoga-compatible. Import from `flexture`:
+All constants are Yoga-compatible. Import from `flexily`:
 
 | Category       | Constants                                                                                                                                          |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -197,7 +197,7 @@ All constants are Yoga-compatible. Import from `flexture`:
 
 ## Testing Utilities
 
-Flexture exports diagnostic helpers for downstream consumers:
+Flexily exports diagnostic helpers for downstream consumers:
 
 ```typescript
 import {
@@ -209,7 +209,7 @@ import {
   expectRelayoutMatchesFresh,
   expectIdempotent,
   expectResizeRoundTrip,
-} from "flexture/testing"
+} from "flexily/testing"
 ```
 
 | Export                                        | Description                                          |

@@ -1,5 +1,5 @@
 // Optional dependency - resolved via km monorepo workspace, falls back at runtime
-declare module "decant" {
+declare module "loggily" {
   export function createLogger(namespace: string): {
     debug?: (msg: string) => void
     info?: (msg: string) => void

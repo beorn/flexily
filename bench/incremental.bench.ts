@@ -3,7 +3,7 @@
  * Tests caching/fingerprint advantage for pre-created trees
  */
 import { bench, describe, beforeAll } from "vitest"
-import * as Flexture from "../src/index.js"
+import * as Flexily from "../src/index.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -22,31 +22,31 @@ function textMeasure(textLen: number) {
   }
 }
 
-function flextureTree(cols: number, cards: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function flexilyTree(cols: number, cards: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(120)
   root.setHeight(40)
-  root.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-  root.setGap(Flexture.GUTTER_ALL, 1)
+  root.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+  root.setGap(Flexily.GUTTER_ALL, 1)
   for (let c = 0; c < cols; c++) {
-    const col = Flexture.Node.create()
+    const col = Flexily.Node.create()
     col.setFlexGrow(1)
     col.setFlexShrink(1)
-    col.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
-    const h = Flexture.Node.create()
+    col.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+    const h = Flexily.Node.create()
     h.setHeight(1)
     col.insertChild(h, 0)
     for (let i = 0; i < cards; i++) {
-      const card = Flexture.Node.create()
-      card.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
-      card.setBorder(Flexture.EDGE_ALL, 1)
-      card.setPadding(Flexture.EDGE_RIGHT, 1)
-      const row = Flexture.Node.create()
-      row.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-      const icon = Flexture.Node.create()
+      const card = Flexily.Node.create()
+      card.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+      card.setBorder(Flexily.EDGE_ALL, 1)
+      card.setPadding(Flexily.EDGE_RIGHT, 1)
+      const row = Flexily.Node.create()
+      row.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+      const icon = Flexily.Node.create()
       icon.setWidth(3)
       row.insertChild(icon, 0)
-      const text = Flexture.Node.create()
+      const text = Flexily.Node.create()
       text.setFlexGrow(1)
       text.setFlexShrink(1)
       text.setMeasureFunc(textMeasure(15 + (i % 20)))
@@ -97,25 +97,25 @@ function yogaTree(cols: number, cards: number) {
 }
 
 // Pre-created trees (initialized in beforeAll)
-let ft: Flexture.Node, ftLeaf: Flexture.Node
+let ft: Flexily.Node, ftLeaf: Flexily.Node
 let yt: ReturnType<typeof yoga.Node.create>, ytLeaf: ReturnType<typeof yoga.Node.create>
-let ftBig: Flexture.Node, ftBigLeaf: Flexture.Node
+let ftBig: Flexily.Node, ftBigLeaf: Flexily.Node
 let ytBig: ReturnType<typeof yoga.Node.create>, ytBigLeaf: ReturnType<typeof yoga.Node.create>
 
 beforeAll(async () => {
   const wasmBuffer = readFileSync(wasmPath)
   yoga = await initYoga(wasmBuffer)
 
-  ft = flextureTree(5, 20)
-  ft.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+  ft = flexilyTree(5, 20)
+  ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
   ftLeaf = ft.getChild(2)!.getChild(10)!.getChild(0)!.getChild(1)!
 
   yt = yogaTree(5, 20)
   yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
   ytLeaf = yt.getChild(2)!.getChild(10)!.getChild(0)!.getChild(1)!
 
-  ftBig = flextureTree(8, 30)
-  ftBig.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+  ftBig = flexilyTree(8, 30)
+  ftBig.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
   ftBigLeaf = ftBig.getChild(4)!.getChild(15)!.getChild(0)!.getChild(1)!
 
   ytBig = yogaTree(8, 30)
@@ -125,7 +125,7 @@ beforeAll(async () => {
   // warmup
   for (let i = 0; i < 500; i++) {
     ftLeaf.markDirty()
-    ft.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+    ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
     ytLeaf.markDirty()
     yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
   }
@@ -135,9 +135,9 @@ const opts = { warmupIterations: 100, iterations: 1000, time: 2000 }
 
 describe("No-change re-layout (fingerprint cache)", () => {
   bench(
-    "Flexture: 5×20 no-change",
+    "Flexily: 5×20 no-change",
     () => {
-      ft.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+      ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
     },
     opts,
   )
@@ -149,9 +149,9 @@ describe("No-change re-layout (fingerprint cache)", () => {
     opts,
   )
   bench(
-    "Flexture: 8×30 no-change",
+    "Flexily: 8×30 no-change",
     () => {
-      ftBig.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+      ftBig.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
     },
     opts,
   )
@@ -166,10 +166,10 @@ describe("No-change re-layout (fingerprint cache)", () => {
 
 describe("Single leaf dirty (incremental re-layout)", () => {
   bench(
-    "Flexture: 5×20 leaf dirty",
+    "Flexily: 5×20 leaf dirty",
     () => {
       ftLeaf.markDirty()
-      ft.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+      ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
     },
     opts,
   )
@@ -182,10 +182,10 @@ describe("Single leaf dirty (incremental re-layout)", () => {
     opts,
   )
   bench(
-    "Flexture: 8×30 leaf dirty",
+    "Flexily: 8×30 leaf dirty",
     () => {
       ftBigLeaf.markDirty()
-      ftBig.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+      ftBig.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
     },
     opts,
   )
@@ -201,12 +201,12 @@ describe("Single leaf dirty (incremental re-layout)", () => {
 
 describe("Width change cycle (120→80→120)", () => {
   bench(
-    "Flexture: 5×20 resize cycle",
+    "Flexily: 5×20 resize cycle",
     () => {
       ft.setWidth(80)
-      ft.calculateLayout(80, 40, Flexture.DIRECTION_LTR)
+      ft.calculateLayout(80, 40, Flexily.DIRECTION_LTR)
       ft.setWidth(120)
-      ft.calculateLayout(120, 40, Flexture.DIRECTION_LTR)
+      ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
     },
     opts,
   )

@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 /**
- * Quick Flexture vs Yoga comparison for iteration.
+ * Quick Flexily vs Yoga comparison for iteration.
  * Run: bun bench/quick-compare.ts [nodeCount] [iterations]
  */
 
-import * as Flexture from "../src/index.js"
+import * as Flexily from "../src/index.js"
 import { layoutNodeCalls } from "../src/layout-zero.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
@@ -17,33 +17,33 @@ const wasmPath = join(__dirname, "../node_modules/yoga-wasm-web/dist/yoga.wasm")
 const nodeCount = parseInt(process.argv[2] || "1500", 10)
 const iterations = parseInt(process.argv[3] || "3", 10)
 
-console.log(`\nComparing Flexture vs Yoga: ${nodeCount} nodes, ${iterations} iterations\n`)
+console.log(`\nComparing Flexily vs Yoga: ${nodeCount} nodes, ${iterations} iterations\n`)
 
 // Initialize Yoga
 const wasmBuffer = readFileSync(wasmPath)
 const yoga: Yoga = await initYoga(wasmBuffer)
 
 // Tree with measure functions (simulates TUI text nodes)
-function createFlextureTree(n: number): Flexture.Node {
-  const root = Flexture.Node.create()
+function createFlexilyTree(n: number): Flexily.Node {
+  const root = Flexily.Node.create()
   root.setWidth(250)
   root.setHeight(120)
-  root.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+  root.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
   const cols = 5
   const itemsPerCol = Math.floor(n / cols / 2)
 
   for (let col = 0; col < cols; col++) {
-    const column = Flexture.Node.create()
+    const column = Flexily.Node.create()
     column.setFlexGrow(1)
-    column.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+    column.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
     for (let item = 0; item < itemsPerCol; item++) {
-      const itemNode = Flexture.Node.create()
-      itemNode.setFlexDirection(Flexture.FLEX_DIRECTION_ROW)
-      itemNode.setPadding(Flexture.EDGE_LEFT, 1)
+      const itemNode = Flexily.Node.create()
+      itemNode.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+      itemNode.setPadding(Flexily.EDGE_LEFT, 1)
 
-      const textNode = Flexture.Node.create()
+      const textNode = Flexily.Node.create()
       const text = `Item ${col}-${item} with some text content`
       textNode.setMeasureFunc((width, _wm, _h, _hm) => {
         const tw = text.length
@@ -99,16 +99,16 @@ function createYogaTree(n: number) {
 }
 
 // Benchmark
-const flextureTimes: number[] = []
+const flexilyTimes: number[] = []
 const yogaTimes: number[] = []
 
 for (let i = 0; i < iterations; i++) {
-  // Flexture
-  const ft = createFlextureTree(nodeCount)
-  Flexture.Node.resetMeasureStats()
+  // Flexily
+  const ft = createFlexilyTree(nodeCount)
+  Flexily.Node.resetMeasureStats()
   const fs = performance.now()
-  ft.calculateLayout(250, 120, Flexture.DIRECTION_LTR)
-  flextureTimes.push(performance.now() - fs)
+  ft.calculateLayout(250, 120, Flexily.DIRECTION_LTR)
+  flexilyTimes.push(performance.now() - fs)
 
   // Yoga
   const yt = createYogaTree(nodeCount)
@@ -119,13 +119,13 @@ for (let i = 0; i < iterations; i++) {
 }
 
 const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length
-const flextureAvg = avg(flextureTimes)
+const flexilyAvg = avg(flexilyTimes)
 const yogaAvg = avg(yogaTimes)
 
-console.log(`Flexture: ${flextureAvg.toFixed(2)}ms avg (${flextureTimes.map((t) => t.toFixed(1)).join(", ")})`)
-console.log(`       measure: calls=${Flexture.Node.measureCalls} hits=${Flexture.Node.measureCacheHits}`)
+console.log(`Flexily: ${flexilyAvg.toFixed(2)}ms avg (${flexilyTimes.map((t) => t.toFixed(1)).join(", ")})`)
+console.log(`       measure: calls=${Flexily.Node.measureCalls} hits=${Flexily.Node.measureCacheHits}`)
 console.log(`       layoutNode: calls=${layoutNodeCalls}`)
 console.log(`Yoga:  ${yogaAvg.toFixed(2)}ms avg (${yogaTimes.map((t) => t.toFixed(1)).join(", ")})`)
 console.log(
-  `\nRatio: Flexture is ${(flextureAvg / yogaAvg).toFixed(2)}x ${flextureAvg > yogaAvg ? "slower" : "faster"} than Yoga`,
+  `\nRatio: Flexily is ${(flexilyAvg / yogaAvg).toFixed(2)}x ${flexilyAvg > yogaAvg ? "slower" : "faster"} than Yoga`,
 )

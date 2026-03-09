@@ -1,6 +1,6 @@
 # Zero-Allocation Design
 
-This document describes the zero-allocation optimization in Flexture and its trade-offs.
+This document describes the zero-allocation optimization in Flexily and its trade-offs.
 
 ## Motivation
 
@@ -111,10 +111,10 @@ for (const child of children) {
 
 ```typescript
 // Default: Zero-allocation algorithm (recommended)
-import { Node } from "flexture"
+import { Node } from "flexily"
 
 // Classic algorithm (for debugging or comparison)
-import { Node } from "flexture/classic"
+import { Node } from "flexily/classic"
 ```
 
 Both exports have identical APIs -- only the internal algorithm differs.

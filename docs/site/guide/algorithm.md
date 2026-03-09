@@ -10,7 +10,7 @@ The algorithm works in multiple passes:
 
 ## Two Algorithm Variants
 
-Flexture provides two layout algorithm implementations:
+Flexily provides two layout algorithm implementations:
 
 | Algorithm      | File             | Default | Strengths                               |
 | -------------- | ---------------- | ------- | --------------------------------------- |

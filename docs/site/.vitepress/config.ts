@@ -1,15 +1,15 @@
 import { defineConfig } from "vitepress"
 
 export default defineConfig({
-  title: "Flexture",
+  title: "Flexily",
   description: "Pure JavaScript Flexbox Layout Engine -- Yoga-compatible API, faster, smaller, no WASM",
-  base: "/flexture/",
+  base: "/flexily/",
 
-  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/flexture/logo.svg" }]],
+  head: [["link", { rel: "icon", type: "image/svg+xml", href: "/flexily/logo.svg" }]],
 
   themeConfig: {
     logo: "/logo.svg",
-    siteTitle: "Flexture",
+    siteTitle: "Flexily",
 
     nav: [
       { text: "Guide", link: "/guide/getting-started" },
@@ -17,8 +17,8 @@ export default defineConfig({
       {
         text: "Links",
         items: [
-          { text: "GitHub", link: "https://github.com/beorn/flexture" },
-          { text: "npm", link: "https://www.npmjs.com/package/flexture" },
+          { text: "GitHub", link: "https://github.com/beorn/flexily" },
+          { text: "npm", link: "https://www.npmjs.com/package/flexily" },
         ],
       },
     ],
@@ -29,7 +29,7 @@ export default defineConfig({
           text: "Introduction",
           items: [
             { text: "Getting Started", link: "/guide/getting-started" },
-            { text: "Why Flexture?", link: "/guide/why-flexture" },
+            { text: "Why Flexily?", link: "/guide/why-flexily" },
           ],
         },
         {
@@ -58,7 +58,7 @@ export default defineConfig({
       ],
     },
 
-    socialLinks: [{ icon: "github", link: "https://github.com/beorn/flexture" }],
+    socialLinks: [{ icon: "github", link: "https://github.com/beorn/flexily" }],
 
     outline: { level: [2, 3] },
 

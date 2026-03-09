@@ -1,6 +1,6 @@
 # Testing
 
-Flexture uses a multi-layered testing strategy to ensure both initial layout correctness and incremental re-layout consistency. The test suite has caught 3 distinct caching/invalidation bugs that passed all single-pass tests.
+Flexily uses a multi-layered testing strategy to ensure both initial layout correctness and incremental re-layout consistency. The test suite has caught 3 distinct caching/invalidation bugs that passed all single-pass tests.
 
 ## Test Categories
 
@@ -24,7 +24,7 @@ bun test tests/layout/
 
 The most sophisticated test layer. These test **incremental re-layout** -- the scenario where `calculateLayout()` is called on a tree that was previously laid out, with some nodes marked dirty.
 
-**Why this matters**: Flexture uses caching (fingerprints, layout cache, measure cache) to skip recomputing unchanged subtrees. These caches are essential for performance but create subtle correctness risks. All 3 bugs found in Flexture were invisible to single-pass tests.
+**Why this matters**: Flexily uses caching (fingerprints, layout cache, measure cache) to skip recomputing unchanged subtrees. These caches are essential for performance but create subtle correctness risks. All 3 bugs found in Flexily were invisible to single-pass tests.
 
 ```bash
 bun test tests/relayout-consistency.test.ts
@@ -77,7 +77,7 @@ bun scripts/mutation-test.ts
 
 ## Public Testing API
 
-Flexture exports diagnostic helpers for downstream consumers:
+Flexily exports diagnostic helpers for downstream consumers:
 
 ```typescript
 import {
@@ -89,7 +89,7 @@ import {
   expectRelayoutMatchesFresh,
   expectIdempotent,
   expectResizeRoundTrip,
-} from "flexture/testing"
+} from "flexily/testing"
 ```
 
 See [API Reference](/api/reference#testing-utilities) for the full list.

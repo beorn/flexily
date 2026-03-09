@@ -1,12 +1,12 @@
 #!/usr/bin/env bun
 /**
- * Mutation testing for Flexture cache code paths.
+ * Mutation testing for Flexily cache code paths.
  *
  * Deliberately injects known-wrong values into cache/invalidation logic
  * and verifies the fuzz suite catches each mutation. If a mutation passes
  * all tests, that's a coverage gap in the test suite.
  *
- * Run: cd vendor/flexture && bun scripts/mutation-test.ts
+ * Run: cd vendor/flexily && bun scripts/mutation-test.ts
  */
 
 import { readFileSync, writeFileSync } from "fs"
@@ -187,7 +187,7 @@ async function main() {
   const gaps: string[] = []
   const skipped: string[] = []
 
-  console.log(`Mutation testing for Flexture cache code paths`)
+  console.log(`Mutation testing for Flexily cache code paths`)
   console.log(`Running ${mutations.length} mutations against relayout-consistency fuzz suite\n`)
 
   for (const mutation of mutations) {
@@ -216,7 +216,7 @@ async function main() {
       process.stdout.write(`  "${mutation.name}" ... `)
 
       const proc = Bun.spawn(
-        ["bun", "vitest", "run", "vendor/flexture/tests/relayout-consistency.test.ts", "--reporter=dot"],
+        ["bun", "vitest", "run", "vendor/flexily/tests/relayout-consistency.test.ts", "--reporter=dot"],
         { cwd: kmRoot, stdout: "pipe", stderr: "pipe" },
       )
       const exitCode = await proc.exited

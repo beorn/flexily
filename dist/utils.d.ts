@@ -1,5 +1,5 @@
 /**
- * Flexture Utility Functions
+ * Flexily Utility Functions
  *
  * Helper functions for edge value manipulation and value resolution.
  */

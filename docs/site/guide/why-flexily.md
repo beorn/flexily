@@ -1,4 +1,4 @@
-# Why Flexture?
+# Why Flexily?
 
 [Yoga](https://yogalayout.dev/) is the industry standard flexbox engine, used by React Native, Ink, and thousands of apps. It's mature and battle-tested. But it's C++ compiled to WASM, and that creates real problems for JavaScript applications.
 
@@ -10,15 +10,15 @@
 
 **Memory growth.** WASM linear memory grows but never shrinks. Yoga's yoga-wasm-web has a [known memory growth bug](https://github.com/nicolo-ribaudo/yoga-wasm-web/issues/1) where each node allocation permanently grows the WASM heap. In long-running apps, this caused [120GB RAM usage in Claude Code](https://github.com/anthropics/claude-code/issues/4953).
 
-**Debugging opacity.** You can't step into WASM in a JS debugger. When layout is wrong, you get a computed number with no way to inspect the algorithm's intermediate state. Flexture is readable JS -- set a breakpoint in `layout-zero.ts`.
+**Debugging opacity.** You can't step into WASM in a JS debugger. When layout is wrong, you get a computed number with no way to inspect the algorithm's intermediate state. Flexily is readable JS -- set a breakpoint in `layout-zero.ts`.
 
 **No tree-shaking.** The WASM binary is monolithic. You get the entire engine even if you use a fraction of the features.
 
-## Flexture's Approach
+## Flexily's Approach
 
-Flexture fills the gap that Facebook's original pure-JS flexbox engine (`css-layout`) left when they moved to C++. Full CSS flexbox spec, Yoga-compatible API, pure JS, zero WASM.
+Flexily fills the gap that Facebook's original pure-JS flexbox engine (`css-layout`) left when they moved to C++. Full CSS flexbox spec, Yoga-compatible API, pure JS, zero WASM.
 
-| Concern            | Yoga                  | Flexture               |
+| Concern            | Yoga                  | Flexily                |
 | ------------------ | --------------------- | ---------------------- |
 | **Runtime**        | WebAssembly           | Pure JavaScript        |
 | **Initialization** | Async (WASM load)     | Synchronous            |
@@ -30,18 +30,18 @@ Flexture fills the gap that Facebook's original pure-JS flexbox engine (`css-lay
 
 Each engine wins in different scenarios:
 
-| Scenario                | Winner       | Margin     |
-| ----------------------- | ------------ | ---------- |
-| **Initial layout**      | Flexture     | 1.5-2.5x   |
-| **No-change re-layout** | **Flexture** | **5.5x**   |
-| **Single dirty leaf**   | Yoga         | 2.8-3.4x   |
-| **Deep nesting (15+)**  | Yoga         | increasing |
+| Scenario                | Winner      | Margin     |
+| ----------------------- | ----------- | ---------- |
+| **Initial layout**      | Flexily     | 1.5-2.5x   |
+| **No-change re-layout** | **Flexily** | **5.5x**   |
+| **Single dirty leaf**   | Yoga        | 2.8-3.4x   |
+| **Deep nesting (15+)**  | Yoga        | increasing |
 
-For interactive TUIs where most keystrokes don't change layout, Flexture's fingerprint cache makes re-layout essentially free (27ns regardless of tree size).
+For interactive TUIs where most keystrokes don't change layout, Flexily's fingerprint cache makes re-layout essentially free (27ns regardless of tree size).
 
 See [Performance](/guide/performance) for detailed benchmarks.
 
-## Use Flexture When
+## Use Flexily When
 
 - You want synchronous initialization (no async `await init()`)
 - You're in an environment where WASM is awkward (older bundlers, edge runtimes)

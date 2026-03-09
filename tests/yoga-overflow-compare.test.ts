@@ -1,14 +1,14 @@
 /**
- * Compare Yoga vs Flexture behavior for overflow + flexGrow.
+ * Compare Yoga vs Flexily behavior for overflow + flexGrow.
  * Bug: km-silvery.scroll-flexgrow
  *
- * Flexture intentionally diverges from Yoga for overflow:hidden/scroll containers:
+ * Flexily intentionally diverges from Yoga for overflow:hidden/scroll containers:
  * - Yoga: overflow containers expand to full content size (flexShrink=0 default)
- * - Flexture: overflow containers shrink to fit parent (CSS spec §4.5 behavior)
+ * - Flexily: overflow containers shrink to fit parent (CSS spec §4.5 behavior)
  * - CSS spec: overflow != visible → automatic min-size = 0 → item can shrink
  */
 import { describe, test, expect, beforeAll } from "vitest"
-import * as Flexture from "../src/index.js"
+import * as Flexily from "../src/index.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -23,8 +23,8 @@ beforeAll(async () => {
   yoga = await initYoga(wasmBuffer)
 })
 
-describe("Yoga vs Flexture: overflow + flexGrow", () => {
-  test("overflow:hidden — Flexture constrains, Yoga does not (intentional divergence)", () => {
+describe("Yoga vs Flexily: overflow + flexGrow", () => {
+  test("overflow:hidden — Flexily constrains, Yoga does not (intentional divergence)", () => {
     // Yoga
     const yRoot = yoga.Node.create()
     yRoot.setFlexDirection(yoga.FLEX_DIRECTION_COLUMN)
@@ -47,25 +47,25 @@ describe("Yoga vs Flexture: overflow + flexGrow", () => {
     expect(yRoot.getComputedHeight()).toBe(10)
     expect(yContainer.getComputedHeight()).toBe(30)
 
-    // Flexture
-    const fRoot = Flexture.Node.create()
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+    // Flexily
+    const fRoot = Flexily.Node.create()
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
     fRoot.setHeight(10)
     fRoot.setWidth(80)
 
-    const fContainer = Flexture.Node.create()
+    const fContainer = Flexily.Node.create()
     fContainer.setFlexGrow(1)
-    fContainer.setOverflow(Flexture.OVERFLOW_HIDDEN)
+    fContainer.setOverflow(Flexily.OVERFLOW_HIDDEN)
 
     for (let i = 0; i < 30; i++) {
-      const fLine = Flexture.Node.create()
+      const fLine = Flexily.Node.create()
       fLine.setHeight(1)
       fContainer.insertChild(fLine, i)
     }
     fRoot.insertChild(fContainer, 0)
-    fRoot.calculateLayout(80, 10, Flexture.DIRECTION_LTR)
+    fRoot.calculateLayout(80, 10, Flexily.DIRECTION_LTR)
 
-    // Flexture DOES constrain (CSS spec §4.5: overflow → min-size:auto=0 → can shrink)
+    // Flexily DOES constrain (CSS spec §4.5: overflow → min-size:auto=0 → can shrink)
     expect(fRoot.getComputedHeight()).toBe(10)
     expect(fContainer.getComputedHeight()).toBe(10)
   })
@@ -88,22 +88,22 @@ describe("Yoga vs Flexture: overflow + flexGrow", () => {
     yRoot.insertChild(yContainer, 0)
     yRoot.calculateLayout(80, 10, yoga.DIRECTION_LTR)
 
-    // Flexture
-    const fRoot = Flexture.Node.create()
-    fRoot.setFlexDirection(Flexture.FLEX_DIRECTION_COLUMN)
+    // Flexily
+    const fRoot = Flexily.Node.create()
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
     fRoot.setHeight(10)
     fRoot.setWidth(80)
 
-    const fContainer = Flexture.Node.create()
+    const fContainer = Flexily.Node.create()
     fContainer.setFlexGrow(1)
 
     for (let i = 0; i < 30; i++) {
-      const fLine = Flexture.Node.create()
+      const fLine = Flexily.Node.create()
       fLine.setHeight(1)
       fContainer.insertChild(fLine, i)
     }
     fRoot.insertChild(fContainer, 0)
-    fRoot.calculateLayout(80, 10, Flexture.DIRECTION_LTR)
+    fRoot.calculateLayout(80, 10, Flexily.DIRECTION_LTR)
 
     // Both: overflow:visible + flexShrink:0 → container stays at content size
     expect(yRoot.getComputedHeight()).toBe(10)

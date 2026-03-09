@@ -1,5 +1,5 @@
 /**
- * Flexture Constants
+ * Flexily Constants
  *
  * Yoga-compatible constants for flexbox layout.
  * These match Yoga's enum values exactly for drop-in compatibility.

@@ -1,5 +1,5 @@
 /**
- * Test utilities for Flexture layout tests
+ * Test utilities for Flexily layout tests
  */
 import { expect } from "vitest"
 import { DIRECTION_LTR, Node, type Direction } from "../src/index.js"
