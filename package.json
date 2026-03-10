@@ -39,6 +39,9 @@
       "import": "./dist/index-classic.js"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "test": "bun test",

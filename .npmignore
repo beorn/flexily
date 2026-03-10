@@ -1,0 +1,24 @@
+# Tests
+tests/
+**/*.test.ts
+**/*.spec.ts
+
+# Benchmarks
+bench/
+
+# Documentation site
+docs/
+
+# Development config
+.github/
+.githooks/
+.claude/
+vitest.config.ts
+tsconfig.json
+bun.lock
+
+# Build artifacts
+node_modules/
+
+# Scripts
+scripts/
