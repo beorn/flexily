@@ -90,6 +90,7 @@ Flexily is Yoga-compatible but follows CSS spec where Yoga doesn't:
 
 | Behavior                                  | Yoga                                                     | Flexily                    | CSS Spec                                             |
 | ----------------------------------------- | -------------------------------------------------------- | -------------------------- | ---------------------------------------------------- |
+| Default `flexDirection`                   | Column                                                   | Row (CSS default)          | Row                                                  |
 | `overflow:hidden/scroll` + `flexShrink:0` | Item expands to content size (ignores parent constraint) | Item shrinks to fit parent | §4.5: automatic min-size = 0 for overflow containers |
 
 **Details**: Yoga defaults `flexShrink` to 0 (unlike CSS's default of 1) and doesn't implement CSS §4.5's rule that overflow containers have `min-size: auto = 0`. This means in Yoga, an `overflow:hidden` child with 30 lines of content inside a height-10 parent will compute as height 30 — defeating the purpose of overflow clipping. Flexily ensures overflow containers can always shrink (`flexShrink >= 1`), matching CSS browser behavior. See `tests/yoga-overflow-compare.test.ts` for comparison tests.
