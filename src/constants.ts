@@ -25,6 +25,7 @@ export const ALIGN_STRETCH = 4
 export const ALIGN_BASELINE = 5
 export const ALIGN_SPACE_BETWEEN = 6
 export const ALIGN_SPACE_AROUND = 7
+export const ALIGN_SPACE_EVENLY = 8
 
 // Justify
 export const JUSTIFY_FLEX_START = 0

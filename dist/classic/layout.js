@@ -824,6 +824,15 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
                             lineCrossOffsets[i] += halfGap + halfGap * 2 * i;
                         }
                         break;
+                    case C.ALIGN_SPACE_EVENLY:
+                        // Equal spacing between lines and at edges
+                        if (numLines > 0) {
+                            const spaceEvenlyGap = freeSpace / (numLines + 1);
+                            for (let i = 0; i < numLines; i++) {
+                                lineCrossOffsets[i] += spaceEvenlyGap * (i + 1);
+                            }
+                        }
+                        break;
                     case C.ALIGN_STRETCH:
                         // Distribute extra space evenly among lines
                         if (freeSpace > 0 && numLines > 0) {

@@ -19,6 +19,7 @@ export declare const ALIGN_STRETCH = 4;
 export declare const ALIGN_BASELINE = 5;
 export declare const ALIGN_SPACE_BETWEEN = 6;
 export declare const ALIGN_SPACE_AROUND = 7;
+export declare const ALIGN_SPACE_EVENLY = 8;
 export declare const JUSTIFY_FLEX_START = 0;
 export declare const JUSTIFY_CENTER = 1;
 export declare const JUSTIFY_FLEX_END = 2;

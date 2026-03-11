@@ -910,6 +910,16 @@ function layoutNode(
             }
             break
 
+          case C.ALIGN_SPACE_EVENLY:
+            // Equal spacing between lines and at edges
+            if (numLines > 0) {
+              const gap = freeSpace / (numLines + 1)
+              for (let i = 0; i < numLines; i++) {
+                _lineCrossOffsets[i]! += gap * (i + 1)
+              }
+            }
+            break
+
           case C.ALIGN_STRETCH:
             // Distribute extra space evenly among lines
             if (freeSpace > 0 && numLines > 0) {
