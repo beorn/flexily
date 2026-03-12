@@ -925,6 +925,20 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
             if (childStyle.alignSelf !== C.ALIGN_AUTO) {
                 alignment = childStyle.alignSelf;
             }
+            // CSS Alignment spec: aspect-ratio fallback alignment
+            // When a flex item has aspect-ratio and auto cross-axis dimension,
+            // the fallback alignment is flex-start (not stretch). This prevents
+            // stretch from overriding the AR-derived dimension.
+            // Only applies when stretch is inherited (align-self: auto), not explicit.
+            const childCrossDimForAR = isRow ? childStyle.height : childStyle.width;
+            const childCrossIsAutoForAR = childCrossDimForAR.unit === C.UNIT_AUTO || childCrossDimForAR.unit === C.UNIT_UNDEFINED;
+            if (alignment === C.ALIGN_STRETCH &&
+                childStyle.alignSelf === C.ALIGN_AUTO &&
+                !Number.isNaN(childStyle.aspectRatio) &&
+                childStyle.aspectRatio > 0 &&
+                childCrossIsAutoForAR) {
+                alignment = C.ALIGN_FLEX_START;
+            }
             // Cross axis size depends on alignment and child's explicit dimensions
             // IMPORTANT: Resolve percent against parent's cross axis, not child's available
             let childCrossSize;
@@ -1330,11 +1344,13 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
             actualUsedMain += childMainSize + totalMainMargin;
         }
         actualUsedMain += totalGaps;
-        if (isRow && style.width.unit !== C.UNIT_POINT && style.width.unit !== C.UNIT_PERCENT) {
+        // Skip main-axis shrink-wrap when aspect ratio determined this dimension
+        const hasAR = !Number.isNaN(aspectRatio) && aspectRatio > 0;
+        if (isRow && style.width.unit !== C.UNIT_POINT && style.width.unit !== C.UNIT_PERCENT && !hasAR) {
             // Auto-width row: shrink-wrap to content
             nodeWidth = actualUsedMain + innerLeft + innerRight;
         }
-        if (!isRow && style.height.unit !== C.UNIT_POINT && style.height.unit !== C.UNIT_PERCENT) {
+        if (!isRow && style.height.unit !== C.UNIT_POINT && style.height.unit !== C.UNIT_PERCENT && !hasAR) {
             // Auto-height column: shrink-wrap to content
             nodeHeight = actualUsedMain + innerTop + innerBottom;
         }
@@ -1368,17 +1384,20 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
         // Cross-axis shrink-wrap for auto-sized dimension
         // Only shrink-wrap when the available dimension is NaN (unconstrained)
         // When availableHeight/Width is defined, Yoga uses it for AUTO-sized root nodes
+        // Skip if aspect ratio already determined this dimension (aspect ratio > shrink-wrap)
         if (isRow &&
             style.height.unit !== C.UNIT_POINT &&
             style.height.unit !== C.UNIT_PERCENT &&
-            Number.isNaN(availableHeight)) {
+            Number.isNaN(availableHeight) &&
+            !hasAR) {
             // Auto-height row: shrink-wrap to total cross size (accounts for multi-line)
             nodeHeight = totalCrossSize + innerTop + innerBottom;
         }
         if (!isRow &&
             style.width.unit !== C.UNIT_POINT &&
             style.width.unit !== C.UNIT_PERCENT &&
-            Number.isNaN(availableWidth)) {
+            Number.isNaN(availableWidth) &&
+            !hasAR) {
             // Auto-width column: shrink-wrap to total cross size (accounts for multi-line)
             nodeWidth = totalCrossSize + innerLeft + innerRight;
         }

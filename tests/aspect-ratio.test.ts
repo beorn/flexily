@@ -143,8 +143,9 @@ describe("Aspect Ratio", () => {
   })
 
   describe("As flex child", () => {
-    it("should stretch cross-axis in row container (alignItems:stretch overrides ratio)", () => {
-      // Default alignItems is STRETCH, so cross-axis (height) stretches to parent
+    it("should use AR fallback alignment (flex-start) instead of implicit stretch (CSS spec)", () => {
+      // CSS Alignment spec: aspect-ratio with auto cross-axis dimension
+      // falls back to flex-start instead of stretch. AR-derived height wins.
       const root = Node.create()
       root.setWidth(200)
       root.setHeight(200)
@@ -152,13 +153,13 @@ describe("Aspect Ratio", () => {
 
       const child = Node.create()
       child.setWidth(100)
-      child.setAspectRatio(2) // Would give height=50, but stretch overrides
+      child.setAspectRatio(2) // height = 100/2 = 50
       root.insertChild(child, 0)
 
       root.calculateLayout(200, 200, DIRECTION_LTR)
 
-      // Stretch overrides aspect ratio on cross-axis
-      expectLayout(child, { width: 100, height: 200 })
+      // CSS spec: AR prevents implicit stretch, so height = width/AR = 50
+      expectLayout(child, { width: 100, height: 50 })
     })
 
     it("should apply ratio in row container when alignSelf is flex-start", () => {
