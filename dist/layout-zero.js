@@ -1449,6 +1449,73 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
     if (!Number.isNaN(nodeHeight) && nodeHeight < minInnerHeight) {
         nodeHeight = minInnerHeight;
     }
+    // -----------------------------------------------------------------------
+    // PHASE 9b: Re-stretch children after shrink-wrap (Yoga compat)
+    // -----------------------------------------------------------------------
+    // When the parent's cross axis was auto (NaN during Phase 8), children with
+    // stretch alignment were shrink-wrapped to content. Now that the cross size
+    // is known from shrink-wrap, re-layout those children with the definite size.
+    // This matches Yoga's two-pass approach for auto-sized containers.
+    if (Number.isNaN(crossAxisSize) && relativeCount > 0) {
+        const finalCross = isRow ? nodeHeight - innerTop - innerBottom : nodeWidth - innerLeft - innerRight;
+        if (!Number.isNaN(finalCross) && finalCross > 0) {
+            for (const child of node.children) {
+                if (child.flex.relativeIndex < 0)
+                    continue;
+                const cstyle = child.style;
+                // Determine alignment for this child
+                let childAlign = style.alignItems;
+                if (cstyle.alignSelf !== C.ALIGN_AUTO) {
+                    childAlign = cstyle.alignSelf;
+                }
+                // AR fallback: aspect-ratio prevents implicit stretch
+                const cCrossDim = isRow ? cstyle.height : cstyle.width;
+                const cCrossIsAuto = cCrossDim.unit === C.UNIT_AUTO || cCrossDim.unit === C.UNIT_UNDEFINED;
+                if (childAlign === C.ALIGN_STRETCH &&
+                    cstyle.alignSelf === C.ALIGN_AUTO &&
+                    !Number.isNaN(cstyle.aspectRatio) &&
+                    cstyle.aspectRatio > 0 &&
+                    cCrossIsAuto) {
+                    childAlign = C.ALIGN_FLEX_START;
+                }
+                if (childAlign !== C.ALIGN_STRETCH)
+                    continue;
+                if (!cCrossIsAuto)
+                    continue;
+                // Compute child's cross margin
+                const cCrossMargin = isRow
+                    ? resolveEdgeValue(cstyle.margin, 1, style.flexDirection, contentWidth, direction) +
+                        resolveEdgeValue(cstyle.margin, 3, style.flexDirection, contentWidth, direction)
+                    : resolveEdgeValue(cstyle.margin, 0, style.flexDirection, contentWidth, direction) +
+                        resolveEdgeValue(cstyle.margin, 2, style.flexDirection, contentWidth, direction);
+                const stretchedCross = finalCross - cCrossMargin;
+                // Only re-layout if the cross size actually changed
+                const currentCross = isRow ? child.layout.height : child.layout.width;
+                if (Math.round(stretchedCross) <= currentCross)
+                    continue;
+                // Re-layout child with the definite cross size
+                // Save position — layoutNode overwrites layout.left/top
+                const savedLeft = child.layout.left;
+                const savedTop = child.layout.top;
+                const cMarginL = resolveEdgeValue(cstyle.margin, 0, style.flexDirection, contentWidth, direction);
+                const cMarginT = resolveEdgeValue(cstyle.margin, 1, style.flexDirection, contentWidth, direction);
+                const cAbsX = absX + innerLeft + savedLeft - cMarginL;
+                const cAbsY = absY + innerTop + savedTop - cMarginT;
+                const passW = isRow ? child.layout.width : stretchedCross;
+                const passH = isRow ? stretchedCross : child.layout.height;
+                layoutNode(child, passW, passH, savedLeft, savedTop, cAbsX, cAbsY, direction);
+                // Restore position and override cross dimension to stretched size
+                child.layout.left = savedLeft;
+                child.layout.top = savedTop;
+                if (isRow) {
+                    child.layout.height = Math.round(stretchedCross);
+                }
+                else {
+                    child.layout.width = Math.round(stretchedCross);
+                }
+            }
+        }
+    }
     // =========================================================================
     // PHASE 10: Final Output - Set Node Layout
     // =========================================================================
