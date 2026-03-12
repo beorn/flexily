@@ -1149,8 +1149,12 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
             // Calculate child's RELATIVE position (stored in layout)
             // Yoga behavior: position is rounded locally, size uses absolute edge rounding
             // This ensures sizes are pixel-perfect at document level while positions remain intuitive
-            const childLeft = Math.round(fractionalLeft + posOffsetX);
-            const childTop = Math.round(fractionalTop + posOffsetY);
+            // Yoga 3.x quirk: measureFunc leaf nodes use Math.floor for position rounding,
+            // while explicit-sized children use Math.round. This affects any justify/align mode
+            // that produces fractional offsets (center, space-around, space-evenly).
+            const posRound = shouldMeasure ? Math.floor : Math.round;
+            const childLeft = posRound(fractionalLeft + posOffsetX);
+            const childTop = posRound(fractionalTop + posOffsetY);
             // Check if cross axis is auto-sized (needed for deciding what to pass to layoutNode)
             const crossDimForLayoutCall = isRow ? childStyle.height : childStyle.width;
             const crossIsAutoForLayoutCall = crossDimForLayoutCall.unit === C.UNIT_AUTO || crossDimForLayoutCall.unit === C.UNIT_UNDEFINED;
@@ -1276,7 +1280,11 @@ function layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, abs
             // baseline alignment, align within the baseline zone instead of the full container.
             // Yoga behavior: non-baseline children are positioned relative to the effective height
             // of the baseline group (max of maxBaseline and tallest child), not the container.
-            const useBaselineZone = hasBaselineAlignment && isRow && !alignItemsIsBaseline && alignment !== C.ALIGN_BASELINE && baselineZoneHeight > 0;
+            const useBaselineZone = hasBaselineAlignment &&
+                isRow &&
+                !alignItemsIsBaseline &&
+                alignment !== C.ALIGN_BASELINE &&
+                baselineZoneHeight > 0;
             const effectiveCrossSize = useBaselineZone ? baselineZoneHeight : crossAxisSize;
             const availableCrossSpace = effectiveCrossSize - finalCrossSize - crossMargin;
             if (hasAutoStartMargin && hasAutoEndMargin) {
