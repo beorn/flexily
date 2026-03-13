@@ -8,11 +8,11 @@ _Yoga comparisons last verified: 2026-03._
 
 ## Status
 
-|                      | Yoga                                                 | Flexily                              |
-| -------------------- | ---------------------------------------------------- | ------------------------------------ |
-| **Maturity**         | Production, battle-tested (React Native, Ink, Litho) | Production-ready, fully tested       |
-| **Test coverage**    | Extensive (auto-generated from Chrome)               | 1368 tests, 41/41 Yoga compatibility |
-| **Real-world usage** | Millions of apps                                     | Used in production                   |
+|                      | Yoga                                                 | Flexily                           |
+| -------------------- | ---------------------------------------------------- | --------------------------------- |
+| **Maturity**         | Production, battle-tested (React Native, Ink, Litho) | Production-ready, fully tested    |
+| **Test coverage**    | Extensive (auto-generated from Chrome)               | 1495 tests, 44 Yoga compatibility |
+| **Real-world usage** | Millions of apps                                     | Used in production                |
 
 ---
 
@@ -81,7 +81,7 @@ root.calculateLayout(100, 100, DIRECTION_LTR)
 console.log(child.getComputedWidth()) // Same output
 ```
 
-**API coverage**: 100% of Yoga's commonly-used API is implemented with identical method signatures. 41/41 Yoga comparison tests pass.
+**API coverage**: Yoga's commonly-used API is implemented with identical method signatures. 44 Yoga comparison tests pass. Some advanced features (e.g., `order` property, writing modes) are not yet implemented.
 
 ---
 
@@ -192,7 +192,7 @@ root.setFlexDirection(FLEX_DIRECTION_ROW);
 
 ## Test Coverage
 
-Flexily includes 1368 tests covering:
+Flexily includes 1495 tests covering:
 
 - ✅ Basic layout (single node, column, row)
 - ✅ Flex grow distribution

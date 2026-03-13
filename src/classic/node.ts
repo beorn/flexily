@@ -109,6 +109,18 @@ export class Node {
    * ```
    */
   insertChild(child: Node, index: number): void {
+    // Cycle guard: prevent self-insertion or insertion of an ancestor
+    if (child === this) {
+      throw new Error("Cannot insert a node as a child of itself")
+    }
+    let ancestor: Node | null = this._parent
+    while (ancestor !== null) {
+      if (ancestor === child) {
+        throw new Error("Cannot insert an ancestor as a child (would create a cycle)")
+      }
+      ancestor = ancestor._parent
+    }
+
     if (child._parent !== null) {
       child._parent.removeChild(child)
     }
@@ -150,6 +162,19 @@ export class Node {
     this._children = []
     this._measureFunc = null
     this._baselineFunc = null
+  }
+
+  /**
+   * Free this node and all descendants recursively.
+   * Each node is detached from its parent and cleaned up.
+   */
+  freeRecursive(): void {
+    // Free children first (leaves to root)
+    const children = [...this._children]
+    for (const child of children) {
+      child.freeRecursive()
+    }
+    this.free()
   }
 
   /**
@@ -375,6 +400,41 @@ export class Node {
    */
   getComputedHeight(): number {
     return this._layout.height
+  }
+
+  /**
+   * Get the computed right edge position after layout (left + width).
+   */
+  getComputedRight(): number {
+    return this._layout.left + this._layout.width
+  }
+
+  /**
+   * Get the computed bottom edge position after layout (top + height).
+   */
+  getComputedBottom(): number {
+    return this._layout.top + this._layout.height
+  }
+
+  /**
+   * Get the computed padding for a specific edge after layout.
+   */
+  getComputedPadding(edge: number): number {
+    return getEdgeValue(this._style.padding, edge).value
+  }
+
+  /**
+   * Get the computed margin for a specific edge after layout.
+   */
+  getComputedMargin(edge: number): number {
+    return getEdgeValue(this._style.margin, edge).value
+  }
+
+  /**
+   * Get the computed border width for a specific edge after layout.
+   */
+  getComputedBorder(edge: number): number {
+    return getEdgeBorderValue(this._style.border, edge)
   }
 
   // ============================================================================

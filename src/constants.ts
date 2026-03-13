@@ -65,7 +65,7 @@ export const OVERFLOW_VISIBLE = 0
 export const OVERFLOW_HIDDEN = 1
 export const OVERFLOW_SCROLL = 2
 
-// Direction (for RTL support - we only support LTR)
+// Direction (LTR and RTL are both supported)
 export const DIRECTION_INHERIT = 0
 export const DIRECTION_LTR = 1
 export const DIRECTION_RTL = 2

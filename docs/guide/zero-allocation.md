@@ -116,7 +116,7 @@ Both algorithms now have complete feature parity:
 | RTL direction      | ✅      | ✅         |
 | EDGE_START/END     | ✅      | ✅         |
 | Baseline alignment | ✅      | ✅         |
-| All Yoga tests     | 41/41   | 41/41      |
+| All Yoga tests     | 44/44   | 44/44      |
 
 ## Usage
 

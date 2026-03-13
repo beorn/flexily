@@ -12,11 +12,11 @@ Every box must be checked before tagging 1.0.
 
 ### Correctness
 
-- [x] All Yoga compatibility tests pass (41/41)
+- [x] All Yoga compatibility tests pass (44/44)
 - [x] Re-layout fuzz tests pass (1200+)
 - [x] Mutation testing validates fuzz suite catches known cache mutations
 - [x] All feature tests pass (~110)
-- [x] Total test count: 1368 passing
+- [x] Total test count: 1495 passing
 - [ ] No known layout correctness bugs (audit open issues before release)
 - [x] Intentional Yoga divergences documented (CSS overflow:hidden behavior)
 
@@ -91,7 +91,7 @@ After 1.0:
 Flexily should reach 1.0 **before** silvery, because:
 
 1. Flexily has a smaller, more focused API surface (layout engine only)
-2. Flexily already passes 1368 tests including comprehensive fuzz testing
+2. Flexily already passes 1495 tests including comprehensive fuzz testing
 3. silvery depends on Flexily -- a stable Flexily simplifies silvery's own 1.0 story
 4. The main blocker (vendor rename + npm publish) is shared with silvery
 

@@ -37,7 +37,6 @@ export { markSubtreeLayoutSeen, countNodes } from "./layout-traversal.js"
 export {
   layoutNodeCalls,
   measureNodeCalls,
-  resolveEdgeCalls,
   layoutSizingCalls,
   layoutPositioningCalls,
   layoutCacheHits,
@@ -52,6 +51,7 @@ import {
   isRowDirection,
   isReverseDirection,
   resolveEdgeValue,
+  resolvePositionEdge,
   isEdgeAuto,
   resolveEdgeBorderValue,
 } from "./layout-helpers.js"
@@ -278,10 +278,13 @@ function layoutNode(
   // This ensures children's absolute positions include parent's position offset
   let parentPosOffsetX = 0
   let parentPosOffsetY = 0
-  if (style.positionType === C.POSITION_TYPE_STATIC || style.positionType === C.POSITION_TYPE_RELATIVE) {
-    const leftPos = style.position[0]
+  // CSS spec: position:static ignores insets (top/left/right/bottom).
+  // Only position:relative applies insets as offsets from normal flow position.
+  if (style.positionType === C.POSITION_TYPE_RELATIVE) {
+    // Resolve logical EDGE_START/EDGE_END to physical left/right based on direction
+    const leftPos = resolvePositionEdge(style.position, 0, direction)
     const topPos = style.position[1]
-    const rightPos = style.position[2]
+    const rightPos = resolvePositionEdge(style.position, 2, direction)
     const bottomPos = style.position[3]
 
     if (leftPos.unit !== C.UNIT_UNDEFINED) {
@@ -478,8 +481,10 @@ function layoutNode(
         const cached = child.getCachedLayout(sizingW, sizingH)
         if (cached) {
           incLayoutCacheHits()
+          _t?.cacheHit(_tn, sizingW, sizingH, cached.width, cached.height)
           baseSize = isRow ? cached.width : cached.height
         } else {
+          _t?.cacheMiss(_tn, sizingW, sizingH)
           // Use measureNode for sizing-only pass (faster than full layoutNode)
           // Save layout before measureNode — it overwrites node.layout.width/height
           // with intrinsic measurements (unconstrained widths -> text doesn't wrap ->
@@ -487,11 +492,12 @@ function layoutNode(
           // in Phase 9 would skip re-computation and preserve the corrupted values.
           const savedW = child.layout.width
           const savedH = child.layout.height
-          measureNode(child, sizingW, sizingH)
+          measureNode(child, sizingW, sizingH, direction)
           const measuredW = child.layout.width
           const measuredH = child.layout.height
           child.layout.width = savedW
           child.layout.height = savedH
+          _t?.measureSaveRestore(_tn, savedW, savedH, measuredW, measuredH)
           baseSize = isRow ? measuredW : measuredH
           // Cache the result for potential reuse
           child.setCachedLayout(sizingW, sizingH, measuredW, measuredH)
@@ -766,20 +772,23 @@ function layoutNode(
           const cached = child.getCachedLayout(child.flex.mainSize, NaN)
           if (cached) {
             incLayoutCacheHits()
+            _t?.cacheHit(_tn, child.flex.mainSize, NaN, cached.width, cached.height)
             childWidth = cached.width
             childHeight = cached.height
           } else {
+            _t?.cacheMiss(_tn, child.flex.mainSize, NaN)
             // Use measureNode for sizing-only pass (faster than full layoutNode)
             // Save layout before measureNode — it overwrites node.layout.width/height
             // with intrinsic measurements. Without save/restore, layoutNode's fingerprint
             // check in Phase 9 would skip re-computation and preserve corrupted values.
             const savedW = child.layout.width
             const savedH = child.layout.height
-            measureNode(child, child.flex.mainSize, NaN)
+            measureNode(child, child.flex.mainSize, NaN, direction)
             childWidth = child.layout.width
             childHeight = child.layout.height
             child.layout.width = savedW
             child.layout.height = savedH
+            _t?.measureSaveRestore(_tn, savedW, savedH, childWidth, childHeight)
             child.setCachedLayout(child.flex.mainSize, NaN, childWidth, childHeight)
           }
         }
@@ -866,6 +875,19 @@ function layoutNode(
           if (measured) {
             childCross = isRow ? measured.height : measured.width
           }
+        } else if (child.children.length > 0) {
+          // Auto-sized container children (no measureFunc, has children):
+          // Compute intrinsic cross-axis size by measuring with unconstrained
+          // dimensions. This gives the shrink-wrap size, which is what we need
+          // for line cross-size estimation. Passing NaN for both axes ensures
+          // measureNode returns the content-determined size rather than
+          // filling the available space.
+          const savedW = child.layout.width
+          const savedH = child.layout.height
+          measureNode(child, NaN, NaN, direction)
+          childCross = isRow ? child.layout.height : child.layout.width
+          child.layout.width = savedW
+          child.layout.height = savedH
         }
         maxLineCross = Math.max(maxLineCross, childCross + crossMarginStart + crossMarginEnd)
       }
@@ -891,72 +913,89 @@ function layoutNode(
       const freeSpace = crossAxisSize - totalLineCrossSize
       const alignContent = style.alignContent
 
-      // Reset offsets based on alignContent
-      if (freeSpace > 0 || alignContent === C.ALIGN_STRETCH) {
-        switch (alignContent) {
-          case C.ALIGN_FLEX_END:
-            // Lines packed at end
+      // Apply alignContent offset based on free space.
+      // flex-end and center apply with both positive and negative free space.
+      // space-between/around/evenly only distribute with positive free space;
+      // with negative space they collapse to flex-start or center (CSS spec).
+      // stretch only expands lines with positive free space.
+      switch (alignContent) {
+        case C.ALIGN_FLEX_END:
+          // Lines packed at end (works with negative free space too — shifts lines up)
+          for (let i = 0; i < numLines; i++) {
+            _lineCrossOffsets[i]! += freeSpace
+          }
+          break
+
+        case C.ALIGN_CENTER:
+          // Lines centered (works with negative free space — equal overflow both sides)
+          {
+            const centerOffset = freeSpace / 2
             for (let i = 0; i < numLines; i++) {
-              _lineCrossOffsets[i]! += freeSpace
+              _lineCrossOffsets[i]! += centerOffset
             }
-            break
+          }
+          break
 
-          case C.ALIGN_CENTER:
-            // Lines centered
-            {
-              const centerOffset = freeSpace / 2
-              for (let i = 0; i < numLines; i++) {
-                _lineCrossOffsets[i]! += centerOffset
+        case C.ALIGN_SPACE_BETWEEN:
+          // First line at start, last at end, evenly distributed
+          // With negative free space: collapses to flex-start (no adjustment)
+          if (freeSpace > 0 && numLines > 1) {
+            const gap = freeSpace / (numLines - 1)
+            for (let i = 1; i < numLines; i++) {
+              _lineCrossOffsets[i]! += gap * i
+            }
+          }
+          break
+
+        case C.ALIGN_SPACE_AROUND:
+          // Even spacing with half-space at edges
+          // With negative free space: collapses to center (CSS spec)
+          if (freeSpace > 0) {
+            const halfGap = freeSpace / (numLines * 2)
+            for (let i = 0; i < numLines; i++) {
+              _lineCrossOffsets[i]! += halfGap + halfGap * 2 * i
+            }
+          } else {
+            // Negative space: center fallback
+            const centerOffset = freeSpace / 2
+            for (let i = 0; i < numLines; i++) {
+              _lineCrossOffsets[i]! += centerOffset
+            }
+          }
+          break
+
+        case C.ALIGN_SPACE_EVENLY:
+          // Equal spacing between lines and at edges
+          // With negative free space: collapses to center (CSS spec)
+          if (freeSpace > 0 && numLines > 0) {
+            const gap = freeSpace / (numLines + 1)
+            for (let i = 0; i < numLines; i++) {
+              _lineCrossOffsets[i]! += gap * (i + 1)
+            }
+          } else if (freeSpace < 0) {
+            // Negative space: center fallback
+            const centerOffset = freeSpace / 2
+            for (let i = 0; i < numLines; i++) {
+              _lineCrossOffsets[i]! += centerOffset
+            }
+          }
+          break
+
+        case C.ALIGN_STRETCH:
+          // Distribute extra space evenly among lines (only with positive free space)
+          if (freeSpace > 0 && numLines > 0) {
+            const extraPerLine = freeSpace / numLines
+            for (let i = 0; i < numLines; i++) {
+              _lineCrossSizes[i]! += extraPerLine
+              // Recalculate offset for subsequent lines
+              if (i > 0) {
+                _lineCrossOffsets[i] = _lineCrossOffsets[i - 1]! + _lineCrossSizes[i - 1]! + crossGap
               }
             }
-            break
+          }
+          break
 
-          case C.ALIGN_SPACE_BETWEEN:
-            // First line at start, last at end, evenly distributed
-            if (numLines > 1) {
-              const gap = freeSpace / (numLines - 1)
-              for (let i = 1; i < numLines; i++) {
-                _lineCrossOffsets[i]! += gap * i
-              }
-            }
-            break
-
-          case C.ALIGN_SPACE_AROUND:
-            // Even spacing with half-space at edges
-            {
-              const halfGap = freeSpace / (numLines * 2)
-              for (let i = 0; i < numLines; i++) {
-                _lineCrossOffsets[i]! += halfGap + halfGap * 2 * i
-              }
-            }
-            break
-
-          case C.ALIGN_SPACE_EVENLY:
-            // Equal spacing between lines and at edges
-            if (numLines > 0) {
-              const gap = freeSpace / (numLines + 1)
-              for (let i = 0; i < numLines; i++) {
-                _lineCrossOffsets[i]! += gap * (i + 1)
-              }
-            }
-            break
-
-          case C.ALIGN_STRETCH:
-            // Distribute extra space evenly among lines
-            if (freeSpace > 0 && numLines > 0) {
-              const extraPerLine = freeSpace / numLines
-              for (let i = 0; i < numLines; i++) {
-                _lineCrossSizes[i]! += extraPerLine
-                // Recalculate offset for subsequent lines
-                if (i > 0) {
-                  _lineCrossOffsets[i] = _lineCrossOffsets[i - 1]! + _lineCrossSizes[i - 1]! + crossGap
-                }
-              }
-            }
-            break
-
-          // ALIGN_FLEX_START is the default - lines already at start
-        }
+        // ALIGN_FLEX_START is the default - lines already at start
       }
 
       // For wrap-reverse, lines should be positioned from the end of the cross axis
@@ -972,6 +1011,29 @@ function layoutNode(
         for (let i = 0; i < numLines; i++) {
           _lineCrossOffsets[i]! += crossStartOffset
         }
+      }
+    }
+
+    // Save line data before Phase 8: recursive layoutNode calls for children
+    // with sub-children overwrite the global pre-allocated _lineCrossSizes,
+    // _lineCrossOffsets, _lineJustifyStarts, and _lineItemSpacings arrays.
+    // For multi-line layouts, we copy the values into small local arrays.
+    // This allocation is rare (only for multi-line wrapping containers) and
+    // tiny (4 arrays x numLines x 8 bytes).
+    let savedLineCrossSizes: Float64Array | null = null
+    let savedLineCrossOffsets: Float64Array | null = null
+    let savedLineJustifyStarts: Float64Array | null = null
+    let savedLineItemSpacings: Float64Array | null = null
+    if (numLines > 1) {
+      savedLineCrossSizes = new Float64Array(numLines)
+      savedLineCrossOffsets = new Float64Array(numLines)
+      savedLineJustifyStarts = new Float64Array(numLines)
+      savedLineItemSpacings = new Float64Array(numLines)
+      for (let i = 0; i < numLines; i++) {
+        savedLineCrossSizes[i] = _lineCrossSizes[i]!
+        savedLineCrossOffsets[i] = _lineCrossOffsets[i]!
+        savedLineJustifyStarts[i] = _lineJustifyStarts[i]!
+        savedLineItemSpacings[i] = _lineItemSpacings[i]!
       }
     }
 
@@ -1035,13 +1097,23 @@ function layoutNode(
         lineChildIdx = 0 // Reset position within line
         currentLineLength = _lineChildren[childLineIdx]!.length
         // Reset mainPos for new line using line-specific justify offset
-        const lineOffset = _lineJustifyStarts[childLineIdx]!
-        currentItemSpacing = _lineItemSpacings[childLineIdx]!
+        // Use saved arrays for multi-line to avoid corruption by recursive layoutNode
+        const lineOffset = savedLineJustifyStarts
+          ? savedLineJustifyStarts[childLineIdx]!
+          : _lineJustifyStarts[childLineIdx]!
+        currentItemSpacing = savedLineItemSpacings
+          ? savedLineItemSpacings[childLineIdx]!
+          : _lineItemSpacings[childLineIdx]!
         mainPos = effectiveReverse ? effectiveMainAxisSize - lineOffset : lineOffset
       }
 
-      // Get cross-axis offset for this child's line (from pre-allocated array)
-      const lineCrossOffset = childLineIdx < MAX_FLEX_LINES ? _lineCrossOffsets[childLineIdx] : 0
+      // Get cross-axis offset for this child's line
+      // Use saved arrays for multi-line to avoid corruption by recursive layoutNode
+      const lineCrossOffset = savedLineCrossOffsets
+        ? savedLineCrossOffsets[childLineIdx]!
+        : childLineIdx < MAX_FLEX_LINES
+          ? _lineCrossOffsets[childLineIdx]
+          : 0
 
       // For main-axis margins, use computed auto margin values
       // For cross-axis margins, use cached values (auto margins on cross axis handled separately)
@@ -1139,7 +1211,13 @@ function layoutNode(
       } else if (parentHasDefiniteCross && alignment === C.ALIGN_STRETCH) {
         // Stretch alignment with definite parent cross size - fill the line's cross axis
         // For wrapping layouts, stretch to line cross size, not full container cross size
-        const lineCross = numLines > 1 && childLineIdx < MAX_FLEX_LINES ? _lineCrossSizes[childLineIdx]! : crossAxisSize
+        // Use saved arrays for multi-line to avoid corruption by recursive layoutNode
+        const lineCross =
+          numLines > 1
+            ? savedLineCrossSizes
+              ? savedLineCrossSizes[childLineIdx]!
+              : _lineCrossSizes[childLineIdx]!
+            : crossAxisSize
         childCrossSize = lineCross - crossMargin
       } else {
         // Non-stretch alignment or no definite cross size - shrink-wrap to content
@@ -1247,14 +1325,16 @@ function layoutNode(
       const fractionalLeft = innerLeft + childX
       const fractionalTop = innerTop + childY
 
-      // Compute position offsets for RELATIVE/STATIC positioned children
+      // Compute position offsets for RELATIVE positioned children
+      // CSS spec: position:static ignores insets; only position:relative applies them.
       // These must be included in the absolute position BEFORE rounding (Yoga-compatible)
       let posOffsetX = 0
       let posOffsetY = 0
-      if (childStyle.positionType === C.POSITION_TYPE_RELATIVE || childStyle.positionType === C.POSITION_TYPE_STATIC) {
-        const relLeftPos = childStyle.position[0]
+      if (childStyle.positionType === C.POSITION_TYPE_RELATIVE) {
+        // Resolve logical EDGE_START/EDGE_END to physical left/right based on direction
+        const relLeftPos = resolvePositionEdge(childStyle.position, 0, direction)
         const relTopPos = childStyle.position[1]
-        const relRightPos = childStyle.position[2]
+        const relRightPos = resolvePositionEdge(childStyle.position, 2, direction)
         const relBottomPos = childStyle.position[3]
 
         // Left offset (takes precedence over right)
@@ -1500,7 +1580,7 @@ function layoutNode(
         }
       }
 
-      if (crossOffset > 0) {
+      if (crossOffset !== 0) {
         // Yoga 3.x quirk: measureFunc leaf nodes use Math.floor for cross-axis alignment
         // offset, matching the main-axis floor rounding behavior
         const crossRound = shouldMeasure ? Math.floor : Math.round
@@ -1584,8 +1664,9 @@ function layoutNode(
     let totalCrossSize = 0
     if (numLines > 1) {
       // Multi-line: sum line cross sizes + cross gaps between lines
+      // Use saved arrays to avoid corruption by recursive layoutNode
       for (let i = 0; i < numLines; i++) {
-        totalCrossSize += _lineCrossSizes[i]!
+        totalCrossSize += savedLineCrossSizes ? savedLineCrossSizes[i]! : _lineCrossSizes[i]!
       }
       totalCrossSize += crossGap * (numLines - 1)
     } else {
@@ -1778,9 +1859,10 @@ function layoutNode(
     const hasAutoMarginBottom = isEdgeAuto(childStyle.margin, 3, style.flexDirection, direction)
 
     // Position offsets from setPosition(edge, value)
-    const leftPos = childStyle.position[0]
+    // Resolve logical EDGE_START/EDGE_END to physical left/right based on direction
+    const leftPos = resolvePositionEdge(childStyle.position, 0, direction)
     const topPos = childStyle.position[1]
-    const rightPos = childStyle.position[2]
+    const rightPos = resolvePositionEdge(childStyle.position, 2, direction)
     const bottomPos = childStyle.position[3]
 
     const hasLeft = leftPos.unit !== C.UNIT_UNDEFINED
@@ -1788,10 +1870,11 @@ function layoutNode(
     const hasTop = topPos.unit !== C.UNIT_UNDEFINED
     const hasBottom = bottomPos.unit !== C.UNIT_UNDEFINED
 
-    const leftOffset = resolveValue(leftPos, nodeWidth)
-    const topOffset = resolveValue(topPos, nodeHeight)
-    const rightOffset = resolveValue(rightPos, nodeWidth)
-    const bottomOffset = resolveValue(bottomPos, nodeHeight)
+    // Yoga resolves percentage position offsets against the content box dimensions
+    const leftOffset = resolveValue(leftPos, absContentBoxW)
+    const topOffset = resolveValue(topPos, absContentBoxH)
+    const rightOffset = resolveValue(rightPos, absContentBoxW)
+    const bottomOffset = resolveValue(bottomPos, absContentBoxH)
 
     // Calculate available size for absolute child using padding box
     const contentW = absPaddingBoxW
@@ -1864,28 +1947,45 @@ function layoutNode(
     const childHeight = child.layout.height
 
     // Apply alignment when no explicit position set
-    // For absolute children, align-items/justify-content apply when no position offsets
+    // For absolute children, align-items applies on cross axis, justify-content on main axis
+    // Row: X = main axis (justifyContent), Y = cross axis (alignItems)
+    // Column: X = cross axis (alignItems), Y = main axis (justifyContent)
     if (!hasLeft && !hasRight) {
-      // No horizontal position - use align-items (for row) or justify-content (for column)
-      // Default column direction: cross-axis is horizontal, use alignItems
-      let alignment = style.alignItems
-      if (childStyle.alignSelf !== C.ALIGN_AUTO) {
-        alignment = childStyle.alignSelf
-      }
-      const freeSpaceX = contentW - childWidth - childMarginLeft - childMarginRight
-      switch (alignment) {
-        case C.ALIGN_CENTER:
-          childX = childMarginLeft + freeSpaceX / 2
-          break
-        case C.ALIGN_FLEX_END:
-          childX = childMarginLeft + freeSpaceX
-          break
-        case C.ALIGN_STRETCH:
-          // Stretch: already handled by setting width to fill
-          break
-        default: // FLEX_START
-          childX = childMarginLeft
-          break
+      if (isRow) {
+        // Row: X is main axis, use justifyContent
+        const freeSpaceX = contentW - childWidth - childMarginLeft - childMarginRight
+        switch (style.justifyContent) {
+          case C.JUSTIFY_CENTER:
+            childX = childMarginLeft + freeSpaceX / 2
+            break
+          case C.JUSTIFY_FLEX_END:
+            childX = childMarginLeft + freeSpaceX
+            break
+          default: // FLEX_START
+            childX = childMarginLeft
+            break
+        }
+      } else {
+        // Column: X is cross axis, use alignItems/alignSelf
+        let alignment = style.alignItems
+        if (childStyle.alignSelf !== C.ALIGN_AUTO) {
+          alignment = childStyle.alignSelf
+        }
+        const freeSpaceX = contentW - childWidth - childMarginLeft - childMarginRight
+        switch (alignment) {
+          case C.ALIGN_CENTER:
+            childX = childMarginLeft + freeSpaceX / 2
+            break
+          case C.ALIGN_FLEX_END:
+            childX = childMarginLeft + freeSpaceX
+            break
+          case C.ALIGN_STRETCH:
+            // Stretch: already handled by setting width to fill
+            break
+          default: // FLEX_START
+            childX = childMarginLeft
+            break
+        }
       }
     } else if (!hasLeft && hasRight) {
       // Position from right edge
@@ -1911,19 +2011,41 @@ function layoutNode(
     }
 
     if (!hasTop && !hasBottom) {
-      // No vertical position - use justify-content (for row) or align-items (for column)
-      // Default column direction: main-axis is vertical, use justifyContent
-      const freeSpaceY = contentH - childHeight - childMarginTop - childMarginBottom
-      switch (style.justifyContent) {
-        case C.JUSTIFY_CENTER:
-          childY = childMarginTop + freeSpaceY / 2
-          break
-        case C.JUSTIFY_FLEX_END:
-          childY = childMarginTop + freeSpaceY
-          break
-        default: // FLEX_START
-          childY = childMarginTop
-          break
+      if (isRow) {
+        // Row: Y is cross axis, use alignItems/alignSelf
+        let alignment = style.alignItems
+        if (childStyle.alignSelf !== C.ALIGN_AUTO) {
+          alignment = childStyle.alignSelf
+        }
+        const freeSpaceY = contentH - childHeight - childMarginTop - childMarginBottom
+        switch (alignment) {
+          case C.ALIGN_CENTER:
+            childY = childMarginTop + freeSpaceY / 2
+            break
+          case C.ALIGN_FLEX_END:
+            childY = childMarginTop + freeSpaceY
+            break
+          case C.ALIGN_STRETCH:
+            // Stretch: already handled by setting height to fill
+            break
+          default: // FLEX_START
+            childY = childMarginTop
+            break
+        }
+      } else {
+        // Column: Y is main axis, use justifyContent
+        const freeSpaceY = contentH - childHeight - childMarginTop - childMarginBottom
+        switch (style.justifyContent) {
+          case C.JUSTIFY_CENTER:
+            childY = childMarginTop + freeSpaceY / 2
+            break
+          case C.JUSTIFY_FLEX_END:
+            childY = childMarginTop + freeSpaceY
+            break
+          default: // FLEX_START
+            childY = childMarginTop
+            break
+        }
       }
     } else if (!hasTop && hasBottom) {
       // Position from bottom edge

@@ -76,7 +76,7 @@ src/
 | `src/layout-measure.ts`              | measureNode - intrinsic sizing                              |
 | `src/node-zero.ts`                   | Node class - **second most performance-critical**           |
 | `bench/yoga-compare-warmup.bench.ts` | Main benchmark comparing Flexily vs Yoga                    |
-| `tests/yoga-comparison.test.ts`      | Yoga compatibility tests (41 tests)                         |
+| `tests/yoga-comparison.test.ts`      | Yoga compatibility tests (44 tests)                         |
 
 ## Architecture
 
@@ -103,8 +103,8 @@ Flexily is Yoga-compatible but follows CSS spec where Yoga doesn't:
 ## Testing
 
 ```bash
-bun test                                              # All tests (1368)
-bun test tests/yoga-comparison.test.ts tests/yoga-overflow-compare.test.ts  # Yoga compatibility (41)
+bun test                                              # All tests (1495)
+bun test tests/yoga-comparison.test.ts tests/yoga-overflow-compare.test.ts  # Yoga compatibility (44)
 bun test tests/layout.test.ts                         # Layout algorithm tests
 bun test tests/relayout-consistency.test.ts  # Re-layout fuzz (1200+)
 ```

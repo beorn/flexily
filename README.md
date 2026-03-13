@@ -34,7 +34,7 @@ console.log(child.getComputedWidth()) // 100
 
 **No tree-shaking.** The WASM binary is monolithic. You get the entire engine even if you use a fraction of the features.
 
-Facebook's original pure-JS flexbox engine (`css-layout`) was abandoned when they moved to C++. [flexbox.js](https://github.com/Planning-nl/flexbox.js) exists but is unmaintained and missing features. Flexily fills the gap: full CSS flexbox spec, Yoga-compatible API, pure JS, zero WASM.
+Facebook's original pure-JS flexbox engine (`css-layout`) was abandoned when they moved to C++. [flexbox.js](https://github.com/Planning-nl/flexbox.js) exists but is unmaintained and missing features. Flexily fills the gap: comprehensive CSS flexbox support, Yoga-compatible API, pure JS, zero WASM.
 
 ## Who Should Use Flexily
 
@@ -49,7 +49,7 @@ Most developers should use a framework built on Flexily, not Flexily directly. F
 
 ## Status
 
-1368 tests passing, including 41/41 Yoga compatibility tests and 1200+ incremental re-layout fuzz tests. Used by [silvery](https://silvery.dev) as its default layout engine.
+1495 tests, including 44 Yoga compatibility tests and 1200+ incremental re-layout fuzz tests. Used by [silvery](https://silvery.dev) as its default layout engine.
 
 | Feature                                       | Status   |
 | --------------------------------------------- | -------- |
@@ -122,7 +122,7 @@ Incremental re-layout (caching unchanged subtrees) is essential for performance 
 
 | Layer              | Tests     | What it verifies                                               |
 | ------------------ | --------- | -------------------------------------------------------------- |
-| Yoga compatibility | 41        | Identical output to Yoga for every feature                     |
+| Yoga compatibility | 44        | Identical output to Yoga for every feature                     |
 | Feature tests      | ~110      | Each flexbox feature in isolation                              |
 | **Re-layout fuzz** | **1200+** | Incremental re-layout matches fresh layout across random trees |
 
@@ -141,7 +141,7 @@ See [docs/testing.md](docs/testing.md) for methodology and [docs/incremental-lay
 
 ## API Compatibility
 
-100% Yoga API compatibility (41/41 comparison tests passing). Drop-in replacement:
+Yoga-compatible API (44 comparison tests passing). Near drop-in replacement for common use cases:
 
 ```typescript
 // Yoga
@@ -184,7 +184,7 @@ Same constants, same method names, same behavior.
 src/
 ├── index.ts        # Main export
 ├── node-zero.ts    # Node class with FlexInfo
-├── layout-zero.ts  # Layout algorithm (~2300 lines)
+├── layout-zero.ts  # Layout algorithm (~2000 lines)
 ├── constants.ts    # Flexbox constants (Yoga-compatible)
 ├── types.ts        # TypeScript interfaces
 ├── utils.ts        # Shared utilities

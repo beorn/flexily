@@ -195,21 +195,8 @@ export function resolveValue(value: Value, availableSize: number): number {
 export function applyMinMax(size: number, min: Value, max: Value, available: number): number {
   let result = size
 
-  if (min.unit !== C.UNIT_UNDEFINED) {
-    // Skip percent min when available is NaN — can't resolve meaningfully
-    if (min.unit === C.UNIT_PERCENT && Number.isNaN(available)) {
-      // Skip: percent against NaN resolves to 0, which would be wrong
-    } else {
-      const minValue = resolveValue(min, available)
-      if (!Number.isNaN(minValue)) {
-        // Only apply min to definite sizes. When size is NaN (auto-sized),
-        // skip — the post-shrink-wrap applyMinMax call will floor it.
-        if (!Number.isNaN(result)) {
-          result = Math.max(result, minValue)
-        }
-      }
-    }
-  }
+  // Apply max first, then min. CSS spec: when min > max, min wins.
+  // By applying max before min, Math.max(result, minValue) ensures min dominates.
 
   if (max.unit !== C.UNIT_UNDEFINED) {
     // Skip percent max when available is NaN — can't resolve meaningfully
@@ -231,6 +218,22 @@ export function applyMinMax(size: number, min: Value, max: Value, available: num
           }
         } else {
           result = Math.min(result, maxValue)
+        }
+      }
+    }
+  }
+
+  if (min.unit !== C.UNIT_UNDEFINED) {
+    // Skip percent min when available is NaN — can't resolve meaningfully
+    if (min.unit === C.UNIT_PERCENT && Number.isNaN(available)) {
+      // Skip: percent against NaN resolves to 0, which would be wrong
+    } else {
+      const minValue = resolveValue(min, available)
+      if (!Number.isNaN(minValue)) {
+        // Only apply min to definite sizes. When size is NaN (auto-sized),
+        // skip — the post-shrink-wrap applyMinMax call will floor it.
+        if (!Number.isNaN(result)) {
+          result = Math.max(result, minValue)
         }
       }
     }

@@ -16,16 +16,16 @@ Flexily is a pure-JavaScript flexbox layout engine with a Yoga-compatible API. T
                 │                               │
          ┌──────┴──────┐                 ┌──────┴───────┐
          │ node-zero.ts│                 │layout-zero.ts │
-         │  (1412 LOC) │                 │  (1781 LOC)   │
+         │  (1412 LOC) │                 │  (2029 LOC)   │
          │  Node class │                 │  layoutNode   │
          └──────┬──────┘                 └──────┬────────┘
                 │                               │
          ┌──────┴──────┐     ┌──────────────────┼──────────────────┐
          │  types.ts   │     │                  │                  │
          │  Interfaces │  layout-helpers.ts  layout-flex-lines.ts  │
-         └─────────────┘  (140 LOC)         (346 LOC)             │
+         └─────────────┘  (160 LOC)         (349 LOC)             │
                           Edge resolution   Pre-alloc arrays   layout-measure.ts
-                                            Line breaking      (257 LOC)
+                                            Line breaking      (259 LOC)
                                             Flex distribution  measureNode
 
          layout-traversal.ts (70 LOC) - Tree traversal (markSubtreeLayoutSeen, countNodes)
@@ -48,16 +48,16 @@ Flexily is a pure-JavaScript flexbox layout engine with a Yoga-compatible API. T
 
 | File                   | LOC   | Role                                                                 | Hot path?                      |
 | ---------------------- | ----- | -------------------------------------------------------------------- | ------------------------------ |
-| `layout-zero.ts`       | 1781  | Core layout: `computeLayout()`, `layoutNode()` (11 phases)           | **Yes** - most critical        |
-| `layout-helpers.ts`    | 140   | Edge resolution: margins, padding, borders                           | **Yes** - called per edge      |
-| `layout-flex-lines.ts` | 346   | Pre-alloc arrays, `breakIntoLines()`, `distributeFlexSpaceForLine()` | **Yes** - flex distribution    |
-| `layout-measure.ts`    | 257   | `measureNode()` — intrinsic sizing                                   | **Yes** - sizing pass          |
+| `layout-zero.ts`       | 2029  | Core layout: `computeLayout()`, `layoutNode()` (11 phases)           | **Yes** - most critical        |
+| `layout-helpers.ts`    | 160   | Edge resolution: margins, padding, borders                           | **Yes** - called per edge      |
+| `layout-flex-lines.ts` | 349   | Pre-alloc arrays, `breakIntoLines()`, `distributeFlexSpaceForLine()` | **Yes** - flex distribution    |
+| `layout-measure.ts`    | 259   | `measureNode()` — intrinsic sizing                                   | **Yes** - sizing pass          |
 | `layout-traversal.ts`  | 70    | Tree traversal: `markSubtreeLayoutSeen()`, `countNodes()`            | Moderate                       |
-| `layout-stats.ts`      | 43    | Debug/benchmark counters                                             | No (counters only)             |
+| `layout-stats.ts`      | 41    | Debug/benchmark counters                                             | No (counters only)             |
 | `node-zero.ts`         | 1412  | Node class, tree ops, caching                                        | **Yes** - second most critical |
-| `types.ts`             | 229   | `FlexInfo`, `Style`, `Layout`, `Value` interfaces                    | No (types only)                |
-| `utils.ts`             | 217   | `resolveValue`, `applyMinMax`, edge helpers, shared traversal stack  | Yes (called frequently)        |
-| `constants.ts`         | 81    | Yoga-compatible numeric constants                                    | No                             |
+| `types.ts`             | 232   | `FlexInfo`, `Style`, `Layout`, `Value` interfaces                    | No (types only)                |
+| `utils.ts`             | 240   | `resolveValue`, `applyMinMax`, edge helpers, shared traversal stack  | Yes (called frequently)        |
+| `constants.ts`         | 82    | Yoga-compatible numeric constants                                    | No                             |
 | `logger.ts`            | 67    | Conditional debug logger (`log.debug?.()`)                           | No (conditional)               |
 | `testing.ts`           | 209   | `getLayout`, `diffLayouts`, `expectRelayoutMatchesFresh`             | No (test only)                 |
 | `classic/`             | ~2900 | Allocating reference algorithm                                       | No (debugging only)            |
@@ -316,7 +316,7 @@ This is Yoga's algorithm. Layout positions stored in `layout.left`/`layout.top` 
 
 ## measureNode vs layoutNode
 
-`measureNode()` (~240 lines) is a lightweight alternative to `layoutNode()` (~1650 lines). It computes `width` and `height` but NOT `left`/`top`. Used during Phase 5 for intrinsic sizing of auto-sized container children. Save/restore of `layout.width`/`layout.height` is required around `measureNode` calls because it overwrites those fields.
+`measureNode()` (~260 lines) is a lightweight alternative to `layoutNode()` (~1900 lines). It computes `width` and `height` but NOT `left`/`top`. Used during Phase 5 for intrinsic sizing of auto-sized container children. Save/restore of `layout.width`/`layout.height` is required around `measureNode` calls because it overwrites those fields.
 
 ## Integration: How Silvery Uses Flexily
 
@@ -451,11 +451,11 @@ cd vendor/flexily && bun run build
 
 | Layer              | Tests     | Command                                                                      | What it verifies                  |
 | ------------------ | --------- | ---------------------------------------------------------------------------- | --------------------------------- |
-| Yoga compat        | 38        | `bun test tests/yoga-comparison.test.ts tests/yoga-overflow-compare.test.ts` | Identical output to Yoga          |
+| Yoga compat        | 44        | `bun test tests/yoga-comparison.test.ts tests/yoga-overflow-compare.test.ts` | Identical output to Yoga          |
 | Feature tests      | ~110      | `bun test tests/layout.test.ts`                                              | Each flexbox feature in isolation |
 | **Re-layout fuzz** | **1200+** | `bun test tests/relayout-consistency.test.ts`                                | Incremental matches fresh         |
 | Mutation testing   | 4+        | `bun scripts/mutation-test.ts`                                               | Fuzz catches cache mutations      |
-| All tests          | 1368      | `bun test`                                                                   | Everything                        |
+| All tests          | 1495      | `bun test`                                                                   | Everything                        |
 
 The fuzz tests are the most important layer. They've caught 3 distinct caching bugs that all single-pass tests missed.
 

@@ -58,7 +58,7 @@ console.log(left.getComputedLeft()) // 0
 console.log(right.getComputedLeft()) // 100
 
 // Clean up
-root.freeRecursive()
+root.free()
 ```
 
 ## Adding Spacing
@@ -70,7 +70,7 @@ const root = Node.create()
 root.setWidth(200)
 root.setFlexDirection(FLEX_DIRECTION_ROW)
 root.setPadding(EDGE_ALL, 10) // 10px padding on all sides
-root.setGap(GAP_COLUMN, 8) // 8px gap between columns
+root.setGap(GUTTER_COLUMN, 8) // 8px gap between columns
 
 const a = Node.create()
 a.setFlexGrow(1)
@@ -177,7 +177,7 @@ Always free nodes when done:
 
 ```typescript
 // Free entire tree
-root.freeRecursive()
+root.free()
 
 // Or free individual nodes (must remove children first)
 root.removeChild(child)

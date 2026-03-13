@@ -174,7 +174,7 @@ node.markDirty() // Force recalculation
 
 ```typescript
 node.free() // Release resources
-node.freeRecursive() // Free this node and all children
+node.free() // Free this node and clean up references
 ```
 
 ## Constants

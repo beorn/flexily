@@ -103,7 +103,6 @@ export { createDefaultStyle, createValue } from "./types.js"
 // Layout stats (for debugging/benchmarking)
 export {
   layoutNodeCalls,
-  resolveEdgeCalls,
   layoutSizingCalls,
   layoutPositioningCalls,
   layoutCacheHits,

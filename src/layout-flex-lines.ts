@@ -141,7 +141,10 @@ export function breakIntoLines(
     if (child.flex.relativeIndex < 0) continue
 
     const flex = child.flex
-    const childMainSize = flex.baseSize + flex.mainMargin
+    // CSS spec 9.3.4: line breaking uses the "hypothetical main size" which is
+    // the flex base size clamped to min/max, not the unclamped base size.
+    const hypotheticalMainSize = Math.max(flex.minMain, Math.min(flex.maxMain, flex.baseSize))
+    const childMainSize = hypotheticalMainSize + flex.mainMargin
     const gapIfNotFirst = lineChildCount > 0 ? mainGap : 0
 
     // Check if child fits on current line

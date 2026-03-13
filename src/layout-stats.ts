@@ -8,7 +8,6 @@
 // Layout statistics for debugging
 export let layoutNodeCalls = 0
 export let measureNodeCalls = 0
-export let resolveEdgeCalls = 0
 export let layoutSizingCalls = 0 // Calls for intrinsic sizing (offset=0,0)
 export let layoutPositioningCalls = 0 // Calls for final positioning
 export let layoutCacheHits = 0
@@ -16,7 +15,6 @@ export let layoutCacheHits = 0
 export function resetLayoutStats(): void {
   layoutNodeCalls = 0
   measureNodeCalls = 0
-  resolveEdgeCalls = 0
   layoutSizingCalls = 0
   layoutPositioningCalls = 0
   layoutCacheHits = 0

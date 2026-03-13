@@ -47,7 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Zero-allocation layout algorithm (layout-zero.ts) for high-frequency recalculation
 - Classic allocating algorithm (layout.ts) for debugging and comparison
 - Dirty tracking for incremental relayout
-- 100% Yoga API compatibility (41/41 comparison tests passing)
+- Yoga API compatibility (41/41 comparison tests passing)
 - 524 tests total
 - 1.5-2.5x faster initial layout than Yoga, 5x smaller bundle, zero dependencies
 

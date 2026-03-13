@@ -4,7 +4,7 @@ Flexily uses a multi-layered testing strategy to ensure both initial layout corr
 
 ## Test Categories
 
-### 1. Yoga Compatibility Tests (41 tests)
+### 1. Yoga Compatibility Tests (44 tests)
 
 Direct comparison against Yoga's WASM implementation. Both engines process the same node tree and must produce identical computed layouts.
 
@@ -12,7 +12,7 @@ Direct comparison against Yoga's WASM implementation. Both engines process the s
 bun test tests/yoga-compat/
 ```
 
-### 2. Layout Feature Tests (~480 tests)
+### 2. Layout Feature Tests (~105 tests)
 
 Traditional example-based tests for each flexbox feature: grow, shrink, wrap, alignment, absolute positioning, aspect ratio, measure functions, etc.
 

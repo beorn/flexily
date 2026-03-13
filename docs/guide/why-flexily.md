@@ -18,7 +18,7 @@ _External project claims last verified: 2026-03._
 
 ## Flexily's Approach
 
-Flexily fills the gap that Facebook's original pure-JS flexbox engine (`css-layout`) left when they moved to C++. Full CSS flexbox spec, Yoga-compatible API, pure JS, zero WASM.
+Flexily fills the gap that Facebook's original pure-JS flexbox engine (`css-layout`) left when they moved to C++. Comprehensive CSS flexbox support, Yoga-compatible API, pure JS, zero WASM.
 
 | Concern            | Yoga                  | Flexily                |
 | ------------------ | --------------------- | ---------------------- |

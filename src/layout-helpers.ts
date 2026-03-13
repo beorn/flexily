@@ -114,6 +114,31 @@ export function isEdgeAuto(
  * - LTR: START->left, END->right
  * - RTL: START->right, END->left
  */
+/**
+ * Resolve logical (START/END) position edges to physical values.
+ * Returns the resolved Value for a physical position index, considering
+ * logical EDGE_START/EDGE_END. Logical takes precedence over physical.
+ *
+ * EDGE_START/EDGE_END always resolve along the inline (horizontal) axis:
+ * - LTR: START->left, END->right
+ * - RTL: START->right, END->left
+ */
+export function resolvePositionEdge(
+  arr: [Value, Value, Value, Value, Value, Value],
+  physicalIndex: number, // 0=left, 1=top, 2=right, 3=bottom
+  direction: number = C.DIRECTION_LTR,
+): Value {
+  const logicalValue = getLogicalEdgeValue(arr, physicalIndex, 0 /* unused */, direction)
+
+  // Logical takes precedence if defined
+  if (logicalValue && logicalValue.unit !== C.UNIT_UNDEFINED) {
+    return logicalValue
+  }
+
+  // Fall back to physical
+  return arr[physicalIndex]!
+}
+
 export function resolveEdgeBorderValue(
   arr: [number, number, number, number, number, number],
   physicalIndex: number, // 0=left, 1=top, 2=right, 3=bottom

@@ -198,32 +198,35 @@ export function createValue(value = 0, unit = 0): Value {
 
 /**
  * Create default style.
+ *
+ * Comments indicate where Yoga and CSS defaults differ.
+ * Flexily follows Yoga defaults for API compatibility.
  */
 export function createDefaultStyle(): Style {
   return {
-    display: 0, // DISPLAY_FLEX
-    positionType: 1, // POSITION_TYPE_RELATIVE
+    display: 0, // DISPLAY_FLEX (same in CSS and Yoga)
+    positionType: 1, // POSITION_TYPE_RELATIVE (same in CSS and Yoga)
     position: [createValue(), createValue(), createValue(), createValue(), createValue(), createValue()],
-    flexDirection: 2, // FLEX_DIRECTION_ROW (CSS default)
-    flexWrap: 0, // WRAP_NO_WRAP
-    flexGrow: 0,
-    flexShrink: 0, // Yoga native default (CSS uses 1)
-    flexBasis: createValue(0, 3), // AUTO
-    alignItems: 4, // ALIGN_STRETCH
-    alignSelf: 0, // ALIGN_AUTO
-    alignContent: 1, // ALIGN_FLEX_START
-    justifyContent: 0, // JUSTIFY_FLEX_START
-    width: createValue(0, 3), // AUTO
-    height: createValue(0, 3), // AUTO
+    flexDirection: 2, // FLEX_DIRECTION_ROW — CSS default; Yoga defaults to COLUMN
+    flexWrap: 0, // WRAP_NO_WRAP (same in CSS and Yoga)
+    flexGrow: 0, // (same in CSS and Yoga)
+    flexShrink: 0, // Yoga default; CSS defaults to 1
+    flexBasis: createValue(0, 3), // AUTO (same in CSS and Yoga)
+    alignItems: 4, // ALIGN_STRETCH (same in CSS and Yoga)
+    alignSelf: 0, // ALIGN_AUTO (same in CSS and Yoga)
+    alignContent: 1, // ALIGN_FLEX_START — Yoga default; CSS defaults to STRETCH
+    justifyContent: 0, // JUSTIFY_FLEX_START (same in CSS and Yoga)
+    width: createValue(0, 3), // AUTO (same in CSS and Yoga)
+    height: createValue(0, 3), // AUTO (same in CSS and Yoga)
     minWidth: createValue(),
     minHeight: createValue(),
     maxWidth: createValue(),
     maxHeight: createValue(),
-    aspectRatio: NaN, // undefined by default
+    aspectRatio: NaN, // undefined by default (same in CSS and Yoga)
     margin: [createValue(), createValue(), createValue(), createValue(), createValue(), createValue()],
     padding: [createValue(), createValue(), createValue(), createValue(), createValue(), createValue()],
     border: [0, 0, 0, 0, NaN, NaN],
     gap: [0, 0],
-    overflow: 0, // OVERFLOW_VISIBLE
+    overflow: 0, // OVERFLOW_VISIBLE (same in CSS and Yoga)
   }
 }

@@ -21,7 +21,7 @@ bun run typecheck   # Type check without emitting
 ## Running Tests
 
 ```bash
-bun test                    # All tests (1368)
+bun test                    # All tests (1495)
 bun test tests/layout.test.ts   # Specific test file
 bun test --watch            # Watch mode
 ```
@@ -63,7 +63,7 @@ diff /tmp/bench-before.txt /tmp/bench-after.txt
 src/
 ├── index.ts        # Main export
 ├── node-zero.ts    # Node class with FlexInfo (hot path)
-├── layout-zero.ts  # Layout algorithm (~2300 lines, hot path)
+├── layout-zero.ts  # Layout algorithm (~2000 lines, hot path)
 ├── constants.ts    # Flexbox constants (Yoga-compatible)
 ├── types.ts        # TypeScript interfaces
 ├── utils.ts        # Shared utilities
@@ -74,7 +74,7 @@ See `docs/` for detailed documentation on the algorithm, API, performance, and t
 
 ## Pull Request Guidelines
 
-1. **Run the full test suite** (`bun test`) — all 1368 tests must pass
+1. **Run the full test suite** (`bun test`) — all 1495 tests must pass
 2. **Run `bun run typecheck`** — no type errors
 3. **Benchmark if touching hot paths** — include before/after numbers in the PR description
 4. **Keep Yoga API compatibility** — don't break the public API surface

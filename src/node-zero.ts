@@ -19,6 +19,7 @@ import {
 } from "./types.js"
 import { setEdgeValue, setEdgeBorder, getEdgeValue, getEdgeBorderValue, traversalStack } from "./utils.js"
 import { log } from "./logger.js"
+import { getTrace } from "./trace.js"
 
 /**
  * A layout node in the flexbox tree.
@@ -184,6 +185,18 @@ export class Node {
    * ```
    */
   insertChild(child: Node, index: number): void {
+    // Cycle guard: prevent self-insertion or insertion of an ancestor (would create infinite loop)
+    if (child === this) {
+      throw new Error("Cannot insert a node as a child of itself")
+    }
+    let ancestor: Node | null = this._parent
+    while (ancestor !== null) {
+      if (ancestor === child) {
+        throw new Error("Cannot insert an ancestor as a child (would create a cycle)")
+      }
+      ancestor = ancestor._parent
+    }
+
     if (child._parent !== null) {
       child._parent.removeChild(child)
     }
@@ -238,6 +251,29 @@ export class Node {
     this._children = []
     this._measureFunc = null
     this._baselineFunc = null
+  }
+
+  /**
+   * Free this node and all descendants recursively.
+   * Each node is detached from its parent and cleaned up.
+   * Uses iterative traversal to avoid stack overflow on deep trees.
+   */
+  freeRecursive(): void {
+    // Collect all descendants first (iterative to avoid stack overflow)
+    const nodes: Node[] = []
+    traversalStack.length = 0
+    traversalStack.push(this)
+    while (traversalStack.length > 0) {
+      const current = traversalStack.pop() as Node
+      nodes.push(current)
+      for (const child of current._children) {
+        traversalStack.push(child)
+      }
+    }
+    // Free in reverse order (leaves first) to avoid parent.removeChild on already-freed nodes
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      nodes[i]!.free()
+    }
   }
 
   /**
@@ -349,6 +385,7 @@ export class Node {
       Node.measureCacheHits++
       this._measureResult.width = m0.rw
       this._measureResult.height = m0.rh
+      getTrace()?.measureCacheHit(0, w, h, m0.rw, m0.rh)
       return this._measureResult
     }
     const m1 = this._m1
@@ -356,6 +393,7 @@ export class Node {
       Node.measureCacheHits++
       this._measureResult.width = m1.rw
       this._measureResult.height = m1.rh
+      getTrace()?.measureCacheHit(0, w, h, m1.rw, m1.rh)
       return this._measureResult
     }
     const m2 = this._m2
@@ -363,6 +401,7 @@ export class Node {
       Node.measureCacheHits++
       this._measureResult.width = m2.rw
       this._measureResult.height = m2.rh
+      getTrace()?.measureCacheHit(0, w, h, m2.rw, m2.rh)
       return this._measureResult
     }
     const m3 = this._m3
@@ -370,8 +409,12 @@ export class Node {
       Node.measureCacheHits++
       this._measureResult.width = m3.rw
       this._measureResult.height = m3.rh
+      getTrace()?.measureCacheHit(0, w, h, m3.rw, m3.rh)
       return this._measureResult
     }
+
+    // Cache miss
+    getTrace()?.measureCacheMiss(0, w, h)
 
     // Call actual measure function
     const result = this._measureFunc(w, wm, h, hm)
@@ -599,8 +642,9 @@ export class Node {
     this._lastCalcH = availableHeight
     this._lastCalcDir = direction
 
-    const start = Date.now()
-    const nodeCount = countNodes(this)
+    // Only compute debug stats when debug logging is enabled (avoid O(n) traversal in production)
+    const start = log.debug ? Date.now() : 0
+    const nodeCount = log.debug ? countNodes(this) : 0
 
     // Reset measure statistics for this layout pass
     Node.resetMeasureStats()
@@ -662,6 +706,56 @@ export class Node {
    */
   getComputedHeight(): number {
     return this._layout.height
+  }
+
+  /**
+   * Get the computed right edge position after layout (left + width).
+   *
+   * @returns The right edge position in points
+   */
+  getComputedRight(): number {
+    return this._layout.left + this._layout.width
+  }
+
+  /**
+   * Get the computed bottom edge position after layout (top + height).
+   *
+   * @returns The bottom edge position in points
+   */
+  getComputedBottom(): number {
+    return this._layout.top + this._layout.height
+  }
+
+  /**
+   * Get the computed padding for a specific edge after layout.
+   * Returns the resolved padding value (percentage and logical edges resolved).
+   *
+   * @param edge - EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, or EDGE_BOTTOM
+   * @returns Padding value in points
+   */
+  getComputedPadding(edge: number): number {
+    return getEdgeValue(this._style.padding, edge).value
+  }
+
+  /**
+   * Get the computed margin for a specific edge after layout.
+   * Returns the resolved margin value (percentage and logical edges resolved).
+   *
+   * @param edge - EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, or EDGE_BOTTOM
+   * @returns Margin value in points
+   */
+  getComputedMargin(edge: number): number {
+    return getEdgeValue(this._style.margin, edge).value
+  }
+
+  /**
+   * Get the computed border width for a specific edge after layout.
+   *
+   * @param edge - EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, or EDGE_BOTTOM
+   * @returns Border width in points
+   */
+  getComputedBorder(edge: number): number {
+    return getEdgeBorderValue(this._style.border, edge)
   }
 
   // ============================================================================

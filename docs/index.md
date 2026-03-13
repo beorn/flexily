@@ -25,9 +25,9 @@ features:
     details: "47 KB minified (16 KB gzipped) vs Yoga's 117 KB. No WASM binary. Tree-shakeable."
   - icon: "\U0001F50C"
     title: Yoga Drop-in
-    details: "100% API compatible. Same constants, same methods. 41/41 Yoga comparison tests pass. Just change the import."
+    details: "Yoga-compatible API. Same constants, same methods. 44 Yoga comparison tests pass. Just change the import."
   - icon: "\U0001F9EA"
-    title: 1368 Tests
+    title: 1495 Tests
     details: "Includes 1200+ incremental re-layout fuzz tests using differential oracle. Catches bugs that single-pass tests miss."
   - icon: "\U0001F6E0\uFE0F"
     title: Pure JavaScript
