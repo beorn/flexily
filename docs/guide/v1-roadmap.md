@@ -1,6 +1,6 @@
 # Flexily v1.0 Roadmap
 
-Current version: **0.1.0**
+Current version: **0.5.0**
 
 ## What 1.0 Means
 
@@ -16,7 +16,8 @@ Every box must be checked before tagging 1.0.
 - [x] Re-layout fuzz tests pass (1200+)
 - [x] Mutation testing validates fuzz suite catches known cache mutations
 - [x] All feature tests pass (~110)
-- [x] Total test count: 1495 passing
+- [x] Total test count: 1561 passing
+- [x] Text measurement backends (monospace, deterministic, pretext adapter)
 - [ ] No known layout correctness bugs (audit open issues before release)
 - [x] Intentional Yoga divergences documented (CSS overflow:hidden behavior)
 
@@ -24,6 +25,7 @@ Every box must be checked before tagging 1.0.
 
 - [x] Yoga-compatible API surface (same constants, same method names)
 - [x] Two entry points: `flexily` (zero-alloc) and `flexily/classic` (allocating)
+- [x] Composable engine API (createFlexily, pipe, TextLayoutService)
 - [ ] API surface audit: review all public exports, remove any accidental leaks
 - [ ] TypeScript declaration files (`dist/`) build cleanly and match source types
 - [ ] No planned breaking changes (or: list remaining breaking changes and execute them pre-1.0)
@@ -69,7 +71,6 @@ Every box must be checked before tagging 1.0.
 These are out of scope for the initial stable release:
 
 - **CSS Grid** -- Flexily is a flexbox engine. Grid is a different algorithm.
-- **Text layout** -- Flexily computes box positions. Text measurement is the consumer's responsibility (via measure functions).
 - **Multi-thread / worker support** -- The API is synchronous by design. Consumers can run it in a worker if needed.
 - **Browser build** -- The npm package targets Node.js/Bun. A browser-ready bundle (ESM) is a nice-to-have but not a 1.0 gate.
 
@@ -91,7 +92,7 @@ After 1.0:
 Flexily should reach 1.0 **before** silvery, because:
 
 1. Flexily has a smaller, more focused API surface (layout engine only)
-2. Flexily already passes 1495 tests including comprehensive fuzz testing
+2. Flexily already passes 1561 tests including comprehensive fuzz testing
 3. silvery depends on Flexily -- a stable Flexily simplifies silvery's own 1.0 story
 4. The main blocker (vendor rename + npm publish) is shared with silvery
 

@@ -26,7 +26,41 @@ yarn add flexily
 
 :::
 
-## Your First Layout
+## Composable API (Recommended)
+
+The composable API is the recommended way to use Flexily. It provides a batteries-included engine with pluggable text measurement:
+
+```typescript
+import { createFlexily } from "flexily"
+
+const flex = createFlexily()
+
+// Create nodes with built-in text support
+const root = flex.createNode()
+root.setWidth(80)
+root.setFlexDirection(FLEX_DIRECTION_ROW)
+
+const label = flex.createNode()
+label.setTextContent("Hello world")
+root.insertChild(label, 0)
+
+const content = flex.createNode()
+content.setFlexGrow(1)
+root.insertChild(content, 1)
+
+flex.calculateLayout(root, 80, 24)
+
+console.log(label.getComputedWidth()) // 11 (one cell per character)
+console.log(content.getComputedWidth()) // 69
+```
+
+`createFlexily()` includes monospace text measurement by default (1 char = 1 cell), making it ideal for terminal UIs. For custom text backends, see [Composable API](../api/reference.md#composable-api) in the API reference.
+
+## Low-Level API
+
+The low-level API provides direct Yoga-compatible access. Use it when you need full control or are migrating from Yoga:
+
+### Your First Layout
 
 Create a simple row with two children:
 
@@ -128,6 +162,8 @@ console.log(body.getComputedHeight()) // 170
 ```
 
 ## Measure Functions
+
+> **Tip**: If you use the composable API (`createFlexily()`), you can call `node.setTextContent("text")` instead of writing a manual measure function. The engine handles text measurement automatically.
 
 For nodes that size based on content (like text), use measure functions:
 

@@ -5,6 +5,31 @@
 [![npm version](https://img.shields.io/npm/v/flexily.svg)](https://www.npmjs.com/package/flexily)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
+**Composable API** (recommended):
+
+```typescript
+import { createFlexily, FLEX_DIRECTION_ROW } from "flexily"
+
+const flex = createFlexily()
+const root = flex.createNode()
+root.setWidth(80)
+root.setFlexDirection(FLEX_DIRECTION_ROW)
+
+const label = flex.createNode()
+label.setTextContent("Hello")  // auto-measured: 5 wide
+
+const content = flex.createNode()
+content.setFlexGrow(1)
+content.setTextContent("World")
+
+root.insertChild(label, 0)
+root.insertChild(content, 1)
+flex.calculateLayout(root, 80, 1)
+// label: 5 wide, content: 75 wide
+```
+
+**Low-level Yoga-compatible API:**
+
 ```typescript
 import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from "flexily"
 
@@ -47,9 +72,47 @@ Most developers should use a framework built on Flexily, not Flexily directly. F
 
 > **Building a terminal UI?** Use [silvery](https://silvery.dev), which uses Flexily by default. You get React components, hooks, and layout feedback without touching the low-level API.
 
+## Composable API
+
+Flexily v0.5+ includes a composable engine with built-in text measurement:
+
+```typescript
+import { createFlexily } from "flexily"
+
+const flex = createFlexily()
+const root = flex.createNode()
+root.setWidth(80)
+root.setFlexDirection(FLEX_DIRECTION_ROW)
+
+const label = flex.createNode()
+label.setTextContent("Hello")
+
+const content = flex.createNode()
+content.setFlexGrow(1)
+content.setTextContent("World")
+
+root.insertChild(label, 0)
+root.insertChild(content, 1)
+flex.calculateLayout(root, 80, 1)
+// label: 5 wide, content: 75 wide
+```
+
+For custom text measurement, compose plugins with `pipe()`:
+
+```typescript
+import { createBareFlexily, pipe, withTestMeasurer } from "flexily"
+
+const flex = pipe(createBareFlexily(), withTestMeasurer())
+```
+
+Text measurement backends:
+- **`withMonospace()`** — terminal grids (1 char = 1 cell), default
+- **`withTestMeasurer()`** — deterministic widths for CI (Latin 0.8, CJK 1.0, emoji 1.8)
+- **`withPretext(pretext)`** — proportional fonts via [Pretext](https://github.com/chenglou/pretext)
+
 ## Status
 
-1495 tests, including 44 Yoga compatibility tests and 1200+ incremental re-layout fuzz tests. Used by [silvery](https://silvery.dev) as its default layout engine.
+1561 tests, including 44 Yoga compatibility tests and 1200+ incremental re-layout fuzz tests. Used by [silvery](https://silvery.dev) as its default layout engine.
 
 | Feature                                       | Status   |
 | --------------------------------------------- | -------- |
@@ -64,6 +127,8 @@ Most developers should use a framework built on Flexily, not Flexily directly. F
 | Logical edges (EDGE_START/END)                | Complete |
 | RTL support                                   | Complete |
 | Baseline alignment                            | Complete |
+| Composable engine (createFlexily, pipe)       | Complete |
+| Text measurement (monospace, proportional)    | Complete |
 
 ## Installation
 
@@ -184,15 +249,18 @@ Same constants, same method names, same behavior.
 
 ```
 src/
-├── index.ts        # Main export
-├── node-zero.ts    # Node class with FlexInfo
-├── layout-zero.ts  # Layout algorithm (~2000 lines)
-├── constants.ts    # Flexbox constants (Yoga-compatible)
-├── types.ts        # TypeScript interfaces
-├── utils.ts        # Shared utilities
-└── classic/        # Allocating algorithm (for debugging)
-    ├── node.ts
-    └── layout.ts
+├── index.ts              # Main export (everything)
+├── create-flexily.ts     # createFlexily, createBareFlexily, pipe, FlexilyNode
+├── text-layout.ts        # TextLayoutService, PreparedText interfaces
+├── monospace-measurer.ts # Terminal text measurement (1 char = 1 cell)
+├── test-measurer.ts      # Deterministic test measurer
+├── pretext-measurer.ts   # Proportional font measurement (peer dep)
+├── node-zero.ts          # Node class with FlexInfo
+├── layout-zero.ts        # Layout algorithm (~2000 lines)
+├── constants.ts          # Flexbox constants (Yoga-compatible)
+├── types.ts              # TypeScript interfaces
+├── utils.ts              # Shared utilities
+└── classic/              # Allocating algorithm (for debugging)
 ```
 
 ## License

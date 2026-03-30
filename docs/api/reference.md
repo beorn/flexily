@@ -1,6 +1,158 @@
 # API Reference
 
+## Composable API
+
+The composable API is the recommended way to use Flexily. It provides a high-level engine with pluggable text measurement, built on top of the low-level Node API.
+
+### createFlexily(options?)
+
+Create a batteries-included engine with monospace text measurement.
+
+```typescript
+import { createFlexily } from "flexily"
+
+const flex = createFlexily()
+const node = flex.createNode()
+node.setTextContent("Hello world")
+flex.calculateLayout(node, 80, 24)
+```
+
+**Options:**
+
+| Option       | Type     | Default | Description                          |
+| ------------ | -------- | ------- | ------------------------------------ |
+| `charWidth`  | `number` | `1`     | Width of each character cell         |
+| `charHeight` | `number` | `1`     | Height of each character cell        |
+
+For terminal UIs, the default `charWidth=1, charHeight=1` maps directly to terminal cells.
+
+### createBareFlexily()
+
+Create a minimal engine with no text measurement plugin. Use `pipe()` to add plugins.
+
+```typescript
+import { createBareFlexily, pipe, withTestMeasurer } from "flexily"
+
+const flex = pipe(createBareFlexily(), withTestMeasurer())
+```
+
+Calling `setTextContent()` on a bare engine without a text plugin throws an error.
+
+### pipe(engine, ...plugins)
+
+Apply plugins to an engine, left to right. Returns the modified engine.
+
+```typescript
+import { createBareFlexily, pipe, withMonospace, withTestMeasurer } from "flexily"
+
+const flex = pipe(createBareFlexily(), withMonospace(1, 1))
+```
+
+### FlexilyEngine
+
+The composable engine interface.
+
+```typescript
+interface FlexilyEngine {
+  createNode(): FlexilyNode
+  calculateLayout(root: FlexilyNode, width?: number, height?: number, direction?: number): void
+  textLayout?: TextLayoutService
+}
+```
+
+| Method            | Description                                             |
+| ----------------- | ------------------------------------------------------- |
+| `createNode()`    | Create a new FlexilyNode (Node with text content mixin) |
+| `calculateLayout` | Calculate layout for a tree (direction defaults to LTR) |
+| `textLayout`      | The active text measurement backend (if any)            |
+
+### FlexilyNode
+
+Extends `Node` with text content methods. Created via `engine.createNode()`.
+
+```typescript
+interface FlexilyNode extends Node {
+  setTextContent(text: string, style?: Partial<ResolvedTextStyle>): void
+  getTextContent(): string | null
+}
+```
+
+| Method             | Description                                                                 |
+| ------------------ | --------------------------------------------------------------------------- |
+| `setTextContent()` | Set text content and install an automatic measure function                  |
+| `getTextContent()` | Get the current text content (or `null` if none)                            |
+
+Calling `setMeasureFunc()` on a FlexilyNode clears its text content. Calling `setTextContent()` replaces any existing measure function.
+
+### FlexilyPlugin
+
+A function that extends or configures the engine.
+
+```typescript
+type FlexilyPlugin = (engine: FlexilyEngine) => FlexilyEngine
+```
+
+### TextLayoutService
+
+The pluggable text measurement backend interface.
+
+```typescript
+interface TextLayoutService {
+  prepare(input: TextPrepareInput): PreparedText
+}
+```
+
+`prepare()` takes text and style, returning a `PreparedText` object that can compute intrinsic sizes and layout at any width.
+
+### Text Measurement Plugins
+
+#### withMonospace(charWidth?, charHeight?)
+
+Monospace text measurement. Each grapheme cluster = `charWidth` units wide, always 1 line (no wrapping). Default for `createFlexily()`.
+
+```typescript
+import { createBareFlexily, pipe, withMonospace } from "flexily"
+
+const flex = pipe(createBareFlexily(), withMonospace(1, 1))
+```
+
+| Parameter    | Type     | Default | Description                   |
+| ------------ | -------- | ------- | ----------------------------- |
+| `charWidth`  | `number` | `1`     | Width per character cell      |
+| `charHeight` | `number` | `1`     | Height per character cell     |
+
+#### withTestMeasurer()
+
+Deterministic text measurement for tests and CI. Fixed grapheme width table: Latin 0.8, CJK 1.0, emoji 1.8 (relative to fontSize). Supports word wrapping.
+
+```typescript
+import { createBareFlexily, pipe, withTestMeasurer } from "flexily"
+
+const flex = pipe(createBareFlexily(), withTestMeasurer())
+```
+
+Cross-platform deterministic -- same results on every OS and runtime.
+
+#### withPretext(pretext)
+
+Proportional font measurement via `@chenglou/pretext` (peer dependency). For Canvas-based text rendering.
+
+```typescript
+import { createBareFlexily, pipe, withPretext } from "flexily"
+import pretext from "@chenglou/pretext"
+
+const flex = pipe(createBareFlexily(), withPretext(pretext))
+```
+
+| Parameter | Type         | Description                                  |
+| --------- | ------------ | -------------------------------------------- |
+| `pretext`  | `PretextAPI` | The pretext module (install separately)      |
+
+---
+
 ## Node
+
+The low-level Yoga-compatible API. All composable API nodes extend Node.
 
 ### Creating Nodes
 

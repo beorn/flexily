@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Flexily"
   text: "Pure JavaScript Flexbox Layout"
-  tagline: "Yoga-compatible API. 1.5-2.5x faster initial layout. 5.5x faster re-layout. 2.5-3.5x smaller. No WASM."
+  tagline: "Yoga-compatible API. Composable text measurement. 1.5-2.5x faster initial layout. 5.5x faster re-layout. 2.5-3.5x smaller. No WASM."
   actions:
     - theme: brand
       text: Get Started
@@ -26,8 +26,11 @@ features:
   - icon: "\U0001F50C"
     title: Yoga Drop-in
     details: "Yoga-compatible API. Same constants, same methods. 44 Yoga comparison tests pass. Just change the import."
+  - icon: "\U0001F4D0"
+    title: Composable Text Measurement
+    details: "Pluggable text measurement via createFlexily(). Monospace, deterministic test, and proportional (pretext) backends. Just setTextContent() — no manual measure functions."
   - icon: "\U0001F9EA"
-    title: 1495 Tests
+    title: 1561 Tests
     details: "Includes 1200+ incremental re-layout fuzz tests using differential oracle. Catches bugs that single-pass tests miss."
   - icon: "\U0001F6E0\uFE0F"
     title: Pure JavaScript
@@ -55,6 +58,27 @@ yarn add flexily
 ```
 
 :::
+
+```typescript
+import { createFlexily } from "flexily"
+
+const flex = createFlexily()
+
+const root = flex.createNode()
+root.setWidth(100)
+root.setFlexDirection(FLEX_DIRECTION_ROW)
+
+const child = flex.createNode()
+child.setFlexGrow(1)
+root.insertChild(child, 0)
+
+flex.calculateLayout(root, 100, 100)
+console.log(child.getComputedWidth()) // 100
+```
+
+### Low-Level API
+
+For direct Yoga-compatible usage without the composable engine:
 
 ```typescript
 import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from "flexily"
