@@ -4,26 +4,51 @@
  * A Yoga-compatible layout engine for terminal UIs and other environments
  * where WebAssembly is not available or desirable.
  *
- * @example
+ * Two API levels:
+ *
+ * 1. Composable (recommended):
  * ```typescript
- * import { Node, FLEX_DIRECTION_ROW, DIRECTION_LTR } from 'flexily';
+ * import { createFlexily } from "flexily"
+ * const flex = createFlexily()
+ * const node = flex.createNode()
+ * node.setTextContent("Hello world")
+ * flex.calculateLayout(node, 80, 24)
+ * ```
  *
- * const root = Node.create();
- * root.setWidth(80);
- * root.setHeight(24);
- * root.setFlexDirection(FLEX_DIRECTION_ROW);
- *
- * const child = Node.create();
- * child.setFlexGrow(1);
- * root.insertChild(child, 0);
- *
- * root.calculateLayout(80, 24, DIRECTION_LTR);
- *
- * console.log(child.getComputedWidth()); // 80
+ * 2. Low-level (Yoga-compatible):
+ * ```typescript
+ * import { Node, DIRECTION_LTR } from "flexily"
+ * const root = Node.create()
+ * root.setWidth(80)
+ * root.calculateLayout(80, 24, DIRECTION_LTR)
  * ```
  */
 
-// Node class (zero-alloc version)
+// Composable API
+export { createFlexily, createBareFlexily, pipe } from "./create-flexily.js"
+export type { FlexilyEngine, FlexilyNode, FlexilyPlugin } from "./create-flexily.js"
+
+// Text measurement plugins
+export { createMonospaceMeasurer, withMonospace } from "./monospace-measurer.js"
+export { createTestMeasurer, withTestMeasurer } from "./test-measurer.js"
+export { createPretextMeasurer, withPretext } from "./pretext-measurer.js"
+export type { PretextAPI, PretextPrepared, PretextLayout } from "./pretext-measurer.js"
+
+// Text layout service types
+export type {
+  TextLayoutService,
+  PreparedText,
+  TextLayout,
+  TextLine,
+  TextConstraints,
+  IntrinsicSizes,
+  ResolvedTextStyle,
+  TextPrepareInput,
+  Rect,
+  TextHit,
+} from "./text-layout.js"
+
+// Node class (zero-alloc version) — low-level Yoga-compatible API
 export { Node } from "./node-zero.js"
 
 // All constants (Yoga-compatible)

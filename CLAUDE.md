@@ -2,6 +2,34 @@
 
 Yoga-compatible API, 1.5-2.5x faster initial layout, 5.5x faster no-change re-layout, 2.5-3.5x smaller, pure JavaScript (no WASM).
 
+## Two API Levels
+
+**Composable (recommended)**:
+
+```typescript
+import { createFlexily } from "flexily"
+const flex = createFlexily()
+const node = flex.createNode()
+node.setTextContent("Hello world")
+flex.calculateLayout(node, 80, 24)
+```
+
+**Low-level (Yoga-compatible)**:
+
+```typescript
+import { Node, DIRECTION_LTR } from "flexily"
+const root = Node.create()
+root.setWidth(80)
+root.calculateLayout(80, 24, DIRECTION_LTR)
+```
+
+**Custom composition**:
+
+```typescript
+import { createBareFlexily, pipe, withTestMeasurer } from "flexily"
+const flex = pipe(createBareFlexily(), withTestMeasurer())
+```
+
 ## Commands
 
 ```bash
@@ -52,7 +80,12 @@ diff /tmp/bench-before.txt /tmp/bench-after.txt
 
 ```
 src/
-├── index.ts              # Main export
+├── index.ts              # Main export (everything: createFlexily, Node, constants, plugins)
+├── create-flexily.ts     # createFlexily, createBareFlexily, pipe, FlexilyNode mixin
+├── text-layout.ts        # TextLayoutService, PreparedText interfaces
+├── monospace-measurer.ts # Monospace text measurement (terminal: 1 char = 1 cell)
+├── test-measurer.ts      # Deterministic test measurer (Latin 0.8, CJK 1.0, emoji 1.8)
+├── pretext-measurer.ts   # Pretext proportional text plugin (peer dep)
 ├── node-zero.ts          # Node class with FlexInfo (hot path)
 ├── layout-zero.ts        # Core layout: computeLayout + layoutNode (hot path)
 ├── layout-helpers.ts     # Edge resolution: margins, padding, borders (hot path)
@@ -68,15 +101,18 @@ src/
 
 ## Key Files
 
-| File                                 | Purpose                                                     |
-| ------------------------------------ | ----------------------------------------------------------- |
-| `src/layout-zero.ts`                 | Core layout: computeLayout + layoutNode - **most critical** |
-| `src/layout-helpers.ts`              | Edge resolution helpers (margins, padding, borders)         |
-| `src/layout-flex-lines.ts`           | Pre-alloc arrays, line breaking, flex distribution          |
-| `src/layout-measure.ts`              | measureNode - intrinsic sizing                              |
-| `src/node-zero.ts`                   | Node class - **second most performance-critical**           |
-| `bench/yoga-compare-warmup.bench.ts` | Main benchmark comparing Flexily vs Yoga                    |
-| `tests/yoga-comparison.test.ts`      | Yoga compatibility tests (44 tests)                         |
+| File                                 | Purpose                                                      |
+| ------------------------------------ | ------------------------------------------------------------ |
+| `src/create-flexily.ts`              | createFlexily + createBareFlexily + pipe + FlexilyNode mixin |
+| `src/text-layout.ts`                 | TextLayoutService, PreparedText interfaces                   |
+| `src/layout-zero.ts`                 | Core layout: computeLayout + layoutNode - **most critical**  |
+| `src/layout-helpers.ts`              | Edge resolution helpers (margins, padding, borders)          |
+| `src/layout-flex-lines.ts`           | Pre-alloc arrays, line breaking, flex distribution           |
+| `src/layout-measure.ts`              | measureNode - intrinsic sizing                               |
+| `src/node-zero.ts`                   | Node class - **second most performance-critical**            |
+| `bench/yoga-compare-warmup.bench.ts` | Main benchmark comparing Flexily vs Yoga                     |
+| `tests/compose.test.ts`              | Compose API tests (33 tests)                                 |
+| `tests/yoga-comparison.test.ts`      | Yoga compatibility tests (44 tests)                          |
 
 ## Architecture
 
