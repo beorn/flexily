@@ -41,6 +41,10 @@
     "./classic": {
       "types": "./src/classic/index.ts",
       "import": "./src/classic/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing.ts",
+      "import": "./src/testing.ts"
     }
   },
   "publishConfig": {

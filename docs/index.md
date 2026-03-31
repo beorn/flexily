@@ -60,7 +60,7 @@ yarn add flexily
 :::
 
 ```typescript
-import { createFlexily } from "flexily"
+import { createFlexily, FLEX_DIRECTION_ROW } from "flexily"
 
 const flex = createFlexily()
 

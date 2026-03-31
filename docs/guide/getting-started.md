@@ -31,7 +31,7 @@ yarn add flexily
 The composable API is the recommended way to use Flexily. It provides a batteries-included engine with pluggable text measurement:
 
 ```typescript
-import { createFlexily } from "flexily"
+import { createFlexily, FLEX_DIRECTION_ROW } from "flexily"
 
 const flex = createFlexily()
 
@@ -100,6 +100,8 @@ root.free()
 Use padding, margin, and gap for spacing:
 
 ```typescript
+import { Node, FLEX_DIRECTION_ROW, EDGE_ALL, GUTTER_COLUMN, DIRECTION_LTR } from "flexily"
+
 const root = Node.create()
 root.setWidth(200)
 root.setFlexDirection(FLEX_DIRECTION_ROW)
@@ -127,6 +129,8 @@ console.log(b.getComputedLeft()) // 104 (10 + 86 + 8)
 Build complex layouts by nesting nodes:
 
 ```typescript
+import { Node, FLEX_DIRECTION_ROW, FLEX_DIRECTION_COLUMN, DIRECTION_LTR } from "flexily"
+
 const root = Node.create()
 root.setWidth(300)
 root.setHeight(200)
