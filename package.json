@@ -58,6 +58,7 @@
     "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
+    "loggily": "workspace:*",
     "typescript": "^5.9.3",
     "vitepress": "^1.6.3",
     "vitest": "^3.1.0",
