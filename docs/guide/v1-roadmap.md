@@ -63,7 +63,7 @@ Every box must be checked before tagging 1.0.
 ## Known Gaps
 
 1. ~~**Bundle audit** (bead `km-flexily.bundle-audit`)~~ -- Done. `bun scripts/measure-bundle.ts` measures all entry points. README and docs updated with accurate numbers.
-2. ~~**npm publish**~~ -- Done. Published as `flexily@0.5.0` on npm. Docs site at flexily.dev.
+2. ~~**npm publish**~~ -- Done. Published as `flexily@0.5.0` on npm. Docs site at beorn.github.io/flexily.
 3. **API surface audit** -- no formal review of which symbols are exported vs. internal. A pre-1.0 pass should ensure only intentional public API is accessible via the `exports` map.
 
 ## What's NOT in 1.0
