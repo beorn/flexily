@@ -1,6 +1,6 @@
 {
   "name": "flexily",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Pure JavaScript flexbox layout engine — composable plugins, text measurement, Yoga-compatible API, no WASM",
   "keywords": [
     "canvas-ui",

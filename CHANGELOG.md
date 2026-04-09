@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-04-09
+
+### Changed
+
+- Renamed `@bearly/vitepress-enrich` to `vitepress-enrich`
+
+### Added
+
+- Pretext integration guide page
+- Glossary tooltip CSS for ecosystem cross-links
+- Navigation submenu for Guide section
+
+### Fixed
+
+- VitePress build: added `vitepress-plugin-llms` and `vitepress-enrich` to docs deps (CI fix)
+- Sitemap URLs, adopted vitepress-enrich for SEO
+- CI: use `bunx --bun` for vitepress, drop old bun versions, remove Node 20
+
+### Docs
+
+- Removed km references from public docs
+- Restored composable API section (pipe/createBareFlexily/plugins)
+- Updated problem statement in tagline, benchmarks button, pretext link
+- Bjorn → Bjørn in author references
+
 ## [0.5.0] - 2026-03-30
 
 ### Added
@@ -70,7 +95,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 524 tests total
 - 1.5-2.5x faster initial layout than Yoga, 5x smaller bundle, zero dependencies
 
-[Unreleased]: https://github.com/beorn/flexily/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/beorn/flexily/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/beorn/flexily/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/beorn/flexily/compare/v0.3.3...v0.5.0
 [0.3.3]: https://github.com/beorn/flexily/compare/v0.1.0...v0.3.3
 [0.1.0]: https://github.com/beorn/flexily/releases/tag/v0.1.0
