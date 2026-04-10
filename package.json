@@ -1,6 +1,6 @@
 {
   "name": "flexily",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Pure JavaScript flexbox layout engine — composable plugins, text measurement, Yoga-compatible API, no WASM",
   "keywords": [
     "canvas-ui",
@@ -72,7 +72,7 @@
     "yoga-wasm-web": "^0.3.3"
   },
   "engines": {
-    "node": ">=23.6.0",
-    "bun": ">=1.0"
+    "bun": ">=1.0",
+    "node": ">=23.6.0"
   }
 }
