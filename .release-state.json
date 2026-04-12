@@ -1,0 +1,11 @@
+{
+  "repoName": "flexily",
+  "version": "0.6.0",
+  "packages": {
+    "flexily": {
+      "bumped": true,
+      "built": true,
+      "verified": true
+    }
+  }
+}
