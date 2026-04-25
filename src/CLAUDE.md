@@ -346,13 +346,13 @@ silvery calls `calculateLayout()` on every render. The no-change case (cursor mo
 
 ## Intentional Divergences from Yoga
 
-| Behavior                                  | Yoga                                     | Flexily                               | CSS Spec                                       |
-| ----------------------------------------- | ---------------------------------------- | ------------------------------------- | ---------------------------------------------- |
-| `overflow:hidden/scroll` + `flexShrink:0` | Item expands to content (ignores parent) | Item shrinks to fit parent            | 4.5: auto min-size = 0 for overflow containers |
-| Default `flexShrink`                      | 0 (Yoga native default)                  | Preset: 0 (yoga) or 1 (css)           | CSS default is 1                               |
-| Default `alignContent`                    | flex-start                               | Preset: flex-start (yoga) or stretch (css) | stretch                                  |
-| Default `flexDirection`                   | Column                                   | Row (CSS default)                     | Row                                            |
-| Baseline alignment                        | Full spec (recursive first-child)        | Simplified (no recursive propagation) | Recursive first-child                          |
+| Behavior                                  | Yoga                                     | Flexily                                    | CSS Spec                                       |
+| ----------------------------------------- | ---------------------------------------- | ------------------------------------------ | ---------------------------------------------- |
+| `overflow:hidden/scroll` + `flexShrink:0` | Item expands to content (ignores parent) | Item shrinks to fit parent                 | 4.5: auto min-size = 0 for overflow containers |
+| Default `flexShrink`                      | 0 (Yoga native default)                  | Preset: 0 (yoga) or 1 (css)                | CSS default is 1                               |
+| Default `alignContent`                    | flex-start                               | Preset: flex-start (yoga) or stretch (css) | stretch                                        |
+| Default `flexDirection`                   | Column                                   | Row (CSS default)                          | Row                                            |
+| Baseline alignment                        | Full spec (recursive first-child)        | Simplified (no recursive propagation)      | Recursive first-child                          |
 
 The `flexShrink` override for overflow containers (line ~1244 in layout-zero.ts) is the most significant divergence. Without it, `overflow:hidden` children inside constrained parents balloon to content size, defeating the purpose of clipping.
 

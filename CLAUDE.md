@@ -138,10 +138,10 @@ Flexily exposes a defaults selector via `createFlexily({ defaults })` and
 `Node.create({ defaults })`. The two presets toggle `flexShrink` and
 `alignContent`:
 
-| Preset    | `flexShrink` | `alignContent` | `flexDirection` |
-| --------- | ------------ | -------------- | --------------- |
-| `"yoga"`  | `0`          | `flex-start`   | `row`           |
-| `"css"`   | `1`          | `stretch`      | `row`           |
+| Preset   | `flexShrink` | `alignContent` | `flexDirection` |
+| -------- | ------------ | -------------- | --------------- |
+| `"yoga"` | `0`          | `flex-start`   | `row`           |
+| `"css"`  | `1`          | `stretch`      | `row`           |
 
 `DEFAULT_PRESET` is `"yoga"` today (drop-in replacement for yoga-layout).
 Multi-target consumers (silvery, web, canvas) can opt into CSS-correct
