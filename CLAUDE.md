@@ -132,6 +132,30 @@ Flexily is Yoga-compatible but follows CSS spec where Yoga doesn't:
 | `overflow:hidden/scroll` + `flexShrink:0` | Item expands to content size (ignores parent constraint) | Item shrinks to fit parent           | §4.5: automatic min-size = 0 for overflow containers |
 | `aspect-ratio` + implicit `stretch`       | Stretch overrides AR on cross-axis                       | AR fallback alignment = `flex-start` | CSS Alignment: AR prevents implicit stretch          |
 
+## Defaults preset (`"css"` vs `"yoga"`)
+
+Flexily exposes a defaults selector via `createFlexily({ defaults })` and
+`Node.create({ defaults })`. The two presets toggle `flexShrink` and
+`alignContent`:
+
+| Preset    | `flexShrink` | `alignContent` | `flexDirection` |
+| --------- | ------------ | -------------- | --------------- |
+| `"yoga"`  | `0`          | `flex-start`   | `row`           |
+| `"css"`   | `1`          | `stretch`      | `row`           |
+
+`DEFAULT_PRESET` is `"yoga"` today (drop-in replacement for yoga-layout).
+Multi-target consumers (silvery, web, canvas) can opt into CSS-correct
+defaults via `createFlexily({ defaults: "css" })`. No module-level state —
+each engine captures its preset in a closure so multiple engines with
+different presets coexist.
+
+`flexDirection` stays `row` in both presets. Yoga's native default is
+`column`, but flexily diverged to `row` (CSS-correct) before this preset
+existed. Strict-Yoga consumers can call `setFlexDirection(COLUMN)` per-tree.
+
+See `tests/defaults-preset.test.ts` for the full preset surface and bead
+`km-silvery.flexshrink-default` for the migration plan.
+
 **Overflow**: Yoga defaults `flexShrink` to 0 (unlike CSS's default of 1) and doesn't implement CSS §4.5's rule that overflow containers have `min-size: auto = 0`. This means in Yoga, an `overflow:hidden` child with 30 lines of content inside a height-10 parent will compute as height 30 — defeating the purpose of overflow clipping. Flexily ensures overflow containers can always shrink (`flexShrink >= 1`), matching CSS browser behavior. See `tests/yoga-overflow-compare.test.ts` for comparison tests.
 
 **Aspect ratio + stretch**: Per CSS Alignment spec, when a flex item has `aspect-ratio` and its cross-axis dimension is auto, the fallback alignment is `flex-start` (not `stretch`). This prevents `align-items: stretch` from overriding the AR-derived dimension. Only applies to inherited stretch (`align-self: auto`); explicit `align-self: stretch` still stretches. See `tests/aspect-ratio.test.ts`.
