@@ -30,6 +30,11 @@ beforeAll(async () => {
   yoga = await initYoga(wasmBuffer)
 })
 
+// Pin Yoga preset on each Flexily.Node.create(YOGA_OPTS) call below so this suite
+// keeps verifying Yoga-compat behavior after Phase 6 flips DEFAULT_PRESET.
+// (See `createFlexilyNode` and the standalone Node.create sites.)
+const YOGA_OPTS = { defaults: "yoga" as const }
+
 // ============================================================================
 // Types and Layout Extraction
 // ============================================================================
@@ -149,7 +154,7 @@ interface ChildConfig extends NodeConfig {
  * Creates and configures a Flexily node
  */
 function createFlexilyNode(config: NodeConfig): Flexily.Node {
-  const node = Flexily.Node.create()
+  const node = Flexily.Node.create(YOGA_OPTS)
   applyFlexilyConfig(node, config)
   return node
 }
@@ -616,11 +621,11 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
 
   it("absolute-with-margin: absolute with margin offset", () => {
     // This test needs custom setup for setting margin on specific edges
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setHeight(100)
 
-    const fChild = Flexily.Node.create()
+    const fChild = Flexily.Node.create(YOGA_OPTS)
     fChild.setPositionType(Flexily.POSITION_TYPE_ABSOLUTE)
     fChild.setPosition(Flexily.EDGE_LEFT, 0)
     fChild.setPosition(Flexily.EDGE_TOP, 0)
@@ -676,17 +681,17 @@ describe("Yoga Comparison: AbsolutePositioning", () => {
 describe("Yoga Comparison: MinMaxDimensions", () => {
   it("min-width-overrides-shrink: minWidth prevents shrinking", () => {
     // Custom setup needed for two children with different configs
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexily.Node.create()
+    const fChild1 = Flexily.Node.create(YOGA_OPTS)
     fChild1.setWidth(80)
     fChild1.setMinWidth(60)
     fChild1.setFlexShrink(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexily.Node.create()
+    const fChild2 = Flexily.Node.create(YOGA_OPTS)
     fChild2.setWidth(80)
     fChild2.setFlexShrink(1)
     fRoot.insertChild(fChild2, 1)
@@ -725,16 +730,16 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
   })
 
   it("max-width-overrides-grow: maxWidth caps growth", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexily.Node.create()
+    const fChild1 = Flexily.Node.create(YOGA_OPTS)
     fChild1.setFlexGrow(1)
     fChild1.setMaxWidth(30)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexily.Node.create()
+    const fChild2 = Flexily.Node.create(YOGA_OPTS)
     fChild2.setFlexGrow(1)
     fRoot.insertChild(fChild2, 1)
 
@@ -806,17 +811,17 @@ describe("Yoga Comparison: MinMaxDimensions", () => {
 
   it("nested-min-max: nested containers with constraints", () => {
     // Custom setup for nested structure
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setHeight(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fOuter = Flexily.Node.create()
+    const fOuter = Flexily.Node.create(YOGA_OPTS)
     fOuter.setFlexGrow(1)
     fOuter.setMaxWidth(60)
     fRoot.insertChild(fOuter, 0)
 
-    const fInner = Flexily.Node.create()
+    const fInner = Flexily.Node.create(YOGA_OPTS)
     fInner.setFlexGrow(1)
     fInner.setMinWidth(40)
     fOuter.insertChild(fInner, 0)
@@ -933,16 +938,16 @@ describe("Yoga Comparison: Gap", () => {
 
 describe("Yoga Comparison: FlexShrink", () => {
   it("shrink-with-basis: different basis values", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexily.Node.create()
+    const fChild1 = Flexily.Node.create(YOGA_OPTS)
     fChild1.setFlexBasis(100)
     fChild1.setFlexShrink(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexily.Node.create()
+    const fChild2 = Flexily.Node.create(YOGA_OPTS)
     fChild2.setFlexBasis(50)
     fChild2.setFlexShrink(1)
     fRoot.insertChild(fChild2, 1)
@@ -980,16 +985,16 @@ describe("Yoga Comparison: FlexShrink", () => {
   })
 
   it("shrink-different-factors: unequal shrink factors", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexily.Node.create()
+    const fChild1 = Flexily.Node.create(YOGA_OPTS)
     fChild1.setWidth(100)
     fChild1.setFlexShrink(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexily.Node.create()
+    const fChild2 = Flexily.Node.create(YOGA_OPTS)
     fChild2.setWidth(100)
     fChild2.setFlexShrink(2)
     fRoot.insertChild(fChild2, 1)
@@ -1027,16 +1032,16 @@ describe("Yoga Comparison: FlexShrink", () => {
   })
 
   it("shrink-zero-no-shrink: shrink 0 prevents shrinking", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexily.Node.create()
+    const fChild1 = Flexily.Node.create(YOGA_OPTS)
     fChild1.setWidth(80)
     fChild1.setFlexShrink(0)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexily.Node.create()
+    const fChild2 = Flexily.Node.create(YOGA_OPTS)
     fChild2.setWidth(80)
     fChild2.setFlexShrink(1)
     fRoot.insertChild(fChild2, 1)
@@ -1080,15 +1085,15 @@ describe("Yoga Comparison: FlexShrink", () => {
 
 describe("Yoga Comparison: FlexGrow", () => {
   it("grow-with-fixed-sibling: grow next to fixed width", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexily.Node.create()
+    const fChild1 = Flexily.Node.create(YOGA_OPTS)
     fChild1.setWidth(30)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexily.Node.create()
+    const fChild2 = Flexily.Node.create(YOGA_OPTS)
     fChild2.setFlexGrow(1)
     fRoot.insertChild(fChild2, 1)
 
@@ -1123,19 +1128,19 @@ describe("Yoga Comparison: FlexGrow", () => {
   })
 
   it("grow-unequal: unequal grow factors", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexily.Node.create()
+    const fChild1 = Flexily.Node.create(YOGA_OPTS)
     fChild1.setFlexGrow(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexily.Node.create()
+    const fChild2 = Flexily.Node.create(YOGA_OPTS)
     fChild2.setFlexGrow(2)
     fRoot.insertChild(fChild2, 1)
 
-    const fChild3 = Flexily.Node.create()
+    const fChild3 = Flexily.Node.create(YOGA_OPTS)
     fChild3.setFlexGrow(1)
     fRoot.insertChild(fChild3, 2)
 
@@ -1174,16 +1179,16 @@ describe("Yoga Comparison: FlexGrow", () => {
   })
 
   it("grow-with-basis: flex-grow with flex-basis", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexily.Node.create()
+    const fChild1 = Flexily.Node.create(YOGA_OPTS)
     fChild1.setFlexBasis(20)
     fChild1.setFlexGrow(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexily.Node.create()
+    const fChild2 = Flexily.Node.create(YOGA_OPTS)
     fChild2.setFlexBasis(20)
     fChild2.setFlexGrow(1)
     fRoot.insertChild(fChild2, 1)
@@ -1227,25 +1232,25 @@ describe("Yoga Comparison: FlexGrow", () => {
 
 describe("Yoga Comparison: NestedLayouts", () => {
   it("nested-flex: multiple nesting levels", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setHeight(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fLeft = Flexily.Node.create()
+    const fLeft = Flexily.Node.create(YOGA_OPTS)
     fLeft.setFlexGrow(1)
     fLeft.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
     fRoot.insertChild(fLeft, 0)
 
-    const fLeftTop = Flexily.Node.create()
+    const fLeftTop = Flexily.Node.create(YOGA_OPTS)
     fLeftTop.setFlexGrow(1)
     fLeft.insertChild(fLeftTop, 0)
 
-    const fLeftBottom = Flexily.Node.create()
+    const fLeftBottom = Flexily.Node.create(YOGA_OPTS)
     fLeftBottom.setFlexGrow(1)
     fLeft.insertChild(fLeftBottom, 1)
 
-    const fRight = Flexily.Node.create()
+    const fRight = Flexily.Node.create(YOGA_OPTS)
     fRight.setFlexGrow(2)
     fRoot.insertChild(fRight, 1)
 
@@ -1290,27 +1295,27 @@ describe("Yoga Comparison: NestedLayouts", () => {
   })
 
   it("mixed-constraints: nested with various constraints", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setHeight(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
     fRoot.setPadding(Flexily.EDGE_ALL, 5)
 
-    const fHeader = Flexily.Node.create()
+    const fHeader = Flexily.Node.create(YOGA_OPTS)
     fHeader.setHeight(20)
     fRoot.insertChild(fHeader, 0)
 
-    const fContent = Flexily.Node.create()
+    const fContent = Flexily.Node.create(YOGA_OPTS)
     fContent.setFlexGrow(1)
     fContent.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
     fContent.setGap(Flexily.GUTTER_COLUMN, 5)
     fRoot.insertChild(fContent, 1)
 
-    const fSidebar = Flexily.Node.create()
+    const fSidebar = Flexily.Node.create(YOGA_OPTS)
     fSidebar.setWidth(20)
     fContent.insertChild(fSidebar, 0)
 
-    const fMain = Flexily.Node.create()
+    const fMain = Flexily.Node.create(YOGA_OPTS)
     fMain.setFlexGrow(1)
     fContent.insertChild(fMain, 1)
 
@@ -1363,16 +1368,16 @@ describe("Yoga Comparison: NestedLayouts", () => {
 
 describe("Yoga Comparison: PercentValues", () => {
   it("percent-nested: percent in nested container", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setHeight(100)
 
-    const fOuter = Flexily.Node.create()
+    const fOuter = Flexily.Node.create(YOGA_OPTS)
     fOuter.setWidthPercent(50)
     fOuter.setHeightPercent(50)
     fRoot.insertChild(fOuter, 0)
 
-    const fInner = Flexily.Node.create()
+    const fInner = Flexily.Node.create(YOGA_OPTS)
     fInner.setWidthPercent(50)
     fInner.setHeightPercent(50)
     fOuter.insertChild(fInner, 0)
@@ -1410,11 +1415,11 @@ describe("Yoga Comparison: PercentValues", () => {
   })
 
   it("percent-margin: percent margin values", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setHeight(100)
 
-    const fChild = Flexily.Node.create()
+    const fChild = Flexily.Node.create(YOGA_OPTS)
     fChild.setWidth(50)
     fChild.setHeight(50)
     fChild.setMarginPercent(Flexily.EDGE_LEFT, 10)
@@ -1474,16 +1479,16 @@ describe("Yoga Comparison: IntentionalDifferences", () => {
     // Both Flexily and Yoga use CSS spec: shrink proportional to (flexShrink * flexBasis)
     // This test verifies Flexily matches Yoga's behavior.
 
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
 
-    const fChild1 = Flexily.Node.create()
+    const fChild1 = Flexily.Node.create(YOGA_OPTS)
     fChild1.setFlexBasis(200) // Large basis
     fChild1.setFlexShrink(1)
     fRoot.insertChild(fChild1, 0)
 
-    const fChild2 = Flexily.Node.create()
+    const fChild2 = Flexily.Node.create(YOGA_OPTS)
     fChild2.setFlexBasis(100) // Small basis
     fChild2.setFlexShrink(1)
     fRoot.insertChild(fChild2, 1)
@@ -1577,16 +1582,16 @@ describe("Yoga Comparison: EdgeCases", () => {
   })
 
   it("mixed-absolute-relative: absolute and relative siblings", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setHeight(100)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
 
-    const fRel1 = Flexily.Node.create()
+    const fRel1 = Flexily.Node.create(YOGA_OPTS)
     fRel1.setHeight(30)
     fRoot.insertChild(fRel1, 0)
 
-    const fAbs = Flexily.Node.create()
+    const fAbs = Flexily.Node.create(YOGA_OPTS)
     fAbs.setPositionType(Flexily.POSITION_TYPE_ABSOLUTE)
     fAbs.setPosition(Flexily.EDGE_RIGHT, 10)
     fAbs.setPosition(Flexily.EDGE_TOP, 10)
@@ -1594,7 +1599,7 @@ describe("Yoga Comparison: EdgeCases", () => {
     fAbs.setHeight(20)
     fRoot.insertChild(fAbs, 1)
 
-    const fRel2 = Flexily.Node.create()
+    const fRel2 = Flexily.Node.create(YOGA_OPTS)
     fRel2.setFlexGrow(1)
     fRoot.insertChild(fRel2, 2)
 
@@ -1638,13 +1643,13 @@ describe("Yoga Comparison: EdgeCases", () => {
   })
 
   it("deeply-nested: 5 levels of nesting", () => {
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)
     fRoot.setHeight(100)
 
     let fCurrent = fRoot
     for (let i = 0; i < 5; i++) {
-      const child = Flexily.Node.create()
+      const child = Flexily.Node.create(YOGA_OPTS)
       child.setFlexGrow(1)
       child.setPadding(Flexily.EDGE_ALL, 5)
       fCurrent.insertChild(child, 0)

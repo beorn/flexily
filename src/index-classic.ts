@@ -100,6 +100,10 @@ export type { BaselineFunc, Layout, MeasureFunc, Style, Value } from "./types.js
 // Utility functions
 export { createDefaultStyle, createValue } from "./types.js"
 
+// Defaults preset (CSS vs Yoga)
+export { DEFAULT_PRESET } from "./defaults.js"
+export type { DefaultsPreset } from "./defaults.js"
+
 // Layout stats (for debugging/benchmarking)
 export {
   layoutNodeCalls,

@@ -4,6 +4,8 @@
  * TypeScript interfaces for the flexbox layout engine.
  */
 
+import { type DefaultsPreset, DEFAULT_PRESET } from "./defaults.js"
+
 /**
  * A value with a unit (point, percent, or auto).
  */
@@ -203,10 +205,21 @@ export function createValue(value = 0, unit = 0): Value {
 /**
  * Create default style.
  *
- * Comments indicate where Yoga and CSS defaults differ.
- * Flexily follows Yoga defaults for API compatibility.
+ * Two presets:
+ * - `"css"` — `flexShrink: 1`, `alignContent: stretch` (browser-correct, multi-target).
+ * - `"yoga"` — `flexShrink: 0`, `alignContent: flex-start` (drop-in for yoga-layout).
+ *
+ * `flexDirection` is `row` in both presets. Yoga's native default is `column`,
+ * but flexily diverged to `row` (CSS-correct) before this preset system existed
+ * and consumers have built around that. The "yoga" preset preserves Yoga's
+ * `flexShrink: 0` + `alignContent: flex-start` divergences without flipping
+ * direction. Strict-Yoga consumers can call `setFlexDirection(COLUMN)` per-tree.
+ *
+ * If `preset` is omitted, the module-level current preset is used (set via
+ * `setDefaultsPreset()` or `createFlexily({ defaults })`). Default is `"yoga"`.
  */
-export function createDefaultStyle(): Style {
+export function createDefaultStyle(preset: DefaultsPreset = DEFAULT_PRESET): Style {
+  const isCss = preset === "css"
   return {
     display: 0, // DISPLAY_FLEX (same in CSS and Yoga)
     positionType: 1, // POSITION_TYPE_RELATIVE (same in CSS and Yoga)
@@ -214,11 +227,11 @@ export function createDefaultStyle(): Style {
     flexDirection: 2, // FLEX_DIRECTION_ROW — CSS default; Yoga defaults to COLUMN
     flexWrap: 0, // WRAP_NO_WRAP (same in CSS and Yoga)
     flexGrow: 0, // (same in CSS and Yoga)
-    flexShrink: 0, // Yoga default; CSS defaults to 1
+    flexShrink: isCss ? 1 : 0, // CSS: 1 — Yoga: 0
     flexBasis: createValue(0, 3), // AUTO (same in CSS and Yoga)
     alignItems: 4, // ALIGN_STRETCH (same in CSS and Yoga)
     alignSelf: 0, // ALIGN_AUTO (same in CSS and Yoga)
-    alignContent: 1, // ALIGN_FLEX_START — Yoga default; CSS defaults to STRETCH
+    alignContent: isCss ? 4 : 1, // CSS: STRETCH — Yoga: FLEX_START
     justifyContent: 0, // JUSTIFY_FLEX_START (same in CSS and Yoga)
     width: createValue(0, 3), // AUTO (same in CSS and Yoga)
     height: createValue(0, 3), // AUTO (same in CSS and Yoga)

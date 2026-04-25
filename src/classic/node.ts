@@ -14,8 +14,14 @@ import {
   type Value,
   createDefaultStyle,
 } from "../types.js"
+import type { DefaultsPreset } from "../defaults.js"
 import { setEdgeValue, setEdgeBorder, getEdgeValue, getEdgeBorderValue } from "../utils.js"
 import { log } from "../logger.js"
+
+/** Options for `Node.create()`. */
+export interface NodeCreateOptions {
+  defaults?: DefaultsPreset
+}
 
 /**
  * A layout node in the flexbox tree.
@@ -26,7 +32,7 @@ export class Node {
   private _children: Node[] = []
 
   // Style
-  private _style: Style = createDefaultStyle()
+  private _style: Style
 
   // Measure function for intrinsic sizing
   private _measureFunc: MeasureFunc | null = null
@@ -56,8 +62,12 @@ export class Node {
    * root.setHeight(200);
    * ```
    */
-  static create(): Node {
-    return new Node()
+  static create(options?: NodeCreateOptions): Node {
+    return new Node(options?.defaults)
+  }
+
+  constructor(preset?: DefaultsPreset) {
+    this._style = createDefaultStyle(preset)
   }
 
   // ============================================================================

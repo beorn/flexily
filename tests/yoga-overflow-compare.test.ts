@@ -23,6 +23,10 @@ beforeAll(async () => {
   yoga = await initYoga(wasmBuffer)
 })
 
+// Pin Yoga preset on every Flexily.Node.create(YOGA_OPTS) call below so this suite
+// keeps verifying Yoga-compat behavior after Phase 6 flips DEFAULT_PRESET.
+const YOGA_OPTS = { defaults: "yoga" as const }
+
 describe("Yoga vs Flexily: overflow + flexGrow", () => {
   test("overflow:hidden — Flexily constrains, Yoga does not (intentional divergence)", () => {
     // Yoga
@@ -48,17 +52,17 @@ describe("Yoga vs Flexily: overflow + flexGrow", () => {
     expect(yContainer.getComputedHeight()).toBe(30)
 
     // Flexily
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
     fRoot.setHeight(10)
     fRoot.setWidth(80)
 
-    const fContainer = Flexily.Node.create()
+    const fContainer = Flexily.Node.create(YOGA_OPTS)
     fContainer.setFlexGrow(1)
     fContainer.setOverflow(Flexily.OVERFLOW_HIDDEN)
 
     for (let i = 0; i < 30; i++) {
-      const fLine = Flexily.Node.create()
+      const fLine = Flexily.Node.create(YOGA_OPTS)
       fLine.setHeight(1)
       fContainer.insertChild(fLine, i)
     }
@@ -89,17 +93,17 @@ describe("Yoga vs Flexily: overflow + flexGrow", () => {
     yRoot.calculateLayout(80, 10, yoga.DIRECTION_LTR)
 
     // Flexily
-    const fRoot = Flexily.Node.create()
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
     fRoot.setHeight(10)
     fRoot.setWidth(80)
 
-    const fContainer = Flexily.Node.create()
+    const fContainer = Flexily.Node.create(YOGA_OPTS)
     fContainer.setFlexGrow(1)
     fContainer.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN) // Yoga defaults to COLUMN; Flexily now defaults to ROW
 
     for (let i = 0; i < 30; i++) {
-      const fLine = Flexily.Node.create()
+      const fLine = Flexily.Node.create(YOGA_OPTS)
       fLine.setHeight(1)
       fContainer.insertChild(fLine, i)
     }

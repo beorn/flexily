@@ -17,9 +17,20 @@ import {
   type Value,
   createDefaultStyle,
 } from "./types.js"
+import type { DefaultsPreset } from "./defaults.js"
 import { setEdgeValue, setEdgeBorder, getEdgeValue, getEdgeBorderValue, traversalStack } from "./utils.js"
 import { log } from "./logger.js"
 import { getTrace } from "./trace.js"
+
+/** Options for `Node.create()`. */
+export interface NodeCreateOptions {
+  /**
+   * Override the active defaults preset for this Node only.
+   * Defaults to the module-level preset (set by `createFlexily({ defaults })`
+   * or `setDefaultsPreset()`; initially `"yoga"`).
+   */
+  defaults?: DefaultsPreset
+}
 
 /**
  * A layout node in the flexbox tree.
@@ -30,7 +41,7 @@ export class Node {
   private _children: Node[] = []
 
   // Style
-  private _style: Style = createDefaultStyle()
+  private _style: Style
 
   // Measure function for intrinsic sizing
   private _measureFunc: MeasureFunc | null = null
@@ -126,16 +137,25 @@ export class Node {
   /**
    * Create a new layout node.
    *
+   * @param options - Optional creation options. Pass `{ defaults: "css" | "yoga" }`
+   *   to override the active module-level preset for this Node only.
    * @returns A new Node instance
    * @example
    * ```typescript
    * const root = Node.create();
    * root.setWidth(100);
    * root.setHeight(200);
+   *
+   * // Per-Node override (test/ad-hoc):
+   * const yogaNode = Node.create({ defaults: "yoga" });
    * ```
    */
-  static create(): Node {
-    return new Node()
+  static create(options?: NodeCreateOptions): Node {
+    return new Node(options?.defaults)
+  }
+
+  constructor(preset?: DefaultsPreset) {
+    this._style = createDefaultStyle(preset)
   }
 
   // ============================================================================

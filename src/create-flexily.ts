@@ -9,6 +9,7 @@ import { Node } from "./node-zero.js"
 import { DIRECTION_LTR, MEASURE_MODE_UNDEFINED, MEASURE_MODE_AT_MOST } from "./constants.js"
 import type { TextLayoutService, ResolvedTextStyle, PreparedText } from "./text-layout.js"
 import { createMonospaceMeasurer } from "./monospace-measurer.js"
+import type { DefaultsPreset } from "./defaults.js"
 
 // ============================================================================
 // FlexilyNode — Node + text content mixin
@@ -102,11 +103,15 @@ export type FlexilyPlugin = (engine: FlexilyEngine) => FlexilyEngine
 /**
  * Create a bare Flexily engine — no plugins, just nodes and layout.
  * Add plugins via pipe() for text measurement.
+ *
+ * @param preset - Defaults preset for `engine.createNode()`. Captured in
+ *   closure; no module-level state. Defaults to undefined (uses
+ *   {@link DEFAULT_PRESET}).
  */
-export function createBareFlexily(): FlexilyEngine {
+export function createBareFlexily(preset?: DefaultsPreset): FlexilyEngine {
   const engine: FlexilyEngine = {
     createNode(): FlexilyNode {
-      return mixTextContent(Node.create(), engine)
+      return mixTextContent(Node.create({ defaults: preset }), engine)
     },
     calculateLayout(root: FlexilyNode, width?: number, height?: number, direction?: number): void {
       root.calculateLayout(width, height, direction ?? DIRECTION_LTR)
@@ -131,6 +136,25 @@ export function pipe(engine: FlexilyEngine, ...plugins: FlexilyPlugin[]): Flexil
   return result
 }
 
+/** Options for {@link createFlexily}. */
+export interface FlexilyOptions {
+  /** Character width in layout units (default: 1, suitable for terminal cells). */
+  charWidth?: number
+  /** Character height in layout units (default: 1). */
+  charHeight?: number
+  /**
+   * Defaults preset for nodes created via `engine.createNode()`:
+   * - `"css"` — `flexShrink: 1`, `alignContent: stretch` (browser-correct, multi-target).
+   * - `"yoga"` — `flexShrink: 0`, `alignContent: flex-start` (drop-in replacement
+   *   for yoga-layout). This is the current flexily default.
+   *
+   * Captured in the engine's closure — no module-level state. Bare
+   * `Node.create()` is unaffected; use `Node.create({ defaults })` for
+   * per-Node overrides.
+   */
+  defaults?: DefaultsPreset
+}
+
 /**
  * Create a batteries-included Flexily engine.
  *
@@ -144,10 +168,13 @@ export function pipe(engine: FlexilyEngine, ...plugins: FlexilyPlugin[]): Flexil
  * const node = flex.createNode()
  * node.setTextContent("Hello world")
  * flex.calculateLayout(node, 80, 24)
+ *
+ * // CSS-correct defaults (multi-target):
+ * const cssFlex = createFlexily({ defaults: "css" })
  * ```
  */
-export function createFlexily(options?: { charWidth?: number; charHeight?: number }): FlexilyEngine {
-  const engine = createBareFlexily()
+export function createFlexily(options?: FlexilyOptions): FlexilyEngine {
+  const engine = createBareFlexily(options?.defaults)
   engine.textLayout = createMonospaceMeasurer(options?.charWidth ?? 1, options?.charHeight ?? 1)
   return engine
 }

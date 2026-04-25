@@ -26,7 +26,11 @@
 
 // Composable API
 export { createFlexily, createBareFlexily, pipe } from "./create-flexily.js"
-export type { FlexilyEngine, FlexilyNode, FlexilyPlugin } from "./create-flexily.js"
+export type { FlexilyEngine, FlexilyNode, FlexilyPlugin, FlexilyOptions } from "./create-flexily.js"
+
+// Defaults preset (CSS vs Yoga)
+export { DEFAULT_PRESET } from "./defaults.js"
+export type { DefaultsPreset } from "./defaults.js"
 
 // Text measurement plugins
 export { createMonospaceMeasurer, withMonospace } from "./monospace-measurer.js"
