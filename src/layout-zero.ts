@@ -682,9 +682,7 @@ function layoutNode(
           if (!Number.isNaN(crossParent)) crossDefinite = crossParent * (crossDim.value / 100)
         }
         if (!Number.isNaN(crossDefinite)) {
-          const transferred = isRow
-            ? crossDefinite * childStyle.aspectRatio
-            : crossDefinite / childStyle.aspectRatio
+          const transferred = isRow ? crossDefinite * childStyle.aspectRatio : crossDefinite / childStyle.aspectRatio
           contentMinSize = Math.min(contentMinSize, transferred)
         }
       }

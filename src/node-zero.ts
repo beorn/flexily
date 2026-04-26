@@ -18,7 +18,8 @@ import {
   createDefaultStyle,
 } from "./types.js"
 import type { DefaultsPreset } from "./defaults.js"
-import { setEdgeValue, setEdgeBorder, getEdgeValue, getEdgeBorderValue, traversalStack } from "./utils.js"
+import { resolveValue, setEdgeValue, setEdgeBorder, getEdgeValue, getEdgeBorderValue, traversalStack } from "./utils.js"
+import { isRowDirection, resolveEdgeValue, resolveEdgeBorderValue } from "./layout-helpers.js"
 import { log } from "./logger.js"
 import { getTrace } from "./trace.js"
 
@@ -62,6 +63,20 @@ export class Node {
   // This avoids redundant recursive layout calls during intrinsic sizing
   private _lc0?: LayoutCacheEntry
   private _lc1?: LayoutCacheEntry
+
+  // Min-content cache — two slots for the two flex axes. Populated lazily by
+  // getMinContent(direction). Cleared in markDirty() alongside the measure +
+  // layout caches. Uses -1 as the invalidation sentinel (NOT NaN — NaN is a
+  // legitimate intrinsic-size value and Object.is(NaN, NaN) === true would
+  // cause false cache hits, same reason _lc0/_lc1 use -1).
+  //
+  // _minContentRow holds min-content along the row axis (i.e., min width).
+  // _minContentCol holds min-content along the column axis (i.e., min height).
+  // Indexing by axis (not main/cross) keeps results stable when the parent's
+  // flexDirection changes, so the cache is reusable across re-layouts of an
+  // unchanged subtree under a re-styled parent.
+  private _minContentRow: number = -1
+  private _minContentCol: number = -1
 
   // Stable result objects for zero-allocation cache returns
   // These are mutated in place instead of creating new objects on each cache hit
@@ -485,6 +500,224 @@ export class Node {
   }
 
   // ============================================================================
+  // Intrinsic Min-Content (recursive, per-content-cached)
+  // ============================================================================
+
+  /**
+   * Compute the intrinsic min-content size of this node along `direction`.
+   *
+   * Recursive definition (matches CSS browser behavior):
+   *  - Leaf with measureFunc: query the measurer via `MEASURE_MODE_MIN_CONTENT`
+   *    on the requested axis (orthogonal axis is UNDEFINED, since min-content
+   *    is the smallest size at which the content does not overflow — for
+   *    wrappable text this is the longest unbreakable token; for non-wrappable
+   *    text this equals naturalWidth).
+   *  - Container with children, querying the main axis (== `flexDirection`):
+   *      padding + border + sum(child.getMinContent(direction)) + total gap
+   *  - Container with children, querying the cross axis:
+   *      padding + border + max(child.getMinContent(direction))
+   *  - Empty leaf without measureFunc: padding + border only.
+   *
+   * Cached per-axis (`_minContentRow`, `_minContentCol`); cache is invalidated
+   * by `markDirty()` (alongside the measure + layout caches). The `-1`
+   * sentinel marks the cache as empty.
+   *
+   * `direction` accepts the FLEX_DIRECTION_* constants. Non-row values are
+   * treated as column. For padding/border resolution, percentage values are
+   * resolved against `containingBlockSize` (parent's content-box width per
+   * CSS spec — pass NaN if unknown, in which case percentages resolve to 0).
+   *
+   * @param direction - FLEX_DIRECTION_ROW or FLEX_DIRECTION_COLUMN
+   * @param containingBlockSize - Parent content-box width for percentage
+   *                              resolution; defaults to NaN (percentages → 0)
+   * @returns Smallest size along `direction` that the node can occupy without
+   *          overflowing its content (in points).
+   */
+  getMinContent(direction: number, containingBlockSize: number = NaN): number {
+    const isRow = isRowDirection(direction)
+    // Cache only the canonical (containing-block-unaware) min-content; results
+    // that depend on parent-resolved percent paddings/margins are recomputed
+    // each call (rare path — common case is points/auto units).
+    const cacheable = Number.isNaN(containingBlockSize)
+    if (cacheable) {
+      const cached = isRow ? this._minContentRow : this._minContentCol
+      if (cached !== -1) return cached
+    }
+
+    let result: number
+    const style = this._style
+
+    if (this._measureFunc !== null) {
+      // Leaf with measureFunc: ask the measurer for true min-content along the
+      // requested axis. For row direction, mW is the answer; for column,
+      // mH is the answer. Orthogonal axis stays UNDEFINED so the measurer can
+      // return content-natural sizing.
+      //
+      // The MIN_CONTENT mode is a flexily-only extension; measurers that
+      // don't recognize it fall through to AT_MOST/UNDEFINED behaviour and
+      // return a conservative (over-large) value, which is safe.
+      const measured = this.cachedMeasure(
+        isRow ? 0 : Infinity,
+        isRow ? C.MEASURE_MODE_MIN_CONTENT : C.MEASURE_MODE_UNDEFINED,
+        isRow ? Infinity : 0,
+        isRow ? C.MEASURE_MODE_UNDEFINED : C.MEASURE_MODE_MIN_CONTENT,
+      )!
+      result = isRow ? measured.width : measured.height
+    } else if (this._children.length === 0) {
+      // Empty leaf: padding + border only along the requested axis.
+      // Percentage padding resolves against containing-block WIDTH per CSS;
+      // we pass it through faithfully.
+      const cb = containingBlockSize
+      const pad = isRow
+        ? resolveEdgeValue(style.padding, 0, style.flexDirection, cb) +
+          resolveEdgeValue(style.padding, 2, style.flexDirection, cb)
+        : resolveEdgeValue(style.padding, 1, style.flexDirection, cb) +
+          resolveEdgeValue(style.padding, 3, style.flexDirection, cb)
+      const bord = isRow
+        ? resolveEdgeBorderValue(style.border, 0, style.flexDirection) +
+          resolveEdgeBorderValue(style.border, 2, style.flexDirection)
+        : resolveEdgeBorderValue(style.border, 1, style.flexDirection) +
+          resolveEdgeBorderValue(style.border, 3, style.flexDirection)
+      result = pad + bord
+    } else {
+      // Container with children: recurse into each in-flow child.
+      // - main axis (direction == flexDirection): sum + gap
+      // - cross axis (direction != flexDirection): max
+      //
+      // For the recursive call, the children's containing-block is THIS
+      // node's content-box width — but we don't have that here without a
+      // full layout. Pass `containingBlockSize` through unchanged: it's the
+      // grandparent's content size, which is the CSS-spec containing block
+      // for percent-padding only on direct children of a definitely-sized
+      // element. For the recursive case we accept the conservative behaviour
+      // (children with percent-padding without a definite ancestor get 0)
+      // — same compromise as the existing `parentWidth` paths in
+      // layout-zero.ts which use NaN -> resolveEdgeValue -> 0 when the
+      // parent isn't definitely sized.
+      const ownIsRow = isRowDirection(style.flexDirection)
+      const queryIsMain = isRow === ownIsRow
+
+      // Padding + border on the requested axis use containing-block sizing
+      const cb = containingBlockSize
+      const pad = isRow
+        ? resolveEdgeValue(style.padding, 0, style.flexDirection, cb) +
+          resolveEdgeValue(style.padding, 2, style.flexDirection, cb)
+        : resolveEdgeValue(style.padding, 1, style.flexDirection, cb) +
+          resolveEdgeValue(style.padding, 3, style.flexDirection, cb)
+      const bord = isRow
+        ? resolveEdgeBorderValue(style.border, 0, style.flexDirection) +
+          resolveEdgeBorderValue(style.border, 2, style.flexDirection)
+        : resolveEdgeBorderValue(style.border, 1, style.flexDirection) +
+          resolveEdgeBorderValue(style.border, 3, style.flexDirection)
+
+      // Inner content size from children. Filter out display:none and absolute.
+      const childCb = NaN // we don't have own content-box yet — see comment above
+      let childSum = 0
+      let childMax = 0
+      let inFlowCount = 0
+      for (const child of this._children) {
+        if (child._style.display === C.DISPLAY_NONE) continue
+        if (child._style.positionType === C.POSITION_TYPE_ABSOLUTE) continue
+
+        // CSS auto-min-size escape hatches (canonical CSS behaviour):
+        //  - overflow != visible → content can clip → min-content along
+        //    main axis is 0 (CSS §4.5 container-side rule).
+        //  - explicit minWidth/minHeight in points → take that as floor.
+        //
+        // For a definite explicit width/height, the child can't shrink past
+        // its own explicit value: treat that as min-content along that axis.
+        //
+        // These mirror the layout-zero.ts overrides so that wrapping a node
+        // in a Box with overflow:hidden / minWidth(0) propagates upward
+        // correctly through the recursive sum/max.
+        let childMin = child._getMinContentForParent(direction, childCb)
+
+        // Cross-axis margins on children are part of the child's outer min
+        const cm = isRow
+          ? resolveValue(child._style.margin[0]!, cb) + resolveValue(child._style.margin[2]!, cb)
+          : resolveValue(child._style.margin[1]!, cb) + resolveValue(child._style.margin[3]!, cb)
+        // Replace NaN (auto margins) with 0 — auto margins don't add to min-content
+        const childMargin = Number.isNaN(cm) ? 0 : cm
+        childMin += childMargin
+
+        if (queryIsMain) {
+          childSum += childMin
+        } else if (childMin > childMax) {
+          childMax = childMin
+        }
+        inFlowCount++
+      }
+
+      let inner = queryIsMain ? childSum : childMax
+      if (queryIsMain && inFlowCount > 1) {
+        // Add total gap between children along the main axis
+        const gap = ownIsRow ? style.gap[0]! : style.gap[1]!
+        inner += gap * (inFlowCount - 1)
+      }
+      result = pad + bord + inner
+    }
+
+    // Honor explicit minWidth/minHeight in points/percent — a definite
+    // explicit min is a hard floor on the intrinsic min-content as well.
+    const minVal = isRow ? style.minWidth : style.minHeight
+    if (minVal.unit === C.UNIT_POINT) {
+      result = Math.max(result, minVal.value)
+    } else if (minVal.unit === C.UNIT_PERCENT && !Number.isNaN(containingBlockSize)) {
+      result = Math.max(result, containingBlockSize * (minVal.value / 100))
+    }
+
+    if (cacheable) {
+      if (isRow) {
+        this._minContentRow = result
+      } else {
+        this._minContentCol = result
+      }
+    }
+    return result
+  }
+
+  /**
+   * Internal helper for parent-driven min-content queries that respect CSS
+   * §4.5 container-side overrides (overflow != visible → 0 along main axis)
+   * and explicit definite sizes. Called only from the recursive container
+   * branch of `getMinContent` (parent already filters display:none/absolute).
+   *
+   * The override logic is parent-direction-dependent (overflow only zeros
+   * the *child's* min-content along the parent's main axis), so we can't
+   * fold it into the cached self-result — but the cached self-result is
+   * still queried via getMinContent below, so we keep the cache hot.
+   */
+  private _getMinContentForParent(parentDirection: number, containingBlockSize: number): number {
+    const isRow = isRowDirection(parentDirection)
+    const style = this._style
+
+    // CSS §4.5 container-side rule: overflow:hidden/scroll/auto on the child
+    // means it can clip on the parent's main axis → min-content = 0 there.
+    // (Mirrors the layout-zero.ts forced flexShrink for overflow children.)
+    if (style.overflow !== C.OVERFLOW_VISIBLE) {
+      return 0
+    }
+
+    // Explicit minWidth/minHeight = 0 in points means "I can shrink to
+    // nothing" — canonical CSS escape hatch from the auto-min rule.
+    const minVal = isRow ? style.minWidth : style.minHeight
+    if (minVal.unit === C.UNIT_POINT && minVal.value === 0) {
+      return 0
+    }
+
+    // Explicit definite size (width/height in points) caps the min-content:
+    // a Box that says width=10 can't have a smaller intrinsic min than 10.
+    // Don't override when explicit size is auto/percent/fit/snug — fall
+    // through to the recursive computation.
+    const sizeVal = isRow ? style.width : style.height
+    if (sizeVal.unit === C.UNIT_POINT) {
+      return sizeVal.value
+    }
+
+    return this.getMinContent(parentDirection, containingBlockSize)
+  }
+
+  // ============================================================================
   // Layout Caching (for intrinsic sizing pass)
   // ============================================================================
 
@@ -588,6 +821,9 @@ export class Node {
       // may invalidate cached layout results that used the old child size
       current._m0 = current._m1 = current._m2 = current._m3 = undefined
       current._lc0 = current._lc1 = undefined
+      // Min-content cache is also content-derived; same invalidation rules
+      current._minContentRow = -1
+      current._minContentCol = -1
       // Skip setting dirty flag if already dirty (but still cleared caches above)
       if (current._isDirty) break
       current._isDirty = true
