@@ -376,4 +376,136 @@ describe("row cross-axis remeasure after flex distribution", () => {
     // Bordered: row(2) + top border(1) + bottom border(1) = 4
     expect(bordered.getComputedHeight()).toBe(4)
   })
+
+  it("auto-height column does not let flexGrow undermeasure wrapped grandchildren", () => {
+    // Mirrors silvercode markdown inside a chat entry:
+    //
+    // row
+    //   marker
+    //   content column
+    //     prose column flexGrow=1
+    //       markdown body column
+    //         many measured text/list rows
+    //
+    // The parent column has auto height. In that case flexGrow has no free
+    // main-axis space to distribute and must not force its Phase-5 intrinsic
+    // height back onto the child after recursive layout. The child may become
+    // taller once wrapped descendants are laid out at their resolved width.
+    const root = Node.create()
+    root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+    root.setWidth(88)
+
+    const row = Node.create()
+    row.setFlexDirection(FLEX_DIRECTION_ROW)
+    row.setWidth(88)
+    root.insertChild(row, 0)
+
+    const marker = Node.create()
+    marker.setWidth(1)
+    marker.setHeight(1)
+    marker.setFlexShrink(0)
+    row.insertChild(marker, 0)
+
+    const content = Node.create()
+    content.setFlexDirection(FLEX_DIRECTION_COLUMN)
+    content.setFlexGrow(1)
+    content.setFlexShrink(1)
+    row.insertChild(content, 1)
+
+    const prose = Node.create()
+    prose.setFlexDirection(FLEX_DIRECTION_COLUMN)
+    prose.setFlexGrow(1)
+    prose.setFlexShrink(1)
+    content.insertChild(prose, 0)
+
+    const body = Node.create()
+    body.setFlexDirection(FLEX_DIRECTION_COLUMN)
+    body.setFlexShrink(0)
+    prose.insertChild(body, 0)
+
+    const makeText = (textWidth: number): Node => {
+      const node = Node.create()
+      node.setMeasureFunc((width, widthMode) => {
+        if (widthMode === MEASURE_MODE_AT_MOST || widthMode === MEASURE_MODE_EXACTLY) {
+          return { width: Math.min(textWidth, width), height: Math.ceil(textWidth / width) }
+        }
+        return { width: textWidth, height: 1 }
+      })
+      return node
+    }
+
+    const makeSpacer = (): Node => {
+      const node = Node.create()
+      node.setHeight(1)
+      node.setFlexShrink(0)
+      return node
+    }
+
+    const makeBullet = (textWidth: number): Node => {
+      const bulletRow = Node.create()
+      bulletRow.setFlexDirection(FLEX_DIRECTION_ROW)
+      bulletRow.setFlexShrink(0)
+
+      const bulletMarker = Node.create()
+      bulletMarker.setWidth(1)
+      bulletMarker.setHeight(1)
+      bulletMarker.setFlexShrink(0)
+      bulletRow.insertChild(bulletMarker, 0)
+
+      const bulletContent = Node.create()
+      bulletContent.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      bulletContent.setFlexGrow(1)
+      bulletContent.setFlexShrink(1)
+      bulletRow.insertChild(bulletContent, 1)
+      bulletContent.insertChild(makeText(textWidth), 0)
+
+      return bulletRow
+    }
+
+    const children = [
+      makeText(23),
+      makeSpacer(),
+      makeText(8),
+      makeSpacer(),
+      makeBullet(120),
+      makeBullet(120),
+      makeBullet(29),
+      makeText(21),
+      makeText(27),
+      makeSpacer(),
+      makeText(13),
+      makeBullet(75),
+      makeBullet(37),
+      makeBullet(180),
+    ]
+    children.forEach((child, index) => body.insertChild(child, index))
+
+    root.calculateLayout(88, NaN, DIRECTION_LTR)
+
+    expect(body.getComputedHeight()).toBe(18)
+    expect(prose.getComputedHeight()).toBe(body.getComputedHeight())
+    expect(content.getComputedHeight()).toBe(body.getComputedHeight())
+    expect(row.getComputedHeight()).toBe(body.getComputedHeight())
+  })
+
+  it("auto-style column with definite available height still lets flexGrow fill the budget", () => {
+    const root = Node.create()
+    root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+    root.setWidth(20)
+
+    const child = Node.create()
+    child.setFlexDirection(FLEX_DIRECTION_COLUMN)
+    child.setFlexGrow(1)
+    root.insertChild(child, 0)
+
+    const leaf = Node.create()
+    leaf.setHeight(2)
+    child.insertChild(leaf, 0)
+
+    root.calculateLayout(20, 10, DIRECTION_LTR)
+
+    expect(root.getComputedHeight()).toBe(10)
+    expect(child.getComputedHeight()).toBe(10)
+    expect(leaf.getComputedHeight()).toBe(2)
+  })
 })

@@ -1531,6 +1531,8 @@ function layoutNode(
       const mainIsAutoChild =
         (mainDim.unit === C.UNIT_AUTO || mainDim.unit === C.UNIT_UNDEFINED) && !hasDefiniteFlexBasis
       const hasFlexGrow = cflex.flexGrow > 0
+      const parentHasDefiniteMain = !Number.isNaN(mainAxisSize)
+      const flexGrowHasDefiniteMainBudget = hasFlexGrow && parentHasDefiniteMain
       // Use flex-computed mainSize for all cases - it includes padding/border as minimum
       // The flex algorithm already computed the proper size based on content/padding/border
       const effectiveMainSize = childMainSize
@@ -1538,9 +1540,11 @@ function layoutNode(
       let childWidth = isRow ? effectiveMainSize : childCrossSize
       let childHeight = isRow ? childCrossSize : effectiveMainSize
 
-      // Only use measure function for intrinsic sizing when flexGrow is NOT set
-      // When flexGrow > 0, the flex algorithm determines size, not the content
-      const shouldMeasure = child.hasMeasureFunc() && child.children.length === 0 && !hasFlexGrow
+      // Only suppress intrinsic leaf measurement when flexGrow has a real
+      // parent main-axis budget to distribute. In an auto/indefinite main
+      // axis there is no free space budget; flexGrow must not force an
+      // earlier intrinsic estimate back over the recursively measured size.
+      const shouldMeasure = child.hasMeasureFunc() && child.children.length === 0 && !flexGrowHasDefiniteMainBudget
       if (shouldMeasure) {
         const widthAuto = childStyle.width.unit === C.UNIT_AUTO || childStyle.width.unit === C.UNIT_UNDEFINED
         const heightAuto = childStyle.height.unit === C.UNIT_AUTO || childStyle.height.unit === C.UNIT_UNDEFINED
@@ -1724,7 +1728,7 @@ function layoutNode(
       const crossIsFitContent =
         crossDimForLayoutCall.unit === C.UNIT_FIT_CONTENT || crossDimForLayoutCall.unit === C.UNIT_SNUG_CONTENT
       const passWidthToChild =
-        isRow && mainIsAutoChild && !hasFlexGrow && !flexDistChanged && !hasMeasureLeaf
+        isRow && mainIsAutoChild && !flexGrowHasDefiniteMainBudget && !flexDistChanged && !hasMeasureLeaf
           ? NaN
           : !isRow && crossIsAutoForLayoutCall && !parentHasDefiniteCross && !crossIsFitContent
             ? NaN
@@ -1736,7 +1740,7 @@ function layoutNode(
                   ? crossAxisSize
                   : childWidth
       const passHeightToChild =
-        !isRow && mainIsAutoChild && !hasFlexGrow && !flexDistChanged && !hasMeasureLeaf
+        !isRow && mainIsAutoChild && !flexGrowHasDefiniteMainBudget && !flexDistChanged && !hasMeasureLeaf
           ? NaN
           : isRow && crossIsAutoForLayoutCall && !parentHasDefiniteCross && !crossIsFitContent
             ? NaN
@@ -1777,7 +1781,7 @@ function layoutNode(
       // producing height=1 instead of the correct wrapped height.
       const hasMeasure = child.hasMeasureFunc() && child.children.length === 0
       const flexDistributionChangedSize = child.flex.mainSize !== child.flex.baseSize
-      if ((!mainIsAuto && !mainIsAutoChild) || hasFlexGrow || hasMeasure || flexDistributionChangedSize) {
+      if ((!mainIsAuto && !mainIsAutoChild) || flexGrowHasDefiniteMainBudget || hasMeasure || flexDistributionChangedSize) {
         // Use edge-based rounding: size = round(end_edge) - round(start_edge)
         if (isRow) {
           _t?.parentOverride(_tn, "main", child.layout.width, edgeBasedMainSize)
@@ -1896,7 +1900,7 @@ function layoutNode(
       //   Use child.layout (from layoutNode), which reflects actual content size.
       //   constrainedMainSize is a stale pre-layout estimate from unconstrained measurement.
       const phaseEightOverrode =
-        (!mainIsAuto && !mainIsAutoChild) || hasFlexGrow || hasMeasure || flexDistributionChangedSize
+        (!mainIsAuto && !mainIsAutoChild) || flexGrowHasDefiniteMainBudget || hasMeasure || flexDistributionChangedSize
       const fractionalMainSize = phaseEightOverrode
         ? constrainedMainSize
         : isRow
