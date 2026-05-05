@@ -9,7 +9,7 @@
  * - Yoga (WebAssembly via yoga-wasm-web)
  */
 
-import * as Flexily from "../dist/index.js"
+import * as Flexily from "../src/index.ts"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import os from "node:os"
 import { readFileSync } from "node:fs"
