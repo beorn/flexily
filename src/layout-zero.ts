@@ -1781,7 +1781,12 @@ function layoutNode(
       // producing height=1 instead of the correct wrapped height.
       const hasMeasure = child.hasMeasureFunc() && child.children.length === 0
       const flexDistributionChangedSize = child.flex.mainSize !== child.flex.baseSize
-      if ((!mainIsAuto && !mainIsAutoChild) || flexGrowHasDefiniteMainBudget || hasMeasure || flexDistributionChangedSize) {
+      if (
+        (!mainIsAuto && !mainIsAutoChild) ||
+        flexGrowHasDefiniteMainBudget ||
+        hasMeasure ||
+        flexDistributionChangedSize
+      ) {
         // Use edge-based rounding: size = round(end_edge) - round(start_edge)
         if (isRow) {
           _t?.parentOverride(_tn, "main", child.layout.width, edgeBasedMainSize)
