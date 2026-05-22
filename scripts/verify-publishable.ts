@@ -68,15 +68,22 @@ function main(): void {
   info(`packing flexily from ${FLEXILY_ROOT}`)
   const packDir = mkdtempSync(join(tmpdir(), "flexily-verify-"))
   try {
-    // COREPACK_ENABLE_STRICT=0 bypasses the "this project uses bun"
-    // refusal — flexily declares packageManager:"bun@..." for local dev
-    // but pnpm is the right tool for pack (it applies publishConfig
-    // overrides; bun pack does not yet).
-    const pack = spawnSync("pnpm", ["pack", "--pack-destination", packDir], {
-      cwd: FLEXILY_ROOT,
-      encoding: "utf8",
-      env: { ...process.env, COREPACK_ENABLE_STRICT: "0" },
-    })
+    // pnpm 10+ refuses to operate on a project whose `packageManager`
+    // field names a different PM (the OTHER_PM_EXPECTED check in pnpm's
+    // checkPackageManager). flexily declares `packageManager: "bun@..."`
+    // for local dev but pnpm is the right tool for pack (it applies
+    // publishConfig overrides; bun pack doesn't). `--pm-on-fail=ignore`
+    // bypasses that refusal cleanly; COREPACK_ENABLE_STRICT=0 stays as a
+    // belt-and-braces for the older corepack path.
+    const pack = spawnSync(
+      "pnpm",
+      ["--pm-on-fail=ignore", "pack", "--pack-destination", packDir],
+      {
+        cwd: FLEXILY_ROOT,
+        encoding: "utf8",
+        env: { ...process.env, COREPACK_ENABLE_STRICT: "0" },
+      },
+    )
     if (pack.status !== 0) {
       fail(`pnpm pack exited ${pack.status}\n${pack.stderr}`)
     }
