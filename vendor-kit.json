@@ -1,9 +1,5 @@
 {
-  "modules": [
-    "release",
-    "format-check",
-    "oxfmt"
-  ],
+  "modules": ["release", "format-check", "oxfmt"],
   "vars": {
     "testCommand": "bun test",
     "bunVersion": "latest",

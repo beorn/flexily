@@ -75,15 +75,11 @@ function main(): void {
     // publishConfig overrides; bun pack doesn't). `--pm-on-fail=ignore`
     // bypasses that refusal cleanly; COREPACK_ENABLE_STRICT=0 stays as a
     // belt-and-braces for the older corepack path.
-    const pack = spawnSync(
-      "pnpm",
-      ["--pm-on-fail=ignore", "pack", "--pack-destination", packDir],
-      {
-        cwd: FLEXILY_ROOT,
-        encoding: "utf8",
-        env: { ...process.env, COREPACK_ENABLE_STRICT: "0" },
-      },
-    )
+    const pack = spawnSync("pnpm", ["--pm-on-fail=ignore", "pack", "--pack-destination", packDir], {
+      cwd: FLEXILY_ROOT,
+      encoding: "utf8",
+      env: { ...process.env, COREPACK_ENABLE_STRICT: "0" },
+    })
     if (pack.status !== 0) {
       fail(`pnpm pack exited ${pack.status}\n${pack.stderr}`)
     }
@@ -129,7 +125,9 @@ function main(): void {
     }
     const badLeaves = leaves.filter((l) => !l.leaf.startsWith("./dist/"))
     if (badLeaves.length > 0) {
-      const formatted = badLeaves.map((l) => `  exports${l.path.map((p) => `["${p}"]`).join("")} = "${l.leaf}"`).join("\n")
+      const formatted = badLeaves
+        .map((l) => `  exports${l.path.map((p) => `["${p}"]`).join("")} = "${l.leaf}"`)
+        .join("\n")
       fail(
         `packed package.json "exports" has leaves NOT under ./dist/ (publishConfig.exports override didn't apply — switch from npm publish to pnpm publish):\n${formatted}`,
       )

@@ -17,12 +17,7 @@
 
 import * as C from "./constants.js"
 import type { Node } from "./node-zero.js"
-import {
-  applyMinMax,
-  findContainerQuerySize,
-  isDevModeAssertionsEnabled,
-  resolveValue,
-} from "./utils.js"
+import { applyMinMax, findContainerQuerySize, isDevModeAssertionsEnabled, resolveValue } from "./utils.js"
 import { log } from "./logger.js"
 import { getTrace } from "./trace.js"
 
@@ -245,8 +240,7 @@ function layoutNode(
     }
     // Add gaps + padding + border. gap[0] is column gap (row layout's between-children).
     const isRowLayout =
-      style.flexDirection === C.FLEX_DIRECTION_ROW ||
-      style.flexDirection === C.FLEX_DIRECTION_ROW_REVERSE
+      style.flexDirection === C.FLEX_DIRECTION_ROW || style.flexDirection === C.FLEX_DIRECTION_ROW_REVERSE
     const gap = isRowLayout ? style.gap[0] : 0
     if (node.children.length > 1 && gap > 0) {
       maxContent += gap * (node.children.length - 1)
@@ -564,10 +558,7 @@ function layoutNode(
       baseSize = childStyle.flexBasis.value
     } else if (childStyle.flexBasis.unit === C.UNIT_PERCENT) {
       baseSize = Number.isNaN(mainAxisSize) ? 0 : mainAxisSize * (childStyle.flexBasis.value / 100)
-    } else if (
-      childStyle.flexBasis.unit === C.UNIT_CQI ||
-      childStyle.flexBasis.unit === C.UNIT_CQMIN
-    ) {
+    } else if (childStyle.flexBasis.unit === C.UNIT_CQI || childStyle.flexBasis.unit === C.UNIT_CQMIN) {
       // A0.1 Pass 2: flex-basis in cqi resolves against child's nearest CQ ancestor.
       const qsize = findContainerQuerySize(child)
       baseSize = Number.isNaN(qsize) ? 0 : qsize * (childStyle.flexBasis.value / 100)
@@ -770,10 +761,7 @@ function layoutNode(
           specifiedSize = childStyle.flexBasis.value
         } else if (childStyle.flexBasis.unit === C.UNIT_PERCENT && !Number.isNaN(mainAxisSize)) {
           specifiedSize = mainAxisSize * (childStyle.flexBasis.value / 100)
-        } else if (
-          childStyle.flexBasis.unit === C.UNIT_CQI ||
-          childStyle.flexBasis.unit === C.UNIT_CQMIN
-        ) {
+        } else if (childStyle.flexBasis.unit === C.UNIT_CQI || childStyle.flexBasis.unit === C.UNIT_CQMIN) {
           // A0.1 Pass 2: cqi flex-basis specified-size suggestion.
           const qsize = findContainerQuerySize(child)
           if (!Number.isNaN(qsize)) {

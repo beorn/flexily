@@ -6,10 +6,10 @@ Status: A0.1 shipped (engine substrate). Consumers: A0.3 math functions (`min`/`
 
 flexily resolves layout in two well-defined epochs per `calculateLayout` pass:
 
-| Epoch  | What is finalized                                                                            | What is still unknown                              |
-| ------ | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Pass 1 | Each CQ container's **frozen inline-size** (`node._frozenQuerySize`)                         | Children's CQ branch resolutions, post-Pass-2 sizes |
-| Pass 2 | Each descendant's CQ branch (via `setContainerQueryStyle`); final `layout.width`/`.height`   | nothing — layout is complete                       |
+| Epoch  | What is finalized                                                                          | What is still unknown                               |
+| ------ | ------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| Pass 1 | Each CQ container's **frozen inline-size** (`node._frozenQuerySize`)                       | Children's CQ branch resolutions, post-Pass-2 sizes |
+| Pass 2 | Each descendant's CQ branch (via `setContainerQueryStyle`); final `layout.width`/`.height` | nothing — layout is complete                        |
 
 Pass 1 captures the parent's constraint-derived inline-size BEFORE recursing into children. Pass 2 runs on top of Pass 1's frozen values — by then, `findContainerQuerySize(child)` returns a stable result for any descendant.
 

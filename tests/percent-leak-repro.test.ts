@@ -1,11 +1,5 @@
 import { describe, test, expect } from "vitest"
-import {
-  Node,
-  DIRECTION_LTR,
-  FLEX_DIRECTION_COLUMN,
-  FLEX_DIRECTION_ROW,
-  UNIT_POINT,
-} from "../src/index.js"
+import { Node, DIRECTION_LTR, FLEX_DIRECTION_COLUMN, FLEX_DIRECTION_ROW, UNIT_POINT } from "../src/index.js"
 
 // Synthetic repro for @km/flexily/15164-percent-phantom-leak.
 //

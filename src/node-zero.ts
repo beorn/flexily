@@ -948,9 +948,10 @@ export class Node {
     // itself, not this mutator.
     for (const key of Object.keys(overrides) as (keyof Style)[]) {
       const v = overrides[key]
-      if (v === undefined) continue
-      // Type-erased write — the Partial<Style> shape guarantees v matches the
-      // field type. Cast is local to this assignment.
+      if (v === undefined)
+        continue
+        // Type-erased write — the Partial<Style> shape guarantees v matches the
+        // field type. Cast is local to this assignment.
       ;(this._style as unknown as Record<string, unknown>)[key as string] = v
       touched = true
     }
