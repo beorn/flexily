@@ -25,7 +25,6 @@ jobs:
         # roundtrip below. Asserts no .ts source files in tarball + every
         # exports[*] leaf points at ./dist/. Catches publishConfig.exports
         # regressions even if the pack+install path happens to succeed.
-        # Owned by @km/flexily/14343-publish-guard.
         run: |
           bun run build
           bun scripts/verify-publishable.ts

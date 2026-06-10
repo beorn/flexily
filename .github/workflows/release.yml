@@ -1,3 +1,4 @@
+# vendor-kit: release@f2c74981a898 — generated; edit packages/km-infra/vendor-kit/templates/release.yml in km, then re-sync
 name: Release
 
 on:
@@ -27,11 +28,6 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
       - name: Verify publishable (tarball assertion)
-        # Pre-publish guard: pnpm pack + assert no .ts source files in
-        # the tarball AND every exports[*] leaf points at ./dist/. Catches
-        # removing publishConfig.exports, switching back to npm publish,
-        # and shipping without bun run build. Owned by
-        # @km/flexily/14343-publish-guard.
         run: bun scripts/verify-publishable.ts
       - name: Check if version already published
         id: check
@@ -46,10 +42,7 @@ jobs:
           fi
       - if: steps.check.outputs.skip != 'true'
         # pnpm publish (NOT npm publish) — npm doesn't apply publishConfig.exports
-        # overrides; pnpm does. flexily's package.json keeps `exports` pointing
-        # to ./src/* for local dev (Bun workspace) and `publishConfig.exports`
-        # to ./dist/* for npm consumers; pnpm publish applies the override.
-        # See vendor/CLAUDE.md "npm Publishing" section for the canonical pattern.
+        # overrides; pnpm does.
         run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -236,7 +236,7 @@ export function resolveValue(value: Value, availableSize: number, queryInlineSiz
       return queryInlineSize * (value.value / 100)
     case C.UNIT_CALC:
       // A0.3 math function. Late-bound per the contract in
-      // vendor/flexily/docs/two-phase-layout.md — evaluates at the same epoch
+      // docs/two-phase-layout.md — evaluates at the same epoch
       // as its leaf units (cqi → Pass 2). A defensively-malformed CALC value
       // without an `expr` payload resolves to 0 (same surface as UNDEFINED).
       if (!value.expr) return 0

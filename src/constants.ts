@@ -101,7 +101,7 @@ export const UNIT_CQMIN = 7
 // CSS math-function value (A0.3). Value carries an `expr: MathExpr` payload;
 // `resolveValue` recursively evaluates against the same availableSize +
 // queryInlineSize as the leaf units. Late-bound per the contract in
-// vendor/flexily/docs/two-phase-layout.md.
+// docs/two-phase-layout.md.
 export const UNIT_CALC = 8
 
 // Container type (A0.1) — declares a node as a container-query container.

@@ -1,0 +1,12 @@
+{
+  "modules": [
+    "release",
+    "format-check",
+    "oxfmt"
+  ],
+  "vars": {
+    "testCommand": "bun test",
+    "bunVersion": "latest",
+    "verifyStep": "      - name: Verify publishable (tarball assertion)\n        run: bun scripts/verify-publishable.ts\n"
+  }
+}

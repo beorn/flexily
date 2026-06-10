@@ -897,7 +897,7 @@ export class Node {
   // is sound — no-op idempotency and mutation-propagation-to-child layout.
   //
   // See `hub/silvery/diagnosis/flexily-two-phase-feasibility.md` for the
-  // verdict report and `@km/silvery/responsive-layout-architecture-reframe`
+  // verdict report
   // for the dragon bead.
 
   /**
