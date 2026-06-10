@@ -561,8 +561,8 @@ After ANY change to `layout-zero.ts` or `node-zero.ts`:
 # 1. Check CPU load -- no heavy processes running
 top -l 1 -n 5 -stats command,cpu | head -10
 
-# 2. Run benchmark
-cd vendor/flexily && bun bench bench/yoga-compare-warmup.bench.ts
+# 2. Run benchmark (from the repo root)
+bun bench bench/yoga-compare-warmup.bench.ts
 
 # 3. Compare against baseline:
 #    Flexily should be ~2x Yoga for flat trees
@@ -570,7 +570,7 @@ cd vendor/flexily && bun bench bench/yoga-compare-warmup.bench.ts
 #    No-change re-layout should be ~5.5x Yoga
 
 # 4. If you changed source, rebuild:
-cd vendor/flexily && bun run build
+bun run build
 ```
 
 **Acceptable impact:**
