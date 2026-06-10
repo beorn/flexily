@@ -73,13 +73,23 @@ function main(): void {
     // checkPackageManager). flexily declares `packageManager: "bun@..."`
     // for local dev but pnpm is the right tool for pack (it applies
     // publishConfig overrides; bun pack doesn't). `--pm-on-fail=ignore`
-    // bypasses that refusal cleanly; COREPACK_ENABLE_STRICT=0 stays as a
-    // belt-and-braces for the older corepack path.
-    const pack = spawnSync("pnpm", ["--pm-on-fail=ignore", "pack", "--pack-destination", packDir], {
-      cwd: FLEXILY_ROOT,
-      encoding: "utf8",
-      env: { ...process.env, COREPACK_ENABLE_STRICT: "0" },
-    })
+    // bypasses that refusal cleanly — but the flag only EXISTS on pnpm 10+;
+    // pnpm 9 (release.yml's pinned action-setup) dies with "Unknown option"
+    // and has no OTHER_PM_EXPECTED check to bypass anyway. Pass it only
+    // where it exists. COREPACK_ENABLE_STRICT=0 stays as belt-and-braces.
+    const runPack = (flags: string[]) =>
+      spawnSync("pnpm", [...flags, "pack", "--pack-destination", packDir], {
+        cwd: FLEXILY_ROOT,
+        encoding: "utf8",
+        env: { ...process.env, COREPACK_ENABLE_STRICT: "0" },
+      })
+    let pack = runPack(["--pm-on-fail=ignore"])
+    if (pack.status !== 0 && /Unknown option/.test(pack.stderr ?? "")) {
+      // pnpm 9 (release.yml's pinned action-setup) predates the flag AND the
+      // OTHER_PM_EXPECTED refusal the flag bypasses — plain pack works there.
+      info("pnpm predates --pm-on-fail; retrying plain pack")
+      pack = runPack([])
+    }
     if (pack.status !== 0) {
       fail(`pnpm pack exited ${pack.status}\n${pack.stderr}`)
     }
