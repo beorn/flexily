@@ -63,7 +63,8 @@
     "ci": "bun run typecheck && bun test",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "check-private": "bun scripts/check-private-leak.ts"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

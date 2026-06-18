@@ -41,6 +41,9 @@ jobs:
       - name: Build docs
         run: cd docs && bunx --bun vitepress build
 
+      - name: Check for private-content leak
+        run: bun scripts/check-private-leak.ts
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
