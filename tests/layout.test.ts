@@ -300,6 +300,60 @@ describe("Flexily Layout Engine", () => {
     })
   })
 
+  describe("Measure leaf rounding vs box sibling (Yoga-faithful — 20533)", () => {
+    // 20533 was filed as "measureFunc leaf floor collapses centered gaps". A
+    // Yoga-oracle differential (yoga-wasm-web) over 1728 measureFunc-leaf + box
+    // centered shapes found flexily == real Yoga in ALL of them: the floor is
+    // Yoga-FAITHFUL (added deliberately in 62d2cc8, which fixed 4 Ink center
+    // tests). floor->round would DIVERGE from Yoga. The differential fuzz never
+    // set a measureFunc, which is why this was misread as a flexily bug. These
+    // expectations are the values real Yoga produces (verified via the oracle).
+    function centeredColumn(rootH: number, gap: number, leafFirst: boolean) {
+      const root = Node.create()
+      root.setWidth(20)
+      root.setHeight(rootH)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      root.setJustifyContent(JUSTIFY_CENTER)
+      if (gap) root.setGap(GUTTER_ALL, gap)
+      const leaf = Node.create()
+      leaf.setMeasureFunc(() => ({ width: 4, height: 1 }))
+      const box = Node.create()
+      box.setWidth(4)
+      box.setHeight(1)
+      if (leafFirst) {
+        root.insertChild(leaf, 0)
+        root.insertChild(box, 1)
+      } else {
+        root.insertChild(box, 0)
+        root.insertChild(leaf, 1)
+      }
+      root.calculateLayout(20, rootH, DIRECTION_LTR)
+      return { leaf, box }
+    }
+
+    it("odd free space, box-first: box rounds / leaf floors (Yoga-faithful)", () => {
+      // rootH=10, content=1+1+gap1=3, free=7 -> 3.5 each side.
+      // box(idx0) rounds to 4, leaf(idx1) floors to 5 — matches real Yoga.
+      const { leaf, box } = centeredColumn(10, 1, false)
+      expectLayout(box, { top: 4 })
+      expectLayout(leaf, { top: 5 })
+    })
+
+    it("odd free space, leaf-first: leaf floors / box rounds (Yoga-faithful)", () => {
+      // leaf(idx0) floors to 3, box(idx1) rounds to 6 — matches real Yoga.
+      const { leaf, box } = centeredColumn(10, 1, true)
+      expectLayout(leaf, { top: 3 })
+      expectLayout(box, { top: 6 })
+    })
+
+    it("even free space sanity: gap preserved", () => {
+      // rootH=11, free=8 -> integer 4 each side, no half-row split; gap stays 1.
+      const { leaf, box } = centeredColumn(11, 1, false)
+      expectLayout(box, { top: 4 })
+      expectLayout(leaf, { top: 6 })
+    })
+  })
+
   describe("Flex Shrink", () => {
     it("should shrink children when they exceed available space", () => {
       const root = Node.create()
