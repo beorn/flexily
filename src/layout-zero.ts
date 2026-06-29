@@ -1831,15 +1831,38 @@ function layoutNode(
         edgeBasedMainSize = childMinMain // Use minimum size instead of 0
       }
 
-      // Calculate child's RELATIVE position (stored in layout)
-      // Yoga behavior: position is rounded locally, size uses absolute edge rounding
-      // This ensures sizes are pixel-perfect at document level while positions remain intuitive
-      // Yoga 3.x quirk: measureFunc leaf nodes use Math.floor for position rounding,
-      // while explicit-sized children use Math.round. This affects any justify/align mode
-      // that produces fractional offsets (center, space-around, space-evenly).
+      // Calculate child's RELATIVE position (stored in layout).
+      //
+      // MAIN axis: derive the relative position from the SAME rounded absolute
+      // edge the SIZE was rounded against (`roundedAbsMainStart`), not from a
+      // local round of the fractional offset. Rounding the local offset means a
+      // renderer that reconstructs absolute positions by ACCUMULATING relative
+      // lefts (`parentScreenX + getComputedLeft()`) drifts one column away from
+      // that edge whenever the parent sits at a fractional absolute position —
+      // nested split panes then overflow their parent / gap from their sibling
+      // by 1 column (@si/flexily/20565). `round(absChild) - round(absParent)`
+      // telescopes: accumulating it from the root reconstructs `round(absChild)`
+      // exactly at every depth, so position and edge-based size stay consistent.
+      // This matches Yoga's roundLayoutResultsToPixelGrid, which stores each
+      // node's position as the difference of rounded absolute edges.
+      //
+      // CROSS axis keeps a local round of the fractional offset: its size is a
+      // plain round of the float extent (not edge-based), so the two stay
+      // internally consistent as-is.
+      //
+      // Yoga 3.x quirk preserved: measureFunc leaf nodes use Math.floor for
+      // position rounding (affects justify/align modes that produce fractional
+      // offsets — center, space-around, space-evenly). Leaves have no children,
+      // so they are never a parent in the telescoping invariant above.
       const posRound = shouldMeasure ? Math.floor : Math.round
-      const childLeft = posRound(fractionalLeft + posOffsetX)
-      const childTop = posRound(fractionalTop + posOffsetY)
+      const roundedAbsParentMainStart = Math.round(
+        isRow ? absX + marginLeft + parentPosOffsetX : absY + marginTop + parentPosOffsetY,
+      )
+      const mainChildPos = shouldMeasure
+        ? posRound(isRow ? fractionalLeft + posOffsetX : fractionalTop + posOffsetY)
+        : roundedAbsMainStart - roundedAbsParentMainStart
+      const childLeft = isRow ? mainChildPos : posRound(fractionalLeft + posOffsetX)
+      const childTop = isRow ? posRound(fractionalTop + posOffsetY) : mainChildPos
 
       // Check if cross axis is auto-sized (needed for deciding what to pass to layoutNode)
       const crossDimForLayoutCall = isRow ? childStyle.height : childStyle.width
