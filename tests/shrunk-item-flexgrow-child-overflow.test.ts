@@ -48,6 +48,9 @@ function assertNoChildOverflows(node: Node): void {
   const ph = node.getComputedHeight()
   for (let i = 0; i < node.getChildCount(); i++) {
     const c = node.getChild(i)
+    // getChild returns Node | undefined; within getChildCount() it is always
+    // present — narrow it (and fail loud if the invariant ever breaks).
+    if (!c) throw new Error(`getChild(${i}) returned undefined within getChildCount() ${node.getChildCount()}`)
     const right = c.getComputedLeft() + c.getComputedWidth()
     const bottom = c.getComputedTop() + c.getComputedHeight()
     expect(
