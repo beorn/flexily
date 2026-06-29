@@ -1871,6 +1871,17 @@ function layoutNode(
       // would recompute with NaN and get a different result.
       const flexDistChanged = child.flex.mainSize !== child.flex.baseSize
       const hasMeasureLeaf = child.hasMeasureFunc() && child.children.length === 0
+      // The child's FINAL main-axis size is the edge-rounded integer
+      // `edgeBasedMainSize` (it's what the parent assigns at the Phase 8 override
+      // below), but `childWidth`/`childHeight` still carry the PRE-rounding float
+      // flex main-size (e.g. 22.5 after a half-cell shrink). Passing that float as
+      // the child container's available main size makes the child resolve its own
+      // content box to 22.5, so a stretchy / percentage GRANDCHILD rounds up to 23
+      // and overflows the parent's edge-rounded 22 by one cell. Pass the rounded
+      // size so descendants are laid out against the width the child actually gets.
+      // Measure leaves are exempt: they have no descendants to mis-size and must
+      // keep the measured constraint that drives their own text wrapping.
+      const mainSizeToPass = hasMeasureLeaf ? (isRow ? childWidth : childHeight) : edgeBasedMainSize
       // For fit-content on cross axis, pass the parent's available cross size
       // so the child can compute min(intrinsic, available).
       const crossIsFitContent =
@@ -1886,7 +1897,9 @@ function layoutNode(
                 ? crossAxisSize
                 : !isRow && crossIsFitContent
                   ? crossAxisSize
-                  : childWidth
+                  : isRow
+                    ? mainSizeToPass
+                    : childWidth
       const passHeightToChild =
         !isRow && mainIsAutoChild && !flexGrowHasDefiniteMainBudget && !flexDistChanged && !hasMeasureLeaf
           ? NaN
@@ -1898,7 +1911,9 @@ function layoutNode(
                 ? crossAxisSize
                 : isRow && crossIsFitContent
                   ? crossAxisSize
-                  : childHeight
+                  : !isRow
+                    ? mainSizeToPass
+                    : childHeight
 
       // Recurse to layout any grandchildren
       // Pass the child's FLOAT absolute position (margin box start, before child's own margin)
