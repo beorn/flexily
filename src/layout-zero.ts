@@ -593,19 +593,33 @@ function layoutNode(
         // Measure function takes PHYSICAL (width, height), not logical (main, cross).
         // For row: main=width, cross=height. For column: main=height, cross=width.
         const wantMaxContent = childStyle.flexGrow > 0
+        // Resolve the child's cross-axis dimension when it has an explicit percent/point
+        // size, so the measure func gets the correct constraint (e.g. width=30% in a
+        // column → measure at 30px, not at parent's full width). Without this, a
+        // measure-func leaf with percent width in a column measures unconstrained (parent width)
+        // and doesn't wrap, producing height=1 instead of the correct wrapped height.
+        const crossDimStyle = isRow ? childStyle.height : childStyle.width
+        let resolvedCross = availCross
+        if (crossDimStyle.unit === C.UNIT_POINT) {
+          resolvedCross = crossDimStyle.value
+        } else if (crossDimStyle.unit === C.UNIT_PERCENT) {
+          resolvedCross = Number.isNaN(crossAxisSize) ? 0 : crossAxisSize * (crossDimStyle.value / 100)
+        } else if (crossDimStyle.unit === C.UNIT_CQI || crossDimStyle.unit === C.UNIT_CQMIN || crossDimStyle.unit === C.UNIT_CALC) {
+          resolvedCross = resolveValue(crossDimStyle, crossAxisSize, findContainerQuerySize(child))
+        }
         const mW = isRow
           ? wantMaxContent
             ? Infinity
             : Number.isNaN(mainAxisSize)
               ? Infinity
               : mainAxisSize
-          : Number.isNaN(availCross)
+          : Number.isNaN(resolvedCross)
             ? Infinity
-            : availCross
+            : resolvedCross
         const mH = isRow
-          ? Number.isNaN(availCross)
+          ? Number.isNaN(resolvedCross)
             ? Infinity
-            : availCross
+            : resolvedCross
           : wantMaxContent
             ? Infinity
             : Number.isNaN(mainAxisSize)
@@ -1980,6 +1994,16 @@ function layoutNode(
         } else {
           _t?.parentOverride(_tn, "main", child.layout.height, edgeBasedMainSize)
           child.layout.height = edgeBasedMainSize
+        }
+      }
+      // When flexGrow changed a measure leaf's width, the height was computed at the
+      // PRE-distribution width. Re-measure at the actual
+      // flex-distributed width to get correct wrapping.
+      if (flexGrowHasDefiniteMainBudget && hasMeasureLeaf && isRow) {
+        const newWidth = child.layout.width
+        const measured = child.cachedMeasure(newWidth, C.MEASURE_MODE_AT_MOST, Infinity, C.MEASURE_MODE_UNDEFINED)
+        if (measured) {
+          child.layout.height = Math.round(measured.height)
         }
       }
       // Cross axis: only override for explicit sizing or when we have a real constraint
