@@ -15,13 +15,37 @@ import {
   createDefaultStyle,
 } from "../types.js"
 import type { DefaultsPreset } from "../defaults.js"
-import { setEdgeValue, setEdgeBorder, getEdgeValue, getEdgeBorderValue } from "../utils.js"
+import {
+  setEdgeValue,
+  setEdgeBorder,
+  getEdgeValue,
+  getEdgeBorderValue,
+  edgeValueMatches,
+  edgeBorderMatches,
+  styleValueMatches,
+} from "../utils.js"
 import { log } from "../logger.js"
 
 /** Options for `Node.create()`. */
 export interface NodeCreateOptions {
   defaults?: DefaultsPreset
 }
+
+type StyleValueKey = "width" | "height" | "minWidth" | "minHeight" | "maxWidth" | "maxHeight" | "flexBasis"
+
+type StyleNumberKey =
+  | "display"
+  | "positionType"
+  | "flexDirection"
+  | "flexWrap"
+  | "flexGrow"
+  | "flexShrink"
+  | "alignItems"
+  | "alignSelf"
+  | "alignContent"
+  | "justifyContent"
+  | "aspectRatio"
+  | "overflow"
 
 /**
  * A layout node in the flexbox tree.
@@ -68,6 +92,22 @@ export class Node {
 
   constructor(preset?: DefaultsPreset) {
     this._style = createDefaultStyle(preset)
+  }
+
+  private setStyleValue(key: StyleValueKey, value: number, unit: number): void {
+    if (styleValueMatches(this._style[key], value, unit)) {
+      return
+    }
+    this._style[key] = { value, unit }
+    this.markDirty()
+  }
+
+  private setStyleNumber(key: StyleNumberKey, value: number): void {
+    if (Object.is(this._style[key], value)) {
+      return
+    }
+    this._style[key] = value
+    this.markDirty()
   }
 
   // ============================================================================
@@ -215,6 +255,9 @@ export class Node {
    * ```
    */
   setMeasureFunc(measureFunc: MeasureFunc): void {
+    if (this._measureFunc === measureFunc) {
+      return
+    }
     this._measureFunc = measureFunc
     this.markDirty()
   }
@@ -224,6 +267,9 @@ export class Node {
    * Marks the node as dirty to trigger layout recalculation.
    */
   unsetMeasureFunc(): void {
+    if (this._measureFunc === null) {
+      return
+    }
     this._measureFunc = null
     this.markDirty()
   }
@@ -255,6 +301,9 @@ export class Node {
    * ```
    */
   setBaselineFunc(baselineFunc: BaselineFunc): void {
+    if (this._baselineFunc === baselineFunc) {
+      return
+    }
     this._baselineFunc = baselineFunc
     this.markDirty()
   }
@@ -264,6 +313,9 @@ export class Node {
    * Marks the node as dirty to trigger layout recalculation.
    */
   unsetBaselineFunc(): void {
+    if (this._baselineFunc === null) {
+      return
+    }
     this._baselineFunc = null
     this.markDirty()
   }
@@ -483,11 +535,10 @@ export class Node {
   setWidth(value: number): void {
     // NaN means "auto" in Yoga API
     if (Number.isNaN(value)) {
-      this._style.width = { value: 0, unit: C.UNIT_AUTO }
+      this.setStyleValue("width", 0, C.UNIT_AUTO)
     } else {
-      this._style.width = { value, unit: C.UNIT_POINT }
+      this.setStyleValue("width", value, C.UNIT_POINT)
     }
-    this.markDirty()
   }
 
   /**
@@ -496,16 +547,14 @@ export class Node {
    * @param value - Width as a percentage (0-100)
    */
   setWidthPercent(value: number): void {
-    this._style.width = { value, unit: C.UNIT_PERCENT }
-    this.markDirty()
+    this.setStyleValue("width", value, C.UNIT_PERCENT)
   }
 
   /**
    * Set the width to auto (determined by layout algorithm).
    */
   setWidthAuto(): void {
-    this._style.width = { value: 0, unit: C.UNIT_AUTO }
-    this.markDirty()
+    this.setStyleValue("width", 0, C.UNIT_AUTO)
   }
 
   // ============================================================================
@@ -520,11 +569,10 @@ export class Node {
   setHeight(value: number): void {
     // NaN means "auto" in Yoga API
     if (Number.isNaN(value)) {
-      this._style.height = { value: 0, unit: C.UNIT_AUTO }
+      this.setStyleValue("height", 0, C.UNIT_AUTO)
     } else {
-      this._style.height = { value, unit: C.UNIT_POINT }
+      this.setStyleValue("height", value, C.UNIT_POINT)
     }
-    this.markDirty()
   }
 
   /**
@@ -533,16 +581,14 @@ export class Node {
    * @param value - Height as a percentage (0-100)
    */
   setHeightPercent(value: number): void {
-    this._style.height = { value, unit: C.UNIT_PERCENT }
-    this.markDirty()
+    this.setStyleValue("height", value, C.UNIT_PERCENT)
   }
 
   /**
    * Set the height to auto (determined by layout algorithm).
    */
   setHeightAuto(): void {
-    this._style.height = { value: 0, unit: C.UNIT_AUTO }
-    this.markDirty()
+    this.setStyleValue("height", 0, C.UNIT_AUTO)
   }
 
   // ============================================================================
@@ -555,8 +601,7 @@ export class Node {
    * @param value - Minimum width in points
    */
   setMinWidth(value: number): void {
-    this._style.minWidth = { value, unit: C.UNIT_POINT }
-    this.markDirty()
+    this.setStyleValue("minWidth", value, C.UNIT_POINT)
   }
 
   /**
@@ -565,8 +610,7 @@ export class Node {
    * @param value - Minimum width as a percentage (0-100)
    */
   setMinWidthPercent(value: number): void {
-    this._style.minWidth = { value, unit: C.UNIT_PERCENT }
-    this.markDirty()
+    this.setStyleValue("minWidth", value, C.UNIT_PERCENT)
   }
 
   /**
@@ -575,8 +619,7 @@ export class Node {
    * @param value - Minimum height in points
    */
   setMinHeight(value: number): void {
-    this._style.minHeight = { value, unit: C.UNIT_POINT }
-    this.markDirty()
+    this.setStyleValue("minHeight", value, C.UNIT_POINT)
   }
 
   /**
@@ -585,8 +628,7 @@ export class Node {
    * @param value - Minimum height as a percentage (0-100)
    */
   setMinHeightPercent(value: number): void {
-    this._style.minHeight = { value, unit: C.UNIT_PERCENT }
-    this.markDirty()
+    this.setStyleValue("minHeight", value, C.UNIT_PERCENT)
   }
 
   /**
@@ -595,8 +637,7 @@ export class Node {
    * @param value - Maximum width in points
    */
   setMaxWidth(value: number): void {
-    this._style.maxWidth = { value, unit: C.UNIT_POINT }
-    this.markDirty()
+    this.setStyleValue("maxWidth", value, C.UNIT_POINT)
   }
 
   /**
@@ -605,8 +646,7 @@ export class Node {
    * @param value - Maximum width as a percentage (0-100)
    */
   setMaxWidthPercent(value: number): void {
-    this._style.maxWidth = { value, unit: C.UNIT_PERCENT }
-    this.markDirty()
+    this.setStyleValue("maxWidth", value, C.UNIT_PERCENT)
   }
 
   /**
@@ -615,8 +655,7 @@ export class Node {
    * @param value - Maximum height in points
    */
   setMaxHeight(value: number): void {
-    this._style.maxHeight = { value, unit: C.UNIT_POINT }
-    this.markDirty()
+    this.setStyleValue("maxHeight", value, C.UNIT_POINT)
   }
 
   /**
@@ -625,8 +664,7 @@ export class Node {
    * @param value - Maximum height as a percentage (0-100)
    */
   setMaxHeightPercent(value: number): void {
-    this._style.maxHeight = { value, unit: C.UNIT_PERCENT }
-    this.markDirty()
+    this.setStyleValue("maxHeight", value, C.UNIT_PERCENT)
   }
 
   /**
@@ -638,8 +676,7 @@ export class Node {
    * @param value - Aspect ratio (width/height). Use NaN to unset.
    */
   setAspectRatio(value: number): void {
-    this._style.aspectRatio = value
-    this.markDirty()
+    this.setStyleNumber("aspectRatio", value)
   }
 
   // ============================================================================
@@ -658,8 +695,7 @@ export class Node {
    * ```
    */
   setFlexGrow(value: number): void {
-    this._style.flexGrow = value
-    this.markDirty()
+    this.setStyleNumber("flexGrow", value)
   }
 
   /**
@@ -669,8 +705,7 @@ export class Node {
    * @param value - Flex shrink factor (default is 1)
    */
   setFlexShrink(value: number): void {
-    this._style.flexShrink = value
-    this.markDirty()
+    this.setStyleNumber("flexShrink", value)
   }
 
   /**
@@ -680,8 +715,7 @@ export class Node {
    * @param value - Flex basis in points
    */
   setFlexBasis(value: number): void {
-    this._style.flexBasis = { value, unit: C.UNIT_POINT }
-    this.markDirty()
+    this.setStyleValue("flexBasis", value, C.UNIT_POINT)
   }
 
   /**
@@ -690,16 +724,14 @@ export class Node {
    * @param value - Flex basis as a percentage (0-100)
    */
   setFlexBasisPercent(value: number): void {
-    this._style.flexBasis = { value, unit: C.UNIT_PERCENT }
-    this.markDirty()
+    this.setStyleValue("flexBasis", value, C.UNIT_PERCENT)
   }
 
   /**
    * Set the flex basis to auto (based on the node's width/height).
    */
   setFlexBasisAuto(): void {
-    this._style.flexBasis = { value: 0, unit: C.UNIT_AUTO }
-    this.markDirty()
+    this.setStyleValue("flexBasis", 0, C.UNIT_AUTO)
   }
 
   /**
@@ -713,8 +745,7 @@ export class Node {
    * ```
    */
   setFlexDirection(direction: number): void {
-    this._style.flexDirection = direction
-    this.markDirty()
+    this.setStyleNumber("flexDirection", direction)
   }
 
   /**
@@ -723,8 +754,7 @@ export class Node {
    * @param wrap - WRAP_NO_WRAP, WRAP_WRAP, or WRAP_WRAP_REVERSE
    */
   setFlexWrap(wrap: number): void {
-    this._style.flexWrap = wrap
-    this.markDirty()
+    this.setStyleNumber("flexWrap", wrap)
   }
 
   // ============================================================================
@@ -743,8 +773,7 @@ export class Node {
    * ```
    */
   setAlignItems(align: number): void {
-    this._style.alignItems = align
-    this.markDirty()
+    this.setStyleNumber("alignItems", align)
   }
 
   /**
@@ -754,8 +783,7 @@ export class Node {
    * @param align - ALIGN_AUTO, ALIGN_FLEX_START, ALIGN_CENTER, ALIGN_FLEX_END, ALIGN_STRETCH, or ALIGN_BASELINE
    */
   setAlignSelf(align: number): void {
-    this._style.alignSelf = align
-    this.markDirty()
+    this.setStyleNumber("alignSelf", align)
   }
 
   /**
@@ -765,8 +793,7 @@ export class Node {
    * @param align - ALIGN_FLEX_START, ALIGN_CENTER, ALIGN_FLEX_END, ALIGN_STRETCH, ALIGN_SPACE_BETWEEN, or ALIGN_SPACE_AROUND
    */
   setAlignContent(align: number): void {
-    this._style.alignContent = align
-    this.markDirty()
+    this.setStyleNumber("alignContent", align)
   }
 
   /**
@@ -780,8 +807,7 @@ export class Node {
    * ```
    */
   setJustifyContent(justify: number): void {
-    this._style.justifyContent = justify
-    this.markDirty()
+    this.setStyleNumber("justifyContent", justify)
   }
 
   // ============================================================================
@@ -800,6 +826,9 @@ export class Node {
    * ```
    */
   setPadding(edge: number, value: number): void {
+    if (edgeValueMatches(this._style.padding, edge, value, C.UNIT_POINT)) {
+      return
+    }
     setEdgeValue(this._style.padding, edge, value, C.UNIT_POINT)
     this.markDirty()
   }
@@ -812,6 +841,9 @@ export class Node {
    * @param value - Padding as a percentage (0-100)
    */
   setPaddingPercent(edge: number, value: number): void {
+    if (edgeValueMatches(this._style.padding, edge, value, C.UNIT_PERCENT)) {
+      return
+    }
     setEdgeValue(this._style.padding, edge, value, C.UNIT_PERCENT)
     this.markDirty()
   }
@@ -828,6 +860,9 @@ export class Node {
    * ```
    */
   setMargin(edge: number, value: number): void {
+    if (edgeValueMatches(this._style.margin, edge, value, C.UNIT_POINT)) {
+      return
+    }
     setEdgeValue(this._style.margin, edge, value, C.UNIT_POINT)
     this.markDirty()
   }
@@ -839,6 +874,9 @@ export class Node {
    * @param value - Margin as a percentage (0-100)
    */
   setMarginPercent(edge: number, value: number): void {
+    if (edgeValueMatches(this._style.margin, edge, value, C.UNIT_PERCENT)) {
+      return
+    }
     setEdgeValue(this._style.margin, edge, value, C.UNIT_PERCENT)
     this.markDirty()
   }
@@ -849,6 +887,9 @@ export class Node {
    * @param edge - EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, EDGE_BOTTOM, EDGE_HORIZONTAL, EDGE_VERTICAL, or EDGE_ALL
    */
   setMarginAuto(edge: number): void {
+    if (edgeValueMatches(this._style.margin, edge, 0, C.UNIT_AUTO)) {
+      return
+    }
     setEdgeValue(this._style.margin, edge, 0, C.UNIT_AUTO)
     this.markDirty()
   }
@@ -860,6 +901,9 @@ export class Node {
    * @param value - Border width in points
    */
   setBorder(edge: number, value: number): void {
+    if (edgeBorderMatches(this._style.border, edge, value)) {
+      return
+    }
     setEdgeBorder(this._style.border, edge, value)
     this.markDirty()
   }
@@ -877,12 +921,23 @@ export class Node {
    */
   setGap(gutter: number, value: number): void {
     if (gutter === C.GUTTER_COLUMN) {
+      if (Object.is(this._style.gap[0], value)) {
+        return
+      }
       this._style.gap[0] = value
     } else if (gutter === C.GUTTER_ROW) {
+      if (Object.is(this._style.gap[1], value)) {
+        return
+      }
       this._style.gap[1] = value
     } else if (gutter === C.GUTTER_ALL) {
+      if (Object.is(this._style.gap[0], value) && Object.is(this._style.gap[1], value)) {
+        return
+      }
       this._style.gap[0] = value
       this._style.gap[1] = value
+    } else {
+      return
     }
     this.markDirty()
   }
@@ -903,8 +958,7 @@ export class Node {
    * ```
    */
   setPositionType(positionType: number): void {
-    this._style.positionType = positionType
-    this.markDirty()
+    this.setStyleNumber("positionType", positionType)
   }
 
   /**
@@ -917,8 +971,14 @@ export class Node {
   setPosition(edge: number, value: number): void {
     // NaN means "auto" (unset) in Yoga API
     if (Number.isNaN(value)) {
+      if (edgeValueMatches(this._style.position, edge, 0, C.UNIT_UNDEFINED)) {
+        return
+      }
       setEdgeValue(this._style.position, edge, 0, C.UNIT_UNDEFINED)
     } else {
+      if (edgeValueMatches(this._style.position, edge, value, C.UNIT_POINT)) {
+        return
+      }
       setEdgeValue(this._style.position, edge, value, C.UNIT_POINT)
     }
     this.markDirty()
@@ -931,6 +991,9 @@ export class Node {
    * @param value - Position offset as a percentage of parent's corresponding dimension
    */
   setPositionPercent(edge: number, value: number): void {
+    if (edgeValueMatches(this._style.position, edge, value, C.UNIT_PERCENT)) {
+      return
+    }
     setEdgeValue(this._style.position, edge, value, C.UNIT_PERCENT)
     this.markDirty()
   }
@@ -945,8 +1008,7 @@ export class Node {
    * @param display - DISPLAY_FLEX or DISPLAY_NONE
    */
   setDisplay(display: number): void {
-    this._style.display = display
-    this.markDirty()
+    this.setStyleNumber("display", display)
   }
 
   /**
@@ -955,8 +1017,7 @@ export class Node {
    * @param overflow - OVERFLOW_VISIBLE, OVERFLOW_HIDDEN, or OVERFLOW_SCROLL
    */
   setOverflow(overflow: number): void {
-    this._style.overflow = overflow
-    this.markDirty()
+    this.setStyleNumber("overflow", overflow)
   }
 
   // ============================================================================
