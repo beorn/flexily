@@ -17,7 +17,7 @@
 
 import * as C from "./constants.js"
 import type { Node } from "./node-zero.js"
-import { applyMinMax, findContainerQuerySize, isDevModeAssertionsEnabled, resolveValue } from "./utils.js"
+import { applyMinMax, findContainerQuerySize, resolveValue } from "./utils.js"
 import { log } from "./logger.js"
 import { getTrace } from "./trace.js"
 
@@ -301,10 +301,9 @@ function layoutNode(
   // the invariant the two-phase algorithm depends on — without it, CQ branch
   // resolution could oscillate as child sizes feed back into container size.
   //
-  // NaN nodeWidth (auto-sized, unconstrained) is propagated as-is. Combined
-  // with `containSize`, the dev-mode assertion fires; without `containSize`,
-  // resolveValue(cqi, _, NaN) returns 0, so the user sees collapsed cqi values.
-  // Either way, the surface is well-defined — silent oscillation is impossible.
+  // NaN nodeWidth (auto-sized, unconstrained) is propagated as-is. Descendant
+  // cqi values then resolve to 0, so this dead-end is explicit instead of
+  // accidentally feeding child intrinsic size back into the query size.
   if (style.containerType !== C.CONTAINER_TYPE_NORMAL) {
     node._setFrozenQuerySize(nodeWidth)
   } else {
@@ -2428,7 +2427,7 @@ function layoutNode(
   layout.top = roundedAbsTop - roundedAbsParentTop
 
   // =========================================================================
-  // PHASE 10a: Dev-mode invariance assertions (A0.1)
+  // PHASE 10a: Container-query invariance assertions (A0.1)
   // =========================================================================
   // Catch "intrinsic leak" — when a CQ container's frozen inline-size (from
   // Pass 1) diverges from its final rendered width (Pass 2 + Phase 9). This
@@ -2440,12 +2439,11 @@ function layoutNode(
   // (default) lets Phase 9 shrink-wrap to children, while Pass 1 froze the
   // pre-shrink value. The fix is `setContainSize(true)` OR an explicit width.
   //
-  // Gated by `isDevModeAssertionsEnabled()` — zero cost in production builds.
+  // Always enforced: this is a correctness invariant, not diagnostics.
   // Allow 1-cell tolerance for edge-rounding ambiguity (the freeze stores a
   // float; layout.width is integer-rounded).
   if (
     style.containerType !== C.CONTAINER_TYPE_NORMAL &&
-    isDevModeAssertionsEnabled() &&
     !Number.isNaN(node.getFrozenQuerySize()) &&
     Math.abs(node.getFrozenQuerySize() - layout.width) > 1
   ) {
