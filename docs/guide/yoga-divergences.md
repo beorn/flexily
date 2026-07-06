@@ -100,6 +100,7 @@ root.setHeight(6)
 for (let i = 0; i < 10; i++) {
   const item = flex.createNode()
   item.setHeight(1)
+  item.setFlexShrink(1)
   root.insertChild(item, i)
 }
 flex.calculateLayout(root, 40, 6)

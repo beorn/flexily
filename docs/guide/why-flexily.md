@@ -6,7 +6,7 @@ _External project claims last verified: 2026-03._
 
 ## The Problems with WASM
 
-**Async initialization.** Yoga requires `await Yoga.init()` before creating any nodes. No synchronous startup, no use at module load time, no use in config files or build scripts. For CLIs that should start instantly, this adds latency and complexity.
+**Async initialization.** Yoga requires an async init (`await initYoga()`) before creating any nodes. No synchronous startup, no use at module load time, no use in config files or build scripts. For CLIs that should start instantly, this adds latency and complexity.
 
 **WASM boundary crossing.** Every method call (`setWidth`, `setFlexGrow`, etc.) crosses the JS-to-WASM boundary. Node creation is ~8x more expensive than a JS object. For TUIs that rebuild layout trees per render, this dominates.
 
@@ -20,13 +20,13 @@ _External project claims last verified: 2026-03._
 
 Flexily fills the gap that Facebook's original pure-JS flexbox engine (`css-layout`) left when they moved to C++. Comprehensive CSS flexbox support, Yoga-compatible API, pure JS, zero WASM.
 
-| Concern            | Yoga                  | Flexily                |
-| ------------------ | --------------------- | ---------------------- |
-| **Runtime**        | WebAssembly           | Pure JavaScript        |
-| **Initialization** | Async (WASM load)     | Synchronous            |
-| **Dependencies**   | WASM runtime required | `debug` (optional)     |
-| **Debugging**      | WASM stack traces     | Native JS stack traces |
-| **Bundle size**    | 117 KB minified       | 47 KB minified         |
+| Concern            | Yoga                  | Flexily                                           |
+| ------------------ | --------------------- | ------------------------------------------------- |
+| **Runtime**        | WebAssembly           | Pure JavaScript                                   |
+| **Initialization** | Async (WASM load)     | Synchronous                                       |
+| **Dependencies**   | WASM runtime required | None (optional debug logging, loaded dynamically) |
+| **Debugging**      | WASM stack traces     | Native JS stack traces                            |
+| **Bundle size**    | 117 KB minified       | 47 KB minified                                    |
 
 ## Performance Trade-offs
 

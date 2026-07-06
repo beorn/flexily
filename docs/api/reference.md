@@ -19,16 +19,17 @@ flex.calculateLayout(node, 80, 24)
 
 **Options:**
 
-| Option       | Type     | Default | Description                   |
-| ------------ | -------- | ------- | ----------------------------- |
-| `charWidth`  | `number` | `1`     | Width of each character cell  |
-| `charHeight` | `number` | `1`     | Height of each character cell |
+| Option       | Type              | Default  | Description                                                                               |
+| ------------ | ----------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `charWidth`  | `number`          | `1`      | Width of each character cell                                                              |
+| `charHeight` | `number`          | `1`      | Height of each character cell                                                             |
+| `defaults`   | `"yoga" \| "css"` | `"yoga"` | Style-defaults preset for created nodes — see [Yoga divergences](/guide/yoga-divergences) |
 
 For terminal UIs, the default `charWidth=1, charHeight=1` maps directly to terminal cells.
 
 ### createBareFlexily()
 
-Create a minimal engine with no text measurement plugin. Use `pipe()` to add plugins.
+Create a minimal engine with no text measurement plugin. Use `pipe()` to add plugins. Accepts the same optional `defaults` preset as `createFlexily()`.
 
 ```typescript
 import { createBareFlexily, pipe, withTestMeasurer } from "flexily"
@@ -325,7 +326,6 @@ node.markDirty() // Force recalculation
 ### Disposal
 
 ```typescript
-node.free() // Release resources
 node.free() // Free this node and clean up references
 ```
 
@@ -333,19 +333,19 @@ node.free() // Free this node and clean up references
 
 All constants are Yoga-compatible. Import from `flexily`:
 
-| Category       | Constants                                                                                                                                          |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Direction      | `DIRECTION_LTR`, `DIRECTION_RTL`, `DIRECTION_INHERIT`                                                                                              |
-| Flex Direction | `FLEX_DIRECTION_ROW`, `FLEX_DIRECTION_COLUMN`, `FLEX_DIRECTION_ROW_REVERSE`, `FLEX_DIRECTION_COLUMN_REVERSE`                                       |
-| Justify        | `JUSTIFY_FLEX_START`, `JUSTIFY_CENTER`, `JUSTIFY_FLEX_END`, `JUSTIFY_SPACE_BETWEEN`, `JUSTIFY_SPACE_AROUND`, `JUSTIFY_SPACE_EVENLY`                |
-| Align          | `ALIGN_FLEX_START`, `ALIGN_CENTER`, `ALIGN_FLEX_END`, `ALIGN_STRETCH`, `ALIGN_BASELINE`, `ALIGN_AUTO`, `ALIGN_SPACE_BETWEEN`, `ALIGN_SPACE_AROUND` |
-| Wrap           | `WRAP_NO_WRAP`, `WRAP_WRAP`, `WRAP_WRAP_REVERSE`                                                                                                   |
-| Position       | `POSITION_TYPE_STATIC`, `POSITION_TYPE_RELATIVE`, `POSITION_TYPE_ABSOLUTE`                                                                         |
-| Edge           | `EDGE_LEFT`, `EDGE_TOP`, `EDGE_RIGHT`, `EDGE_BOTTOM`, `EDGE_START`, `EDGE_END`, `EDGE_HORIZONTAL`, `EDGE_VERTICAL`, `EDGE_ALL`                     |
-| Gap            | `GUTTER_COLUMN`, `GUTTER_ROW`, `GUTTER_ALL`                                                                                                        |
-| Measure Mode   | `MEASURE_MODE_EXACTLY`, `MEASURE_MODE_AT_MOST`, `MEASURE_MODE_UNDEFINED`                                                                           |
-| Overflow       | `OVERFLOW_VISIBLE`, `OVERFLOW_HIDDEN`, `OVERFLOW_SCROLL`                                                                                           |
-| Display        | `DISPLAY_FLEX`, `DISPLAY_NONE`                                                                                                                     |
+| Category       | Constants                                                                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Direction      | `DIRECTION_LTR`, `DIRECTION_RTL`, `DIRECTION_INHERIT`                                                                                                                    |
+| Flex Direction | `FLEX_DIRECTION_ROW`, `FLEX_DIRECTION_COLUMN`, `FLEX_DIRECTION_ROW_REVERSE`, `FLEX_DIRECTION_COLUMN_REVERSE`                                                             |
+| Justify        | `JUSTIFY_FLEX_START`, `JUSTIFY_CENTER`, `JUSTIFY_FLEX_END`, `JUSTIFY_SPACE_BETWEEN`, `JUSTIFY_SPACE_AROUND`, `JUSTIFY_SPACE_EVENLY`                                      |
+| Align          | `ALIGN_FLEX_START`, `ALIGN_CENTER`, `ALIGN_FLEX_END`, `ALIGN_STRETCH`, `ALIGN_BASELINE`, `ALIGN_AUTO`, `ALIGN_SPACE_BETWEEN`, `ALIGN_SPACE_AROUND`, `ALIGN_SPACE_EVENLY` |
+| Wrap           | `WRAP_NO_WRAP`, `WRAP_WRAP`, `WRAP_WRAP_REVERSE`                                                                                                                         |
+| Position       | `POSITION_TYPE_STATIC`, `POSITION_TYPE_RELATIVE`, `POSITION_TYPE_ABSOLUTE`                                                                                               |
+| Edge           | `EDGE_LEFT`, `EDGE_TOP`, `EDGE_RIGHT`, `EDGE_BOTTOM`, `EDGE_START`, `EDGE_END`, `EDGE_HORIZONTAL`, `EDGE_VERTICAL`, `EDGE_ALL`                                           |
+| Gap            | `GUTTER_COLUMN`, `GUTTER_ROW`, `GUTTER_ALL`                                                                                                                              |
+| Measure Mode   | `MEASURE_MODE_EXACTLY`, `MEASURE_MODE_AT_MOST`, `MEASURE_MODE_UNDEFINED`                                                                                                 |
+| Overflow       | `OVERFLOW_VISIBLE`, `OVERFLOW_HIDDEN`, `OVERFLOW_SCROLL`                                                                                                                 |
+| Display        | `DISPLAY_FLEX`, `DISPLAY_NONE`                                                                                                                                           |
 
 ## Testing Utilities
 

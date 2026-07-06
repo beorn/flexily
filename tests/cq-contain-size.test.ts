@@ -27,8 +27,8 @@
  *
  * For the snap-left use case (silvercode chat lanes), the CQ container has
  * an explicit width from fitWidth lane selection — containSize is redundant
- * but documents intent and remains the invariance signal for dev-mode
- * assertions (next commit).
+ * but documents intent and remains the invariance signal for runtime
+ * assertions.
  */
 import { describe, expect, test } from "vitest"
 import * as C from "../src/constants.js"
@@ -148,7 +148,7 @@ describe("[A0.1] containSize invariant", () => {
     // Phase 9's containSize gate keeps the width at the calculateLayout-supplied
     // available size instead of shrinking to children. The opposite scenario
     // (containSize=false) is unsound — `cq-invariance.test.ts` shows the
-    // dev-mode "intrinsic leak" assertion fires on it.
+    // runtime "intrinsic leak" assertion fires on it.
     const flex = createFlexily()
     const cq = flex.createNode()
     cq.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
