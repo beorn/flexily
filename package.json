@@ -55,6 +55,7 @@
   },
   "scripts": {
     "build": "vp pack",
+    "prepack": "vp pack",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:vp": "vp test",
