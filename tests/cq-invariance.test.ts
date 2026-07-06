@@ -1,17 +1,16 @@
 /**
- * A0.1 — dev-mode invariance assertions.
+ * A0.1 — container-query invariance assertions.
  *
  * Validates that flexily throws "intrinsic leak" when a CQ container's frozen
  * inline-size (Pass 1) diverges from its final rendered width (Phase 9). This
- * is the dev-mode safety net that prevents the subtle bug class the two-phase
+ * is the runtime safety net that prevents the subtle bug class the two-phase
  * algorithm exists to eliminate: descendants resolving cqi against a frozen
  * size that doesn't match the rendered layout → visible misalignment that
  * looks like a font/spacing bug, NOT a layout bug.
  *
- * Gating: `isDevModeAssertionsEnabled()` reads SILVERY_STRICT + NODE_ENV.
- * Default (dev/test): ON. Production: OFF (zero cost).
+ * Gating: always ON. This is a correctness invariant, not diagnostics.
  *
- * Per dragon bead "Dev-mode invariance assertions:
+ * Per dragon bead "invariance assertions:
  *   - Recompute CQ branches with same frozen size → outcomes differ → throw "branch instability"
  *   - Assert container's used main-size equals its frozen query size → throw "intrinsic leak""
  *
@@ -22,7 +21,7 @@ import { describe, expect, test } from "vitest"
 import * as C from "../src/constants.js"
 import { createFlexily } from "../src/index.js"
 
-describe("[A0.1] dev-mode invariance — intrinsic-leak assertion", () => {
+describe("[A0.1] CQ invariance — intrinsic-leak assertion", () => {
   test("CQ container with auto-width + no containSize THROWS intrinsic-leak", () => {
     // The classic unsound configuration: auto-width CQ container (no
     // containSize, no explicit width). Pass 1 freezes pre-shrink-wrap size;
@@ -139,7 +138,7 @@ describe("[A0.1] dev-mode invariance — intrinsic-leak assertion", () => {
   })
 })
 
-describe("[A0.1] dev-mode invariance — assertion gating", () => {
+describe("[A0.1] CQ invariance — assertion gating", () => {
   test("assertion is enabled by default in test runs (NODE_ENV !== production)", () => {
     // This is meta-testing: confirms the test environment correctly triggers
     // the assertion. Subsequent assertion tests rely on this.
@@ -155,5 +154,29 @@ describe("[A0.1] dev-mode invariance — assertion gating", () => {
     // configured correctly — but per CLAUDE.md, SILVERY_STRICT=1 is default
     // for all tests.
     expect(() => flex.calculateLayout(cq, 200, 100)).toThrow(/intrinsic-leak/)
+  })
+
+  test("assertion still fires in production mode", () => {
+    const savedNodeEnv = process.env.NODE_ENV
+    const savedStrict = process.env.SILVERY_STRICT
+    process.env.NODE_ENV = "production"
+    delete process.env.SILVERY_STRICT
+
+    try {
+      const flex = createFlexily()
+      const cq = flex.createNode()
+      cq.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+
+      const child = flex.createNode()
+      child.setWidth(50)
+      cq.insertChild(child, 0)
+
+      expect(() => flex.calculateLayout(cq, 200, 100)).toThrow(/intrinsic-leak/)
+    } finally {
+      if (savedNodeEnv === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = savedNodeEnv
+      if (savedStrict === undefined) delete process.env.SILVERY_STRICT
+      else process.env.SILVERY_STRICT = savedStrict
+    }
   })
 })

@@ -122,8 +122,8 @@ describe("[A0.1 Pass 1] CQ container freeze", () => {
     // inline-size is unknown until shrink-wrap. We freeze NaN. Pass 2's
     // resolveValue(cqi, _, NaN) yields 0, so the user sees collapsed values —
     // they MUST set containSize=true OR set an explicit width to make their
-    // CQ container useful. The dev-mode invariance check (next commit) will
-    // throw "intrinsic leak" on this configuration.
+    // CQ container useful. The intrinsic-leak invariant cannot compare sizes
+    // until the frozen query size is finite.
     const flex = createFlexily()
     const node = flex.createNode()
     node.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
