@@ -14,10 +14,10 @@ The algorithm works in multiple passes:
 
 Flexily provides two layout algorithm implementations:
 
-| Algorithm      | File             | Default | Strengths                               |
-| -------------- | ---------------- | ------- | --------------------------------------- |
-| **Zero-alloc** | `layout-zero.ts` | ✅ Yes  | Faster for flat layouts, no GC pressure |
-| **Classic**    | `layout.ts`      | No      | Simpler code, good for debugging        |
+| Algorithm      | File                | Default | Strengths                               |
+| -------------- | ------------------- | ------- | --------------------------------------- |
+| **Zero-alloc** | `layout-zero.ts`    | ✅ Yes  | Faster for flat layouts, no GC pressure |
+| **Classic**    | `classic/layout.ts` | No      | Simpler code, good for debugging        |
 
 Both implement identical Yoga-compatible behavior. The zero-alloc version uses pre-allocated arrays and node-attached FlexInfo structs to eliminate temporary allocations during layout.
 
@@ -50,17 +50,17 @@ Input: amount (extra space to distribute)
 ```
 Input: amount (space to remove)
 
-1. Calculate totalShrinkAmount = sum of flex-shrink values for items above min size
+1. Calculate totalScaledShrink = sum of (flex-shrink × flex-basis) for items above min size
 2. If no shrinkable items, exit
 3. Loop while amount remaining:
-   a. amountPerShrink = remaining / totalShrinkAmount
-   b. For each item:
+   a. For each item:
       - If item.shrink > 0 and size > minSize:
-        - shrink = item.shrink * amountPerShrink
+        - scaledShrink = item.shrink * item.baseSize
+        - shrink = remaining * scaledShrink / totalScaledShrink
         - maxShrink = size - minSize
         - If shrink >= maxShrink:
           - shrink = maxShrink (cap at min)
-          - totalShrinkAmount -= item.shrink (remove from next iteration)
+          - totalScaledShrink -= scaledShrink (remove from next iteration)
         - finalSize = size - shrink
         - Resize item to finalSize
         - remaining -= shrink
@@ -72,21 +72,17 @@ Items with larger basis values shrink more, matching browser behavior.
 
 ## Line Layout Flow
 
-```
-1. _setItemSizes():
-   - If availableSpace > 0: grow items
-   - If availableSpace < 0: shrink items
+For each flex line, `layoutNode()`:
 
-2. setItemPositions():
-   - Apply justifyContent alignment
+1. **Resolves flex sizes** — `distributeFlexSpaceForLine()` grows items when
+   free space is positive and shrinks them when negative (the two algorithms above)
+2. **Positions items along the main axis** — applies `justifyContent` spacing
+3. **Measures the cross axis** — the line's cross size is the max of its items'
+   cross sizes; `alignItems`/`alignSelf` then place each item within the line
 
-3. _calcLayoutInfo():
-   - Calculate cross axis max size for line
-```
+## justify-content
 
-## ItemPositioner (justify-content)
-
-The ItemPositioner handles:
+Main-axis alignment supports:
 
 - flex-start (default): items at start
 - flex-end: items at end
@@ -130,7 +126,7 @@ The baseline is used when `ALIGN_BASELINE` is set on the container's `alignItems
 
 | File                    | Description                             |
 | ----------------------- | --------------------------------------- |
-| `src/layout-zero.ts`    | Layout algorithm (default, ~2500 lines) |
+| `src/layout-zero.ts`    | Layout algorithm (default, ~2700 lines) |
 | `src/node-zero.ts`      | Node class with FlexInfo                |
 | `src/index.ts`          | Default export                          |
 | `src/classic/layout.ts` | Classic layout algorithm (~1800 lines)  |

@@ -67,13 +67,13 @@ The primary benchmark. Includes tree creation + `calculateLayout()`.
 
 #### Flat Layouts
 
-| Nodes | Flexily | Yoga     | Ratio        |
-| ----- | ------- | -------- | ------------ |
-| 100   | 74 µs   | 157 µs   | Flexily 2.1x |
-| 500   | 371 µs  | 835 µs   | Flexily 2.3x |
-| 1000  | 767 µs  | 1797 µs  | Flexily 2.3x |
-| 2000  | 1497 µs | 3937 µs  | Flexily 2.6x |
-| 5000  | 4929 µs | 12496 µs | Flexily 2.5x |
+| Nodes | Flexily | Yoga     | Ratio               |
+| ----- | ------- | -------- | ------------------- |
+| 100   | 74 µs   | 157 µs   | Flexily 2.1x        |
+| 500   | 371 µs  | 835 µs   | Flexily 2.3x        |
+| 1000  | 767 µs  | 1797 µs  | Flexily 2.3x        |
+| 2000  | 1497 µs | 3937 µs  | Flexily 2.6x[^flat] |
+| 5000  | 4929 µs | 12496 µs | Flexily 2.5x        |
 
 #### TUI Board (columns × bordered cards with measure functions)
 
@@ -108,6 +108,8 @@ Trees using diverse flex properties (justifyContent, alignItems, alignSelf, flex
 | 50    | 255 µs  | 101 µs | Yoga 2.5x    |
 
 Flexily wins at shallow nesting but Yoga overtakes at 15+ levels.
+
+[^flat]: Large flat trees can slightly exceed the typical 1.5-2.5x initial-layout range.
 
 ### Re-layout (Pre-existing Tree)
 

@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Flexily"
   text: "Pure JavaScript Flexbox Layout"
-  tagline: "Need flexbox layout outside the browser? Yoga requires WASM, async init, and leaks memory in long-running apps. Flexily is a pure JavaScript drop-in replacement — 1.5-5.5x faster, 3x smaller, no WASM. Powers Silvery's terminal UI layout."
+  tagline: "Need flexbox layout outside the browser? Yoga requires WASM, async init, and leaks memory in long-running apps. Flexily is a pure JavaScript drop-in replacement — 1.5-5.5x faster, 2.5-3.5x smaller, no WASM. Powers Silvery's terminal UI layout."
   actions:
     - theme: brand
       text: Get Started
@@ -38,7 +38,7 @@ features:
     link: /guide/pretext
     linkText: Learn more
   - icon: "\U0001F9EA"
-    title: 1561 Tests
+    title: 1774 Tests
     details: "Includes 1200+ incremental re-layout fuzz tests using differential oracle. Catches bugs that single-pass tests miss."
   - icon: "\U0001F6E0\uFE0F"
     title: Pure JavaScript
@@ -94,7 +94,7 @@ import { createBareFlexily, pipe, withTestMeasurer } from "flexily"
 const flex = pipe(createBareFlexily(), withTestMeasurer())
 ```
 
-Available plugins: `withMonospaceMeasurer()` (terminal), `withTestMeasurer()` (deterministic), `withPretextMeasurer()` (proportional fonts via [Pretext](https://github.com/chenglou/pretext)).
+Available plugins: `withMonospace()` (terminal), `withTestMeasurer()` (deterministic), `withPretext()` (proportional fonts via [Pretext](https://github.com/chenglou/pretext)).
 
 ### Low-Level API
 

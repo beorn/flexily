@@ -11,19 +11,19 @@ _Yoga comparisons last verified: 2026-03._
 |                      | Yoga                                                 | Flexily                           |
 | -------------------- | ---------------------------------------------------- | --------------------------------- |
 | **Maturity**         | Production, battle-tested (React Native, Ink, Litho) | Production-ready, fully tested    |
-| **Test coverage**    | Extensive (auto-generated from Chrome)               | 1495 tests, 44 Yoga compatibility |
+| **Test coverage**    | Extensive (auto-generated from Chrome)               | 1774 tests, 44 Yoga compatibility |
 | **Real-world usage** | Millions of apps                                     | Used in production                |
 
 ---
 
 ## Why Flexily Exists
 
-| Concern            | Yoga                  | Flexily                |
-| ------------------ | --------------------- | ---------------------- |
-| **Runtime**        | WebAssembly           | Pure JavaScript        |
-| **Initialization** | Async (WASM load)     | Synchronous            |
-| **Dependencies**   | WASM runtime required | `debug` (optional)     |
-| **Debugging**      | WASM stack traces     | Native JS stack traces |
+| Concern            | Yoga                  | Flexily                                           |
+| ------------------ | --------------------- | ------------------------------------------------- |
+| **Runtime**        | WebAssembly           | Pure JavaScript                                   |
+| **Initialization** | Async (WASM load)     | Synchronous                                       |
+| **Dependencies**   | WASM runtime required | None (optional debug logging, loaded dynamically) |
+| **Debugging**      | WASM stack traces     | Native JS stack traces                            |
 
 ### Bundle Size
 
@@ -32,7 +32,7 @@ _Yoga comparisons last verified: 2026-03._
 | **Minified** | 117 KB (25 KB JS + 89 KB WASM) | 47 KB (35 KB[^1]) | **2.5-3.4x smaller** |
 | **Gzipped**  | 39 KB (9 KB JS + 28 KB WASM)   | 16 KB (11 KB[^1]) | **2.5-3.6x smaller** |
 
-[^1]: Without the optional `debug` dependency (tree-shaken by most bundlers).
+[^1]: Without optional debug logging (`loggily`/`debug`, loaded dynamically only when installed).
 
 Measured with `bun scripts/measure-bundle.ts` (Bun.build minified, zlib gzip).
 
@@ -171,9 +171,9 @@ bun bench bench/incremental.bench.ts          # No-change, dirty leaf, resize
 ### From Yoga to Flexily
 
 ```diff
-- import Yoga from 'yoga-wasm-web';
-- const yoga = await Yoga.init();
-- const root = yoga.Node.create();
+- import initYoga from 'yoga-wasm-web';
+- const Yoga = await initYoga();
+- const root = Yoga.Node.create();
 + import { Node } from 'flexily';
 + const root = Node.create();  // Synchronous!
 
@@ -192,7 +192,7 @@ root.setFlexDirection(FLEX_DIRECTION_ROW);
 
 ## Test Coverage
 
-Flexily includes 1495 tests covering:
+Flexily includes 1774 tests covering:
 
 - ✅ Basic layout (single node, column, row)
 - ✅ Flex grow distribution

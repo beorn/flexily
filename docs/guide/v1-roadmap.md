@@ -1,6 +1,6 @@
 # Flexily v1.0 Roadmap
 
-Current version: **0.5.0**
+Current version: **0.7.3**
 
 ## What 1.0 Means
 
@@ -43,27 +43,27 @@ Every box must be checked before tagging 1.0.
 
 - [x] `package.json` has `engines` field (`node >=18`, `bun >=1.0`)
 - [x] `package.json` has correct `exports` map (`.` and `./classic`)
-- [x] `files` field limits published content to `dist` and `src`
+- [x] `files` field limits published content to `dist`
 - [ ] `npm pack --dry-run` produces a clean, minimal tarball
-- [ ] Published on npm as `flexily`
+- [x] Published on npm as `flexily`
 - [x] MIT license
 
 ### Documentation
 
 - [x] README with usage, performance, and API overview
 - [x] `CONTRIBUTING.md` with dev setup, testing, and PR guidelines
-- [x] `docs/api.md` -- complete API reference
-- [x] `docs/performance.md` -- benchmarks and methodology
-- [x] `docs/testing.md` -- test infrastructure and methodology
-- [x] `docs/algorithm.md` -- layout algorithm explanation
-- [x] `docs/yoga-comparison.md` -- feature comparison
-- [x] `docs/incremental-layout-bugs.md` -- bug taxonomy
+- [x] `docs/api/reference.md` -- complete API reference
+- [x] `docs/guide/performance.md` -- benchmarks and methodology
+- [x] `docs/guide/testing.md` -- test infrastructure and methodology
+- [x] `docs/guide/algorithm.md` -- layout algorithm explanation
+- [x] `docs/guide/yoga-comparison.md` -- feature comparison
+- [x] `docs/guide/incremental-layout-bugs.md` -- bug taxonomy
 - [x] CHANGELOG.md started (v0.1.0, v0.3.3, v0.5.0 entries)
 
 ## Known Gaps
 
 1. ~~**Bundle audit**~~ -- Done. `bun scripts/measure-bundle.ts` measures all entry points. README and docs updated with accurate numbers.
-2. ~~**npm publish**~~ -- Done. Published as `flexily@0.5.0` on npm. Docs site at beorn.codes/flexily.
+2. ~~**npm publish**~~ -- Done. Published as `flexily` on npm (0.7.3 current). Docs site at beorn.codes/flexily.
 3. **API surface audit** -- no formal review of which symbols are exported vs. internal. A pre-1.0 pass should ensure only intentional public API is accessible via the `exports` map.
 
 ## What's NOT in 1.0
@@ -92,7 +92,7 @@ After 1.0:
 Flexily should reach 1.0 **before** silvery, because:
 
 1. Flexily has a smaller, more focused API surface (layout engine only)
-2. Flexily already passes 1561 tests including comprehensive fuzz testing
+2. Flexily already passes 1774 tests including comprehensive fuzz testing
 3. silvery depends on Flexily -- a stable Flexily simplifies silvery's own 1.0 story
 4. The main blocker (vendor rename + npm publish) is shared with silvery
 

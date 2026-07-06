@@ -9,7 +9,7 @@ Flexily uses a multi-layered testing strategy to ensure both initial layout corr
 Direct comparison against Yoga's WASM implementation. Both engines process the same node tree and must produce identical computed layouts.
 
 ```bash
-bun test tests/yoga-compat/
+bun test tests/yoga-comparison.test.ts
 ```
 
 ### 2. Layout Feature Tests (~105 tests)
@@ -17,7 +17,7 @@ bun test tests/yoga-compat/
 Traditional example-based tests for each flexbox feature: grow, shrink, wrap, alignment, absolute positioning, aspect ratio, measure functions, etc.
 
 ```bash
-bun test tests/layout/
+bun test tests/layout.test.ts
 ```
 
 ### 3. Re-layout Consistency Tests (~1200 tests)
@@ -83,7 +83,7 @@ When a fuzz test fails, the seed uniquely identifies the tree structure for repr
 
 ### 4. Differential Fuzz Tests (100 seeds)
 
-Separate from relayout-consistency, these fuzz tests compare Flexily's zero-allocation and classic algorithms against each other, ensuring both produce identical results.
+Separate from relayout-consistency, these fuzz tests compare Flexily against Yoga on randomized trees, ensuring both produce identical results.
 
 ```bash
 bun test tests/differential-fuzz.fuzz.ts

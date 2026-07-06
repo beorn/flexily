@@ -30,9 +30,9 @@ pnpm add flexily
 The core API change: no async initialization.
 
 ```diff
-- import Yoga from "yoga-wasm-web"
-- const yoga = await Yoga.init()
-- const root = yoga.Node.create()
+- import initYoga from "yoga-wasm-web"
+- const Yoga = await initYoga()
+- const root = Yoga.Node.create()
 + import { Node } from "flexily"
 + const root = Node.create()  // Synchronous!
 ```
