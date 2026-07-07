@@ -1689,6 +1689,523 @@ describe("Yoga Comparison: EdgeCases", () => {
 })
 
 // ============================================================================
+// Category: MeasureFunc with Percent Sizing — cross-axis resolution
+// ============================================================================
+
+describe("Yoga Comparison: MeasureFuncPercent", () => {
+  function buildMeasureFunc(contentWidth = 80): Flexily.MeasureFunc {
+    return (_w: number, wm: number) => {
+      if (wm === Flexily.MEASURE_MODE_EXACTLY || wm === Flexily.MEASURE_MODE_AT_MOST) {
+        if (_w >= contentWidth) {
+          return { width: contentWidth, height: 1 }
+        }
+        const customHeight = 35
+        return { width: Math.min(contentWidth, _w), height: customHeight }
+      }
+      return { width: contentWidth, height: 1 }
+    }
+  }
+
+  it("percent-width-in-column: 30% width measure leaf should resolve against parent width", () => {
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+    fRoot.setWidth(100)
+    fRoot.setHeight(100)
+
+    const fChild = Flexily.Node.create(YOGA_OPTS)
+    fChild.setWidthPercent(30)
+    fChild.setMeasureFunc(buildMeasureFunc(80))
+    fRoot.insertChild(fChild, 0)
+
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_COLUMN)
+    yRoot.setWidth(100)
+    yRoot.setHeight(100)
+
+    const yChild = yoga.Node.create()
+    yChild.setWidthPercent(30)
+    yChild.setMeasureFunc(buildMeasureFunc(80))
+    yRoot.insertChild(yChild, 0)
+
+    yRoot.calculateLayout(100, 100, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    const match = layoutsMatch(flexilyLayout, yogaLayout, 0.001)
+    recordResult({
+      category: "MeasureFuncPercent",
+      name: "percent-width-in-column",
+      passed: match,
+      flexily: flexilyLayout,
+      yoga: yogaLayout,
+    })
+    expect(match).toBe(true)
+  })
+
+  it("percent-height-in-row: 30% height (cross-axis) measure leaf resolves against parent height, not full parent", () => {
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+    fRoot.setWidth(100)
+    fRoot.setHeight(100)
+
+    const fChild = Flexily.Node.create(YOGA_OPTS)
+    fChild.setWidthPercent(30)
+    fChild.setMeasureFunc((_w: number, _wm: number, _h: number, hm: number) => {
+      const derivedHeight = _w >= 80 ? 1 : Math.ceil(80 / Math.max(_w, 1))
+      return { width: _w, height: derivedHeight }
+    })
+    fRoot.insertChild(fChild, 0)
+
+    fRoot.calculateLayout(100, 100, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_ROW)
+    yRoot.setWidth(100)
+    yRoot.setHeight(100)
+
+    const yChild = yoga.Node.create()
+    yChild.setWidthPercent(30)
+    yChild.setMeasureFunc((_w: number) => {
+      const derivedHeight = _w >= 80 ? 1 : Math.ceil(80 / Math.max(_w, 1))
+      return { width: _w, height: derivedHeight }
+    })
+    yRoot.insertChild(yChild, 0)
+
+    yRoot.calculateLayout(100, 100, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    const match = layoutsMatch(flexilyLayout, yogaLayout, 0.001)
+    recordResult({
+      category: "MeasureFuncPercent",
+      name: "percent-height-in-row",
+      passed: match,
+      flexily: flexilyLayout,
+      yoga: yogaLayout,
+    })
+    expect(match).toBe(true)
+  })
+
+  it("flexgrow-widthpercent: row leaf with flexGrow and widthPercent re-measures after distribution", () => {
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+    fRoot.setWidth(100)
+    fRoot.setHeight(50)
+    fRoot.setAlignItems(Flexily.ALIGN_FLEX_START)
+
+    const fSibling = Flexily.Node.create(YOGA_OPTS)
+    fSibling.setWidth(40)
+    fSibling.setFlexShrink(0)
+    fRoot.insertChild(fSibling, 0)
+
+    const fChild = Flexily.Node.create(YOGA_OPTS)
+    fChild.setWidthPercent(30)
+    fChild.setFlexGrow(1)
+    fChild.setMeasureFunc(buildMeasureFunc(80))
+    fRoot.insertChild(fChild, 1)
+
+    fRoot.calculateLayout(100, 50, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_ROW)
+    yRoot.setWidth(100)
+    yRoot.setHeight(50)
+    yRoot.setAlignItems(yoga.ALIGN_FLEX_START)
+
+    const ySibling = yoga.Node.create()
+    ySibling.setWidth(40)
+    ySibling.setFlexShrink(0)
+    yRoot.insertChild(ySibling, 0)
+
+    const yChild = yoga.Node.create()
+    yChild.setWidthPercent(30)
+    yChild.setFlexGrow(1)
+    yChild.setMeasureFunc(buildMeasureFunc(80))
+    yRoot.insertChild(yChild, 1)
+
+    yRoot.calculateLayout(100, 50, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    const match = layoutsMatch(flexilyLayout, yogaLayout, 0.001)
+    recordResult({
+      category: "MeasureFuncPercent",
+      name: "flexgrow-widthpercent",
+      passed: match,
+      flexily: flexilyLayout,
+      yoga: yogaLayout,
+    })
+    expect(match).toBe(true)
+  })
+
+  // ==========================================================================
+  // Percent Measure Leaf — Flat and nested scenarios matching
+  // tests/differential-fuzz.fuzz.ts > Percent Measure Leaf
+  // ==========================================================================
+
+  it("percent-measure-leaf-row: flat row with percent+measure leaf children", () => {
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+    fRoot.setWidth(300)
+    fRoot.setHeight(200)
+
+    // Child 1: 30% width, measureFunc with 200 content width
+    // width=90, measure returns height=ceil(200/90)=3, but stretch → height=200
+    const fC1 = Flexily.Node.create(YOGA_OPTS)
+    fC1.setWidthPercent(30)
+    fC1.setMeasureFunc((_w: number) => {
+      if (_w >= 200) return { width: 200, height: 1 }
+      return { width: Math.min(200, _w), height: Math.ceil(200 / Math.max(_w, 1)) }
+    })
+    fRoot.insertChild(fC1, 0)
+
+    // Child 2: 50% width, measureFunc with 80 content width (fits in 150px → height=1)
+    const fC2 = Flexily.Node.create(YOGA_OPTS)
+    fC2.setWidthPercent(50)
+    fC2.setMeasureFunc((_w: number) => {
+      if (_w >= 80) return { width: 80, height: 1 }
+      return { width: Math.min(80, _w), height: Math.ceil(80 / Math.max(_w, 1)) }
+    })
+    fRoot.insertChild(fC2, 1)
+
+    // Child 3: fixed 60×40 sibling (no stretch — explicit height=40)
+    const fC3 = Flexily.Node.create(YOGA_OPTS)
+    fC3.setWidth(60)
+    fC3.setHeight(40)
+    fRoot.insertChild(fC3, 2)
+
+    fRoot.calculateLayout(300, 200, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_ROW)
+    yRoot.setWidth(300)
+    yRoot.setHeight(200)
+
+    const yC1 = yoga.Node.create()
+    yC1.setWidthPercent(30)
+    yC1.setMeasureFunc((_w: number) => {
+      if (_w >= 200) return { width: 200, height: 1 }
+      return { width: Math.min(200, _w), height: Math.ceil(200 / Math.max(_w, 1)) }
+    })
+    yRoot.insertChild(yC1, 0)
+
+    const yC2 = yoga.Node.create()
+    yC2.setWidthPercent(50)
+    yC2.setMeasureFunc((_w: number) => {
+      if (_w >= 80) return { width: 80, height: 1 }
+      return { width: Math.min(80, _w), height: Math.ceil(80 / Math.max(_w, 1)) }
+    })
+    yRoot.insertChild(yC2, 1)
+
+    const yC3 = yoga.Node.create()
+    yC3.setWidth(60)
+    yC3.setHeight(40)
+    yRoot.insertChild(yC3, 2)
+
+    yRoot.calculateLayout(300, 200, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    const match = layoutsMatch(flexilyLayout, yogaLayout, 0.001)
+    recordResult({
+      category: "MeasureFuncPercent",
+      name: "percent-measure-leaf-row",
+      passed: match,
+      flexily: flexilyLayout,
+      yoga: yogaLayout,
+    })
+    expect(match).toBe(true)
+  })
+
+  it("percent-measure-leaf-column: flat column with percent+measure leaf children", () => {
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+    fRoot.setWidth(300)
+    fRoot.setHeight(200)
+
+    // Child 1: 30% width, measureFunc with 200 content width.
+    // In column: width is auto (stretch cross-axis → 300), height is main axis (auto from measure).
+    // measure called with w=300, content=200 fits in 300 → height=1
+    const fC1 = Flexily.Node.create(YOGA_OPTS)
+    fC1.setWidthPercent(30)
+    fC1.setMeasureFunc((_w: number) => {
+      if (_w >= 200) return { width: 200, height: 1 }
+      return { width: Math.min(200, _w), height: Math.ceil(200 / Math.max(_w, 1)) }
+    })
+    fRoot.insertChild(fC1, 0)
+
+    // Child 2: 50% width, measureFunc with 80 content (fits in any reasonable width → height=1)
+    const fC2 = Flexily.Node.create(YOGA_OPTS)
+    fC2.setWidthPercent(50)
+    fC2.setMeasureFunc((_w: number) => {
+      if (_w >= 80) return { width: 80, height: 1 }
+      return { width: Math.min(80, _w), height: Math.ceil(80 / Math.max(_w, 1)) }
+    })
+    fRoot.insertChild(fC2, 1)
+
+    // Child 3: fixed 60×40 sibling
+    const fC3 = Flexily.Node.create(YOGA_OPTS)
+    fC3.setWidth(60)
+    fC3.setHeight(40)
+    fRoot.insertChild(fC3, 2)
+
+    fRoot.calculateLayout(300, 200, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_COLUMN)
+    yRoot.setWidth(300)
+    yRoot.setHeight(200)
+
+    const yC1 = yoga.Node.create()
+    yC1.setWidthPercent(30)
+    yC1.setMeasureFunc((_w: number) => {
+      if (_w >= 200) return { width: 200, height: 1 }
+      return { width: Math.min(200, _w), height: Math.ceil(200 / Math.max(_w, 1)) }
+    })
+    yRoot.insertChild(yC1, 0)
+
+    const yC2 = yoga.Node.create()
+    yC2.setWidthPercent(50)
+    yC2.setMeasureFunc((_w: number) => {
+      if (_w >= 80) return { width: 80, height: 1 }
+      return { width: Math.min(80, _w), height: Math.ceil(80 / Math.max(_w, 1)) }
+    })
+    yRoot.insertChild(yC2, 1)
+
+    const yC3 = yoga.Node.create()
+    yC3.setWidth(60)
+    yC3.setHeight(40)
+    yRoot.insertChild(yC3, 2)
+
+    yRoot.calculateLayout(300, 200, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    const match = layoutsMatch(flexilyLayout, yogaLayout, 0.001)
+    recordResult({
+      category: "MeasureFuncPercent",
+      name: "percent-measure-leaf-column",
+      passed: match,
+      flexily: flexilyLayout,
+      yoga: yogaLayout,
+    })
+    expect(match).toBe(true)
+  })
+
+  it("percent-measure-leaf-nested-2x2: flexGrow containers with percent+measure grandchildren", () => {
+    // Root: Row(400×200) → [Container(flexGrow:1), Container(flexGrow:1)]
+    // Each container is a Column with 2 percent+measure leaf children.
+    // Container width = 200 (flexGrow divides 400 - gap(10) = 390/2 ≈ 195)
+    // Each leaf resolves widthPercent(30) and widthPercent(50) relative to container's 195px.
+
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+    fRoot.setWidth(400)
+    fRoot.setHeight(200)
+    fRoot.setGap(Flexily.GUTTER_COLUMN, 10)
+
+    const fOuter1 = Flexily.Node.create(YOGA_OPTS)
+    fOuter1.setFlexGrow(1)
+    fOuter1.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+    fOuter1.setGap(Flexily.GUTTER_ROW, 5)
+    fRoot.insertChild(fOuter1, 0)
+
+    const fL1 = Flexily.Node.create(YOGA_OPTS)
+    fL1.setWidthPercent(30)
+    fL1.setMeasureFunc((_w: number) => {
+      if (_w >= 200) return { width: 200, height: 1 }
+      return { width: Math.min(200, _w), height: Math.ceil(200 / Math.max(_w, 1)) }
+    })
+    fOuter1.insertChild(fL1, 0)
+
+    const fL2 = Flexily.Node.create(YOGA_OPTS)
+    fL2.setWidthPercent(50)
+    fL2.setMeasureFunc((_w: number) => {
+      if (_w >= 80) return { width: 80, height: 1 }
+      return { width: Math.min(80, _w), height: Math.ceil(80 / Math.max(_w, 1)) }
+    })
+    fOuter1.insertChild(fL2, 1)
+
+    const fOuter2 = Flexily.Node.create(YOGA_OPTS)
+    fOuter2.setFlexGrow(1)
+    fOuter2.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+    fOuter2.setGap(Flexily.GUTTER_ROW, 5)
+    fRoot.insertChild(fOuter2, 1)
+
+    const fL3 = Flexily.Node.create(YOGA_OPTS)
+    fL3.setWidthPercent(40)
+    fL3.setMeasureFunc((_w: number) => {
+      if (_w >= 120) return { width: 120, height: 1 }
+      return { width: Math.min(120, _w), height: Math.ceil(120 / Math.max(_w, 1)) }
+    })
+    fOuter2.insertChild(fL3, 0)
+
+    const fL4 = Flexily.Node.create(YOGA_OPTS)
+    fL4.setWidthPercent(60)
+    fL4.setMeasureFunc((_w: number) => {
+      if (_w >= 90) return { width: 90, height: 1 }
+      return { width: Math.min(90, _w), height: Math.ceil(90 / Math.max(_w, 1)) }
+    })
+    fOuter2.insertChild(fL4, 1)
+
+    fRoot.calculateLayout(400, 200, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_ROW)
+    yRoot.setWidth(400)
+    yRoot.setHeight(200)
+    yRoot.setGap(yoga.GUTTER_COLUMN, 10)
+
+    const yOuter1 = yoga.Node.create()
+    yOuter1.setFlexGrow(1)
+    yOuter1.setFlexDirection(yoga.FLEX_DIRECTION_COLUMN)
+    yOuter1.setGap(yoga.GUTTER_ROW, 5)
+    yRoot.insertChild(yOuter1, 0)
+
+    const yL1 = yoga.Node.create()
+    yL1.setWidthPercent(30)
+    yL1.setMeasureFunc((_w: number) => {
+      if (_w >= 200) return { width: 200, height: 1 }
+      return { width: Math.min(200, _w), height: Math.ceil(200 / Math.max(_w, 1)) }
+    })
+    yOuter1.insertChild(yL1, 0)
+
+    const yL2 = yoga.Node.create()
+    yL2.setWidthPercent(50)
+    yL2.setMeasureFunc((_w: number) => {
+      if (_w >= 80) return { width: 80, height: 1 }
+      return { width: Math.min(80, _w), height: Math.ceil(80 / Math.max(_w, 1)) }
+    })
+    yOuter1.insertChild(yL2, 1)
+
+    const yOuter2 = yoga.Node.create()
+    yOuter2.setFlexGrow(1)
+    yOuter2.setFlexDirection(yoga.FLEX_DIRECTION_COLUMN)
+    yOuter2.setGap(yoga.GUTTER_ROW, 5)
+    yRoot.insertChild(yOuter2, 1)
+
+    const yL3 = yoga.Node.create()
+    yL3.setWidthPercent(40)
+    yL3.setMeasureFunc((_w: number) => {
+      if (_w >= 120) return { width: 120, height: 1 }
+      return { width: Math.min(120, _w), height: Math.ceil(120 / Math.max(_w, 1)) }
+    })
+    yOuter2.insertChild(yL3, 0)
+
+    const yL4 = yoga.Node.create()
+    yL4.setWidthPercent(60)
+    yL4.setMeasureFunc((_w: number) => {
+      if (_w >= 90) return { width: 90, height: 1 }
+      return { width: Math.min(90, _w), height: Math.ceil(90 / Math.max(_w, 1)) }
+    })
+    yOuter2.insertChild(yL4, 1)
+
+    yRoot.calculateLayout(400, 200, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    const match = layoutsMatch(flexilyLayout, yogaLayout, 0.001)
+    recordResult({
+      category: "MeasureFuncPercent",
+      name: "percent-measure-leaf-nested-2x2",
+      passed: match,
+      flexily: flexilyLayout,
+      yoga: yogaLayout,
+    })
+    expect(match).toBe(true)
+  })
+
+  it("percent-measure-leaf-nested-3x3: flexGrow containers with percent+measure grandchildren", () => {
+    // Root: Column(500×300) → [Container(flexGrow:1) ×3]
+    // Each container is a Row with 3 percent+measure leaf children.
+    // Container height = 300/3 - gaps ≈ 93px each
+
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_COLUMN)
+    fRoot.setWidth(500)
+    fRoot.setHeight(300)
+    fRoot.setGap(Flexily.GUTTER_ROW, 10)
+
+    const children: Array<{ wPct: number; content: number }> = [
+      { wPct: 20, content: 180 },
+      { wPct: 40, content: 250 },
+      { wPct: 60, content: 100 },
+    ]
+
+    for (let i = 0; i < 3; i++) {
+      const outerCol = Flexily.Node.create(YOGA_OPTS)
+      outerCol.setFlexGrow(1)
+      outerCol.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+      outerCol.setGap(Flexily.GUTTER_COLUMN, 5)
+      fRoot.insertChild(outerCol, i)
+
+      for (let j = 0; j < 3; j++) {
+        const leaf = Flexily.Node.create(YOGA_OPTS)
+        const idx = (i + j) % 3
+        const { wPct, content } = children[idx]!
+        leaf.setWidthPercent(wPct)
+        leaf.setMeasureFunc((_w: number) => {
+          if (_w >= content) return { width: content, height: 1 }
+          return { width: Math.min(content, _w), height: Math.ceil(content / Math.max(_w, 1)) }
+        })
+        outerCol.insertChild(leaf, j)
+      }
+    }
+
+    fRoot.calculateLayout(500, 300, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_COLUMN)
+    yRoot.setWidth(500)
+    yRoot.setHeight(300)
+    yRoot.setGap(yoga.GUTTER_ROW, 10)
+
+    for (let i = 0; i < 3; i++) {
+      const outerCol = yoga.Node.create()
+      outerCol.setFlexGrow(1)
+      outerCol.setFlexDirection(yoga.FLEX_DIRECTION_ROW)
+      outerCol.setGap(yoga.GUTTER_COLUMN, 5)
+      yRoot.insertChild(outerCol, i)
+
+      for (let j = 0; j < 3; j++) {
+        const leaf = yoga.Node.create()
+        const idx = (i + j) % 3
+        const { wPct, content } = children[idx]!
+        leaf.setWidthPercent(wPct)
+        leaf.setMeasureFunc((_w: number) => {
+          if (_w >= content) return { width: content, height: 1 }
+          return { width: Math.min(content, _w), height: Math.ceil(content / Math.max(_w, 1)) }
+        })
+        outerCol.insertChild(leaf, j)
+      }
+    }
+
+    yRoot.calculateLayout(500, 300, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    const match = layoutsMatch(flexilyLayout, yogaLayout, 0.001)
+    recordResult({
+      category: "MeasureFuncPercent",
+      name: "percent-measure-leaf-nested-3x3",
+      passed: match,
+      flexily: flexilyLayout,
+      yoga: yogaLayout,
+    })
+    expect(match).toBe(true)
+  })
+})
+
+// ============================================================================
 // Generate Report
 // ============================================================================
 
