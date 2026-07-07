@@ -864,15 +864,6 @@ describe("Fuzz: Stress Test (50 Nested)", () => {
 
 /**
  * Generates trees where leaf nodes have widthPercent + measureFunc.
- *
- * Scenarios covered:
- * - Leaf with widthPercent + measureFunc (no flexGrow)
- * - Leaf with widthPercent + measureFunc + flexGrow
- * - Leaf with widthPercent + measureFunc + siblings with explicit widths
- * - Leaf without measureFunc, just widthPercent
- *
- * The measureFunc simulates text wrapping: contentWidth "characters" wrap
- * into ceil(contentWidth / availableWidth) lines when constrained.
  */
 function generatePercentMeasureTree(ctx: RandomContext, childCount: number): TreeSpec {
   const rootWidth = randomInt(ctx, 100, 500)
@@ -1077,4 +1068,32 @@ describe("Fuzz: Percent Measure Leaf (Column)", () => {
 // Tests: Percent Measure Leaf (Nested)
 // ============================================================================
 
-// describe("Fuzz: Percent Measure Leaf (Nested 2x
+describe("Fuzz: Percent Measure Leaf (Nested 2x2)", () => {
+  for (let seed = 14000; seed < 14030; seed++) {
+    it(`seed=${seed}`, () => {
+      const result = runPercentMeasureNestedTest(seed, 2, 2)
+      expect(result.passed).toBe(true)
+    })
+  }
+})
+
+describe("Fuzz: Percent Measure Leaf (Nested 3x3)", () => {
+  for (let seed = 14500; seed < 14530; seed++) {
+    it(`seed=${seed}`, () => {
+      const result = runPercentMeasureNestedTest(seed, 3, 3)
+      expect(result.passed).toBe(true)
+    })
+  }
+})
+
+// ============================================================================
+// Summary
+// ============================================================================
+
+describe("Differential Fuzz Summary", () => {
+  it("prints summary", () => {
+    log.debug?.(
+      `\n${"=".repeat(60)}\nDIFFERENTIAL FUZZ TEST SUMMARY\n${"=".repeat(60)}\n\nThese tests generate random flexbox trees and compare Flexily vs Yoga.\nUse seed values to reproduce any failing cases.\n\nTest categories:\n- Simple Flat: Single level with fixed/flex children\n- Nested: Two-level layouts with flexGrow\n- Kanban: Column-based card layouts (TUI pattern)\n- Dashboard: Header + sidebar + content (TUI pattern)\n- Absolute: Mixed relative + absolute positioned children\n- Stress: Many random seeds for broad coverage\n\nTolerance: ${EPSILON}px (for rounding differences)\n\n${"=".repeat(60)}`,
+    )
+  })
+})
