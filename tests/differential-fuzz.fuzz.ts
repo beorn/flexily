@@ -164,6 +164,7 @@ function layoutsMatch(
 interface NodeStyle {
   width?: number
   height?: number
+  widthPercent?: number
   flexDirection?: number
   flexGrow?: number
   flexShrink?: number
@@ -174,6 +175,8 @@ interface NodeStyle {
   gap?: number
   positionType?: number
   positionEdges?: { edge: number; value: number }[]
+  measureContentWidth?: number
+  measureCustomHeight?: number
 }
 
 interface TreeSpec {
@@ -351,6 +354,7 @@ function generateNestedTree(ctx: RandomContext, outerChildCount: number, innerCh
 function applyStyleToFlexilyNode(node: Flexily.Node, style: NodeStyle): void {
   if (style.width !== undefined) node.setWidth(style.width)
   if (style.height !== undefined) node.setHeight(style.height)
+  if (style.widthPercent !== undefined) node.setWidthPercent(style.widthPercent)
   if (style.flexDirection !== undefined) {
     node.setFlexDirection(style.flexDirection)
   }
@@ -371,11 +375,23 @@ function applyStyleToFlexilyNode(node: Flexily.Node, style: NodeStyle): void {
       node.setPosition(edge, value)
     }
   }
+  if (style.measureContentWidth !== undefined && style.measureContentWidth > 0) {
+    const contentWidth = style.measureContentWidth
+    node.setMeasureFunc((_w: number, wm: number) => {
+      if (wm === Flexily.MEASURE_MODE_UNDEFINED) {
+        return { width: contentWidth, height: 1 }
+      }
+      if (_w >= contentWidth) return { width: contentWidth, height: 1 }
+      const customHeight = style.measureCustomHeight ?? 35
+      return { width: Math.min(contentWidth, _w), height: customHeight }
+    })
+  }
 }
 
 function applyStyleToYogaNode(node: YogaNode, style: NodeStyle): void {
   if (style.width !== undefined) node.setWidth(style.width)
   if (style.height !== undefined) node.setHeight(style.height)
+  if (style.widthPercent !== undefined) node.setWidthPercent(style.widthPercent)
   if (style.flexDirection !== undefined) {
     node.setFlexDirection(style.flexDirection as FlexDirection)
   }
@@ -395,6 +411,17 @@ function applyStyleToYogaNode(node: YogaNode, style: NodeStyle): void {
     for (const { edge, value } of style.positionEdges) {
       node.setPosition(edge as Edge, value)
     }
+  }
+  if (style.measureContentWidth !== undefined && style.measureContentWidth > 0) {
+    const contentWidth = style.measureContentWidth
+    node.setMeasureFunc((_w: number, wm: number) => {
+      if (wm === yoga.MEASURE_MODE_UNDEFINED) {
+        return { width: contentWidth, height: 1 }
+      }
+      if (_w >= contentWidth) return { width: contentWidth, height: 1 }
+      const customHeight = style.measureCustomHeight ?? 35
+      return { width: Math.min(contentWidth, _w), height: customHeight }
+    })
   }
 }
 
@@ -832,13 +859,222 @@ describe("Fuzz: Stress Test (50 Nested)", () => {
 })
 
 // ============================================================================
-// Summary
+// Tests: Percent Width + MeasureFunc Leaf
 // ============================================================================
 
-describe("Differential Fuzz Summary", () => {
-  it("prints summary", () => {
-    log.debug?.(
-      `\n${"=".repeat(60)}\nDIFFERENTIAL FUZZ TEST SUMMARY\n${"=".repeat(60)}\n\nThese tests generate random flexbox trees and compare Flexily vs Yoga.\nUse seed values to reproduce any failing cases.\n\nTest categories:\n- Simple Flat: Single level with fixed/flex children\n- Nested: Two-level layouts with flexGrow\n- Kanban: Column-based card layouts (TUI pattern)\n- Dashboard: Header + sidebar + content (TUI pattern)\n- Absolute: Mixed relative + absolute positioned children\n- Stress: Many random seeds for broad coverage\n\nTolerance: ${EPSILON}px (for rounding differences)\n\n${"=".repeat(60)}`,
-    )
+/**
+ * Generates trees where leaf nodes have widthPercent + measureFunc.
+ *
+ * Scenarios covered:
+ * - Leaf with widthPercent + measureFunc (no flexGrow)
+ * - Leaf with widthPercent + measureFunc + flexGrow
+ * - Leaf with widthPercent + measureFunc + siblings with explicit widths
+ * - Leaf without measureFunc, just widthPercent
+ *
+ * The measureFunc simulates text wrapping: contentWidth "characters" wrap
+ * into ceil(contentWidth / availableWidth) lines when constrained.
+ */
+function generatePercentMeasureTree(ctx: RandomContext, childCount: number): TreeSpec {
+  const rootWidth = randomInt(ctx, 100, 500)
+  const rootHeight = randomInt(ctx, 80, 400)
+  const flexDirection = randomChoice(ctx, [Flexily.FLEX_DIRECTION_ROW, Flexily.FLEX_DIRECTION_COLUMN])
+
+  const children: TreeSpec[] = []
+  for (let i = 0; i < childCount; i++) {
+    const isPercent = randomBool(ctx, 0.7)
+    const hasMeasure = randomBool(ctx, 0.7)
+    const childStyle: NodeStyle = {}
+
+    if (isPercent) {
+      // widthPercent from 10% to 90%
+      childStyle.widthPercent = randomInt(ctx, 10, 90)
+    }
+
+    if (hasMeasure) {
+      // Intrinsic content wider than the resolved percent to force wrapping.
+      // contentWidth is 1.5x–4x the expected resolved width.
+      const pct = childStyle.widthPercent ?? 50
+      const resolvedEstimate = Math.floor((rootWidth * pct) / 100)
+      childStyle.measureContentWidth = randomInt(ctx, Math.floor(resolvedEstimate * 1.5), resolvedEstimate * 4)
+      childStyle.measureCustomHeight = randomInt(ctx, 10, 100)
+    } else if (!isPercent) {
+      // Fixed dimensions for non-percent, non-measure children
+      if (flexDirection === Flexily.FLEX_DIRECTION_ROW) {
+        childStyle.width = randomInt(ctx, 20, Math.floor(rootWidth / childCount) - 10)
+        childStyle.height = randomInt(ctx, 20, rootHeight - 20)
+      } else {
+        childStyle.width = randomInt(ctx, 20, rootWidth - 20)
+        childStyle.height = randomInt(ctx, 20, Math.floor(rootHeight / childCount) - 10)
+      }
+    }
+
+    // Optional flexGrow (but not always — we want to test pure percent resolution too)
+    if (randomBool(ctx, 0.3)) {
+      childStyle.flexGrow = randomInt(ctx, 1, 3)
+    }
+
+    // Optional padding/margin
+    if (randomBool(ctx, 0.3)) {
+      childStyle.padding = randomInt(ctx, 1, 8)
+    }
+    if (randomBool(ctx, 0.2)) {
+      childStyle.margin = randomInt(ctx, 1, 5)
+    }
+
+    children.push({ style: childStyle, children: [] })
+  }
+
+  // Sort: non-percent children first, then percent children.
+  // This creates more interesting scenarios (remaining space after fixed siblings).
+  children.sort((a, b) => {
+    const aPct = a.style.widthPercent !== undefined ? 1 : 0
+    const bPct = b.style.widthPercent !== undefined ? 1 : 0
+    return aPct - bPct
   })
+
+  return {
+    style: {
+      width: rootWidth,
+      height: rootHeight,
+      flexDirection,
+      padding: randomBool(ctx, 0.3) ? randomInt(ctx, 5, 15) : undefined,
+      gap: randomBool(ctx, 0.3) ? randomInt(ctx, 2, 10) : undefined,
+      alignItems: randomBool(ctx, 0.3)
+        ? randomChoice(ctx, [Flexily.ALIGN_FLEX_START, Flexily.ALIGN_CENTER, Flexily.ALIGN_STRETCH])
+        : undefined,
+    },
+    children,
+  }
+}
+
+/**
+ * Nested variant: root → intermediate flex containers → percent measure leaves.
+ * Tests percent resolution through multiple layout passes (flexGrow parent → child).
+ */
+function generatePercentMeasureNestedTree(ctx: RandomContext, outerCount: number, leafCount: number): TreeSpec {
+  const rootWidth = randomInt(ctx, 200, 500)
+  const rootHeight = randomInt(ctx, 150, 400)
+  const rootDirection = randomChoice(ctx, [Flexily.FLEX_DIRECTION_ROW, Flexily.FLEX_DIRECTION_COLUMN])
+
+  const children: TreeSpec[] = []
+  for (let i = 0; i < outerCount; i++) {
+    const innerDirection = randomChoice(ctx, [Flexily.FLEX_DIRECTION_ROW, Flexily.FLEX_DIRECTION_COLUMN])
+
+    const leaves: TreeSpec[] = []
+    for (let j = 0; j < leafCount; j++) {
+      const pct = randomInt(ctx, 10, 50)
+      const resolvedEstimate = Math.floor((rootWidth * pct) / 100)
+      leaves.push({
+        style: {
+          widthPercent: pct,
+          measureContentWidth: randomInt(ctx, Math.floor(resolvedEstimate * 1.5), resolvedEstimate * 4),
+          measureCustomHeight: randomInt(ctx, 10, 100),
+          flexGrow: randomBool(ctx, 0.3) ? 1 : undefined,
+        },
+        children: [],
+      })
+    }
+
+    children.push({
+      style: {
+        flexGrow: 1,
+        flexDirection: innerDirection,
+        padding: randomBool(ctx, 0.3) ? randomInt(ctx, 5, 10) : undefined,
+        gap: randomBool(ctx, 0.3) ? randomInt(ctx, 2, 6) : undefined,
+      },
+      children: leaves,
+    })
+  }
+
+  return {
+    style: {
+      width: rootWidth,
+      height: rootHeight,
+      flexDirection: rootDirection,
+      padding: randomBool(ctx, 0.3) ? randomInt(ctx, 5, 15) : undefined,
+      gap: randomBool(ctx, 0.3) ? randomInt(ctx, 5, 10) : undefined,
+    },
+    children,
+  }
+}
+
+// ============================================================================
+// Percent Measure Test Runners
+// ============================================================================
+
+function runPercentMeasureTest(seed: number, childCount: number): { passed: boolean; diff?: string } {
+  const rng = createRng(seed)
+  const ctx: RandomContext = { rng }
+  const spec = generatePercentMeasureTree(ctx, childCount)
+
+  const flexilyRoot = buildFlexilyTree(spec)
+  const yogaRoot = buildYogaTree(spec)
+
+  const rootWidth = spec.style.width ?? 300
+  const rootHeight = spec.style.height ?? 200
+
+  flexilyRoot.calculateLayout(rootWidth, rootHeight, Flexily.DIRECTION_LTR)
+  yogaRoot.calculateLayout(rootWidth, rootHeight, yoga.DIRECTION_LTR)
+
+  const flexilyLayout = getFlexilyLayout(flexilyRoot)
+  const yogaLayout = getYogaLayout(yogaRoot)
+  yogaRoot.freeRecursive()
+
+  const result = layoutsMatch(flexilyLayout, yogaLayout)
+  return { passed: result.match, diff: result.diff }
+}
+
+function runPercentMeasureNestedTest(seed: number, outer: number, leaves: number): { passed: boolean; diff?: string } {
+  const rng = createRng(seed)
+  const ctx: RandomContext = { rng }
+  const spec = generatePercentMeasureNestedTree(ctx, outer, leaves)
+
+  const flexilyRoot = buildFlexilyTree(spec)
+  const yogaRoot = buildYogaTree(spec)
+
+  const rootWidth = spec.style.width ?? 300
+  const rootHeight = spec.style.height ?? 200
+
+  flexilyRoot.calculateLayout(rootWidth, rootHeight, Flexily.DIRECTION_LTR)
+  yogaRoot.calculateLayout(rootWidth, rootHeight, yoga.DIRECTION_LTR)
+
+  const flexilyLayout = getFlexilyLayout(flexilyRoot)
+  const yogaLayout = getYogaLayout(yogaRoot)
+  yogaRoot.freeRecursive()
+
+  const result = layoutsMatch(flexilyLayout, yogaLayout)
+  return { passed: result.match, diff: result.diff }
+}
+
+// ============================================================================
+// Tests: Percent Measure Leaf (Flat)
+// ============================================================================
+
+describe("Fuzz: Percent Measure Leaf (Row)", () => {
+  for (let seed = 12000; seed < 12050; seed++) {
+    const childCount = 3 + (seed % 4)
+    it(`seed=${seed} children=${childCount}`, () => {
+      const result = runPercentMeasureTest(seed, childCount)
+      if (!result.passed) {
+        log.debug?.(`Difference: ${result.diff}`)
+      }
+      expect(result.passed).toBe(true)
+    })
+  }
 })
+
+describe("Fuzz: Percent Measure Leaf (Column)", () => {
+  for (let seed = 13000; seed < 13050; seed++) {
+    const childCount = 3 + (seed % 4)
+    it(`seed=${seed} children=${childCount}`, () => {
+      const result = runPercentMeasureTest(seed, childCount)
+      expect(result.passed).toBe(true)
+    })
+  }
+})
+
+// ============================================================================
+// Tests: Percent Measure Leaf (Nested)
+// ============================================================================
+
+// describe("Fuzz: Percent Measure Leaf (Nested 2x
