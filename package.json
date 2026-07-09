@@ -76,7 +76,7 @@
     "vitepress": "^1.6.3",
     "vitepress-enrich": "^0.4.0",
     "vitepress-plugin-llms": "^1.0.0",
-    "vitest": "^4.1.5",
+    "vitest": "^4.1.10",
     "yoga-wasm-web": "^0.3.3"
   },
   "engines": {
