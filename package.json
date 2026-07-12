@@ -37,7 +37,6 @@
     "./testing": "./src/testing.ts"
   },
   "publishConfig": {
-    "access": "public",
     "exports": {
       ".": {
         "types": "./dist/index.d.mts",
@@ -51,7 +50,8 @@
         "types": "./dist/testing.d.mts",
         "import": "./dist/testing.mjs"
       }
-    }
+    },
+    "access": "public"
   },
   "scripts": {
     "build": "vp pack",
@@ -70,12 +70,12 @@
   "devDependencies": {
     "@types/node": "^25.5.0",
     "loggily": "^0.4.2",
-    "oxfmt": "0.38.0",
+    "oxfmt": "0.58.0",
     "typescript": "^5.9.3",
     "vite-plus": "latest",
     "vitepress": "^1.6.3",
     "vitepress-enrich": "^0.4.0",
-    "vitepress-plugin-llms": "^1.0.0",
+    "vitepress-plugin-llms": "^1.13.2",
     "vitest": "^4.1.5",
     "yoga-wasm-web": "^0.3.3"
   },
