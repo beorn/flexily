@@ -579,7 +579,11 @@ After ANY change to `layout-zero.ts` or `node-zero.ts`:
 uptime | sed 's/.*load average[s]*: //' && (nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # 2. Run benchmark (from the repo root)
-bun bench bench/yoga-compare-warmup.bench.ts
+# BOTH files: the warmup benchmark has zero measureFunc leaves and is blind to
+# text-only paths. Establish the harness floor with a null control (two
+# byte-identical copies) before believing any delta — under fleet load it has
+# reported +3.66% from identical code.
+bun bench bench/yoga-compare-warmup.bench.ts bench/yoga-compare-rich.bench.ts
 
 # 3. Compare against baseline:
 #    Flexily should be ~2x Yoga for flat trees

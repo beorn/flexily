@@ -47,7 +47,7 @@ Flexily's value proposition is **performance**. Any change that MAY impact perfo
 uptime | sed 's/.*load average[s]*: //' && (nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # BEFORE making changes
-bun bench bench/yoga-compare-warmup.bench.ts > /tmp/bench-before.txt
+bun bench bench/yoga-compare-warmup.bench.ts bench/yoga-compare-rich.bench.ts > /tmp/bench-before.txt
 
 # Make your changes...
 
@@ -55,13 +55,17 @@ bun bench bench/yoga-compare-warmup.bench.ts > /tmp/bench-before.txt
 uptime | sed 's/.*load average[s]*: //' && (nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # AFTER making changes
-bun bench bench/yoga-compare-warmup.bench.ts > /tmp/bench-after.txt
+bun bench bench/yoga-compare-warmup.bench.ts bench/yoga-compare-rich.bench.ts > /tmp/bench-after.txt
 
 # Compare results - look for regressions
 diff /tmp/bench-before.txt /tmp/bench-after.txt
 ```
 
+**BOTH benchmark files, always.** `yoga-compare-warmup.bench.ts` contains **zero** `measureFunc` leaves, so on its own it is structurally blind to every code path that only text nodes reach — it can report a clean pass on a change it never executed. `yoga-compare-rich.bench.ts` exercises them. A gate that cannot see the changed path is not a gate.
+
 **Before each benchmark run**, verify no CPU-heavy processes (builds, other test suites, browsers, video encoding) are running. Inconsistent system load invalidates comparisons.
+
+**Know the instrument's floor before believing a delta.** On a loaded host this benchmark cannot resolve a difference smaller than roughly 10%, which is larger than the <5% bar below — so a number inside that band certifies nothing. Establish the floor with a **null control**: run the harness against two byte-identical copies of the code and see what difference it claims. Measured 2026-08-11 on a 32-core box under fleet load, the null control reported a median +3.66% and a 4-of-25 sign skew **from identical code**. If your measured delta sits inside the null envelope, the honest result is "no measurable difference on this host", not the number.
 
 **Changes that require benchmarking:**
 
@@ -110,7 +114,8 @@ src/
 | `src/layout-flex-lines.ts`           | Pre-alloc arrays, line breaking, flex distribution           |
 | `src/layout-measure.ts`              | measureNode - intrinsic sizing                               |
 | `src/node-zero.ts`                   | Node class - **second most performance-critical**            |
-| `bench/yoga-compare-warmup.bench.ts` | Main benchmark comparing Flexily vs Yoga                     |
+| `bench/yoga-compare-warmup.bench.ts` | Main benchmark vs Yoga — **no `measureFunc` leaves**; blind to text paths |
+| `bench/yoga-compare-rich.bench.ts`   | Vs Yoga **with `measureFunc` leaves** — required alongside the warmup file |
 | `tests/compose.test.ts`              | Compose API tests (33 tests)                                 |
 | `tests/yoga-comparison.test.ts`      | Yoga compatibility tests (44 tests)                          |
 
