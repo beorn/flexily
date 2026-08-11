@@ -132,9 +132,24 @@ Flexily is Yoga-compatible but follows CSS spec where Yoga doesn't:
 | `overflow:hidden/scroll` + `flexShrink:0` | Item expands to content size (ignores parent constraint) | Item shrinks to fit parent                                      | §4.5: automatic min-size = 0 for overflow containers |
 | `aspect-ratio` + implicit `stretch`       | Stretch overrides AR on cross-axis                       | AR fallback alignment = `flex-start`                            | CSS Alignment: AR prevents implicit stretch          |
 | **Flex-item default min-size**            | `0` (no auto floor)                                      | CSS preset: content-based minimum (auto rule); Yoga preset: `0` | §4.5: `min-block-size: auto = content-based minimum` |
-| **`measureFunc` leaf main-axis position** | `Math.floor` (text is never rounded down)                | Same rounding as every other child — siblings tile exactly       | Adjacent boxes share an edge; no spec'd text exception |
+**`measureFunc` leaf main-axis position is NOT in this table** — it is not a semantic divergence. See [The two-level contract](#the-two-level-contract-semantics-vs-quantization) below.
 
-**`measureFunc` leaf main-axis position (deliberate divergence)**: Yoga rounds a text node's position down and its right edge up, so text is never clipped by the pixel grid; the cost is that a text node can overlap its neighbour, which is invisible at subpixel scale. Flexily's consumers lay out on a CELL grid, where the same overlap is a whole cell: the later sibling paints over the earlier one's last cell, and when that cell held an elision marker the text is cut with nothing left to say so. A shared edge must therefore be rounded by exactly ONE function for every node type, so the main axis uses the telescoping `round(absChild) - round(absParent)` for leaves and containers alike. Yoga's cross-axis leaf floor is untouched. See `tests/main-axis-tiling.test.ts` and the "Measure leaf rounding vs box sibling" block in `tests/layout.test.ts`.
+## The two-level contract: semantics vs quantization
+
+**Flexily's contract has two levels, and they are not in tension.**
+
+1. **In CONTINUOUS space, the contract is Yoga semantics.** That is what the 20533 Yoga-oracle differential certified over 1728 `measureFunc`-leaf shapes, and it still stands.
+2. **Quantization to a discrete grid is TARGET-SPECIFIC policy.** The cell-grid policy's invariant is **exact tiling**: every shared edge is rounded exactly ONCE, by one function.
+
+Yoga's `floor`-the-position / `ceil`-the-right-edge for text is not semantics — it is a *subpixel quantization policy*, and reading it as semantics is the mistake this section exists to prevent.
+
+**Both policies optimize the SAME value: never silently lose content.** At subpixel scale, loss means clipping a glyph, so Yoga accepts an invisible overlap with the neighbour to prevent it. On a cell grid the overlap **is** the loss — a whole-cell overpaint of exactly the cell holding an elision marker, so text is cut with nothing left to say so. Same principle, target-inverted policy.
+
+This is also why the multi-target story needs no exception list: a canvas/DOM target takes continuous values or Yoga's subpixel policy; a terminal target takes tiling. One principle, resolved per target.
+
+**Concretely**: the main axis uses the telescoping `round(absChild) - round(absParent)` for `measureFunc` leaves and containers alike. Yoga's cross-axis leaf `Math.floor` is untouched. Guarded by a width SWEEP (`tests/main-axis-tiling.test.ts`), never a hand-picked width, because the failure mode is non-monotonic in container width. See also the "Measure leaf rounding vs box sibling" block in `tests/layout.test.ts`.
+
+**If you are here to restore Yoga fidelity**: the fidelity you are looking for is at level 1 and is intact — check the Yoga differential fuzz (451 cases) before changing anything at level 2.
 
 **Flex-item auto min-size (CSS §4.5 item-side, shipped under CSS preset)**: CSS §4.5 has two complementary rules. Flexily implements both — the _container_ side (overflow containers can shrink to 0) and the _item_ side (flex items default to a content-based minimum, not 0). Under Yoga preset (`flexShrink: 0` + `min: undefined → 0`) this is invisible because items never shrink. Under CSS preset (`flexShrink: 1` + `min: auto → content`), items keep their intrinsic content size when overflow is visible, and shrink to 0 when overflow is hidden/scroll/auto. The implementation derives content-size separately from `flex-basis` so `flex: 1 1 0` patterns keep their content. Aspect-ratio + definite cross-axis clamps the auto-min by the transferred-size suggestion. See `tests/auto-min-size.test.ts`.
 

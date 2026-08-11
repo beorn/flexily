@@ -347,6 +347,8 @@ describe("Flexily Layout Engine", () => {
     }
 
     it("odd free space, box-first: leaf lands after the gap, not on it", () => {
+      // INVARIANT: every shared edge is rounded exactly once, so a leaf occupies
+      // the same edge its size was measured against — leaves tile like any box.
       // rootH=10, content=1+1+gap1=3, free=7 -> 3.5 each side. box(idx0) at 4,
       // gap row 5, leaf(idx1) at 6. Under the old floor the leaf sat at 5 and
       // the gap row vanished.
@@ -356,6 +358,8 @@ describe("Flexily Layout Engine", () => {
     })
 
     it("odd free space, leaf-first: leaf lands before the gap, not on top of it", () => {
+      // INVARIANT: every shared edge is rounded exactly once, so no cell is
+      // unowned — the mirror of the overlap case, and the same one rounding.
       // leaf(idx0) at 4, gap row 5, box(idx1) at 6. Under the old floor the leaf
       // sat at 3, leaving an unowned hole at row 5.
       const { leaf, box } = centeredColumn(10, 1, true)

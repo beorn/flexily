@@ -13,6 +13,23 @@ Flexily is Yoga-compatible but intentionally diverges where Yoga deviates from t
 | `aspect-ratio` + implicit `stretch`       | Stretch overrides AR on cross-axis | **AR fallback alignment = `flex-start`**                        | CSS Alignment: AR prevents implicit stretch                 |
 | **Flex item default min-size**            | `0` (no auto floor)                | CSS preset: content-based minimum (auto rule); Yoga preset: `0` | Section 4.5: `min-block-size: auto = content-based minimum` |
 
+## Not a divergence: quantization policy
+
+One difference is deliberately **absent** from the table above, because it is not the same kind of thing. The divergences on this page are *semantic*: Yoga deviates from CSS, and Flexily follows CSS. Rounding a layout onto a discrete grid is a different level, and CSS has nothing to say about it.
+
+**The contract has two levels.**
+
+1. **Continuous space → Yoga semantics.** This is what the divergence list above is about, and what the Yoga differential fuzz certifies.
+2. **Quantization to a discrete grid → target-specific policy.** Its invariant is *exact tiling*: every shared edge is rounded exactly once, by one function.
+
+Yoga's policy for text nodes — floor the position, ceil the right edge — is a **subpixel quantization policy**, not a semantic rule. It buys "a glyph is never clipped by the pixel grid" at the cost of a text node overlapping its neighbour by a fraction of a pixel.
+
+Flexily's consumers include targets that lay out on a **cell grid**, where there is no such thing as a fraction of a cell. There the same overlap is a whole cell, the later sibling paints over it, and if that cell held an ellipsis the text is cut with nothing left to say so.
+
+**Both policies optimize the same value: never silently lose content.** At subpixel scale, loss means clipping a glyph — so you accept an invisible overlap. On a cell grid, the overlap *is* the loss — so the same value demands the opposite rounding. Same principle, inverted by the target.
+
+So `measureFunc` leaves take the same telescoping main-axis position as every other child. Cross-axis leaf rounding is unchanged. If you are reading this because a cell-grid consumer needs subpixel behaviour, or a subpixel consumer needs tiling, that is a target-policy selection — not a fidelity question.
+
 ## Divergence 1: Default Flex Direction
 
 **Yoga**: Defaults to `column` (legacy from React Native's mobile-first layout).
