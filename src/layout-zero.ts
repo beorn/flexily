@@ -1847,19 +1847,24 @@ function layoutNode(
       //
       // CROSS axis keeps a local round of the fractional offset: its size is a
       // plain round of the float extent (not edge-based), so the two stay
-      // internally consistent as-is.
+      // internally consistent as-is. Yoga's 3.x measureFunc-leaf `Math.floor`
+      // quirk is preserved there (`posRound`).
       //
-      // Yoga 3.x quirk preserved: measureFunc leaf nodes use Math.floor for
-      // position rounding (affects justify/align modes that produce fractional
-      // offsets — center, space-around, space-evenly). Leaves have no children,
-      // so they are never a parent in the telescoping invariant above.
+      // The main axis takes the telescoping form for EVERY child, measureFunc
+      // leaves included. A shared edge must be rounded by exactly ONE function
+      // or adjacent siblings stop tiling: floor-ing a leaf's position while its
+      // size was derived from `Math.round(absChildLeft)` places the leaf one
+      // column left of the edge its width was measured against, so it overlaps
+      // the previous sibling (and gaps from the next) whenever the fractional
+      // part of its absolute start crosses 0.5. In a cell grid the later
+      // sibling then paints over the earlier one's last cell — which for
+      // truncated text is exactly the cell holding the elision marker, turning
+      // an elision into a silent drop.
       const posRound = shouldMeasure ? Math.floor : Math.round
       const roundedAbsParentMainStart = Math.round(
         isRow ? absX + marginLeft + parentPosOffsetX : absY + marginTop + parentPosOffsetY,
       )
-      const mainChildPos = shouldMeasure
-        ? posRound(isRow ? fractionalLeft + posOffsetX : fractionalTop + posOffsetY)
-        : roundedAbsMainStart - roundedAbsParentMainStart
+      const mainChildPos = roundedAbsMainStart - roundedAbsParentMainStart
       const childLeft = isRow ? mainChildPos : posRound(fractionalLeft + posOffsetX)
       const childTop = isRow ? posRound(fractionalTop + posOffsetY) : mainChildPos
 

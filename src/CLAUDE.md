@@ -354,8 +354,13 @@ silvery calls `calculateLayout()` on every render. The no-change case (cursor mo
 | Default `flexDirection`                   | Column                                   | Row (CSS default)                          | Row                                                            |
 | Baseline alignment                        | Full spec (recursive first-child)        | Simplified (no recursive propagation)      | Recursive first-child                                          |
 | **Flex-item default min-size**            | `0` (no auto floor)                      | CSS preset: content-based min; Yoga: `0`   | §4.5 item rule: `min-block-size: auto = content-based minimum` |
+| **`measureFunc` leaf main-axis position** | `Math.floor` (never round text down)     | Same rounding as any other child           | Adjacent boxes share an edge; no text exception                |
 
 The `flexShrink` override for overflow containers (line ~1244 in layout-zero.ts) is the most significant _container-side_ divergence. Without it, `overflow:hidden` children inside constrained parents balloon to content size, defeating the purpose of clipping.
+
+### Main-axis tiling beats Yoga's text rounding
+
+Edge-based rounding only tiles if each shared edge is rounded by exactly ONE function. Yoga breaks that on purpose for text — `floor` the position, `ceil` the right edge, so the pixel grid never clips a glyph — and eats a subpixel overlap with the neighbour to buy it. On a cell grid the overlap is a whole cell that the later sibling paints over, and for elided text that cell is the one holding the "…", so content vanishes with no marker. Flexily therefore gives `measureFunc` leaves the same telescoping main-axis position as every other child (`roundedAbsMainStart - roundedAbsParentMainStart`); the cross-axis leaf `Math.floor` is unaffected, as is the Ink center behavior that depends on it. The failure mode is non-monotonic in container width — which children sit past the 0.5 boundary shifts as flex redistributes a deficit — so it is guarded by a width SWEEP (`tests/main-axis-tiling.test.ts`), never by a hand-picked width.
 
 ### Flex-item auto min-size (CSS §4.5, item-side rule — shipped under CSS preset)
 
