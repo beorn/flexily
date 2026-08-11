@@ -374,6 +374,8 @@ Flexily therefore gives `measureFunc` leaves the same telescoping main-axis posi
 
 **Restoring Yoga's text rounding here does not restore fidelity** — level 1 is already intact. Check the differential fuzz before changing level 2.
 
+**`classic/` has NOT adopted the tiling policy, and that limits what it can adjudicate.** It still rounds a child's position with a local `Math.round` of the fractional offset (`classic/layout.ts`) while sizing by absolute edges — two functions for one shared edge — so it does not tile measure leaves the way `zero` now does. **classic is therefore not a reference for QUANTIZATION questions; it remains a reference for allocation behaviour.** If you are debugging a tiling or rounding disagreement, do not treat classic's answer as the oracle: the two are expected to differ at level 2. Whether classic should adopt the policy or be documented as deliberately Yoga-shaped is an open decision — the invariant actually worth testing is that classic and zero agree at LEVEL 1, on pre-quantization continuous values, which is what makes classic a reference at all and which nothing currently checks.
+
 ### Flex-item auto min-size (CSS §4.5, item-side rule — shipped under CSS preset)
 
 CSS §4.5 has two complementary rules: the _container_ side (overflow containers get `min-size: auto = 0`, implemented around layout-zero.ts:587) and the _item_ side (flex items default to `min-block-size: auto = content-based minimum`).
