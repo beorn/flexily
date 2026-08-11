@@ -576,7 +576,7 @@ After ANY change to `layout-zero.ts` or `node-zero.ts`:
 
 ```bash
 # 1. Check CPU load -- no heavy processes running
-top -l 1 -n 5 -stats command,cpu | head -10
+uptime | sed 's/.*load average[s]*: //' && (nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # 2. Run benchmark (from the repo root)
 bun bench bench/yoga-compare-warmup.bench.ts

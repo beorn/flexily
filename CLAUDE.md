@@ -44,7 +44,7 @@ Flexily's value proposition is **performance**. Any change that MAY impact perfo
 
 ```bash
 # Check for CPU-heavy processes that would skew results
-top -l 1 -n 5 -stats command,cpu | head -10
+uptime | sed 's/.*load average[s]*: //' && (nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # BEFORE making changes
 bun bench bench/yoga-compare-warmup.bench.ts > /tmp/bench-before.txt
@@ -52,7 +52,7 @@ bun bench bench/yoga-compare-warmup.bench.ts > /tmp/bench-before.txt
 # Make your changes...
 
 # Check CPU load again (should match pre-change conditions)
-top -l 1 -n 5 -stats command,cpu | head -10
+uptime | sed 's/.*load average[s]*: //' && (nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # AFTER making changes
 bun bench bench/yoga-compare-warmup.bench.ts > /tmp/bench-after.txt
