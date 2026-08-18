@@ -366,7 +366,7 @@ The `flexShrink` override for overflow containers (line ~1244 in layout-zero.ts)
 1. **Continuous space → Yoga semantics.** Certified by the 20533 Yoga-oracle differential over 1728 `measureFunc`-leaf shapes, and still true. The Yoga differential fuzz (451 cases) guards it.
 2. **Quantization to a discrete grid → target-specific policy.** The cell-grid policy's invariant is exact tiling: edge-based rounding only tiles if each shared edge is rounded by exactly ONE function.
 
-Yoga's `floor`-position / `ceil`-right-edge for text is a *subpixel quantization policy*, not semantics.
+Yoga's `floor`-position / `ceil`-right-edge for text is a _subpixel quantization policy_, not semantics.
 
 **Both policies optimize the same value — never silently lose content.** At subpixel scale, loss means clipping a glyph, so Yoga eats an invisible overlap with the neighbour to prevent it. On a cell grid the overlap IS the loss: a whole cell the later sibling paints over, and for elided text that cell is the one holding the "…", so content vanishes with no marker. Same principle, target-inverted policy — which is why the multi-target story needs no exception list (canvas/DOM takes continuous values or Yoga's subpixel policy; the terminal takes tiling).
 

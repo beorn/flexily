@@ -105,19 +105,19 @@ src/
 
 ## Key Files
 
-| File                                 | Purpose                                                      |
-| ------------------------------------ | ------------------------------------------------------------ |
-| `src/create-flexily.ts`              | createFlexily + createBareFlexily + pipe + FlexilyNode mixin |
-| `src/text-layout.ts`                 | TextLayoutService, PreparedText interfaces                   |
-| `src/layout-zero.ts`                 | Core layout: computeLayout + layoutNode - **most critical**  |
-| `src/layout-helpers.ts`              | Edge resolution helpers (margins, padding, borders)          |
-| `src/layout-flex-lines.ts`           | Pre-alloc arrays, line breaking, flex distribution           |
-| `src/layout-measure.ts`              | measureNode - intrinsic sizing                               |
-| `src/node-zero.ts`                   | Node class - **second most performance-critical**            |
-| `bench/yoga-compare-warmup.bench.ts` | Main benchmark vs Yoga — **no `measureFunc` leaves**; blind to text paths |
+| File                                 | Purpose                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `src/create-flexily.ts`              | createFlexily + createBareFlexily + pipe + FlexilyNode mixin               |
+| `src/text-layout.ts`                 | TextLayoutService, PreparedText interfaces                                 |
+| `src/layout-zero.ts`                 | Core layout: computeLayout + layoutNode - **most critical**                |
+| `src/layout-helpers.ts`              | Edge resolution helpers (margins, padding, borders)                        |
+| `src/layout-flex-lines.ts`           | Pre-alloc arrays, line breaking, flex distribution                         |
+| `src/layout-measure.ts`              | measureNode - intrinsic sizing                                             |
+| `src/node-zero.ts`                   | Node class - **second most performance-critical**                          |
+| `bench/yoga-compare-warmup.bench.ts` | Main benchmark vs Yoga — **no `measureFunc` leaves**; blind to text paths  |
 | `bench/yoga-compare-rich.bench.ts`   | Vs Yoga **with `measureFunc` leaves** — required alongside the warmup file |
-| `tests/compose.test.ts`              | Compose API tests (33 tests)                                 |
-| `tests/yoga-comparison.test.ts`      | Yoga compatibility tests (44 tests)                          |
+| `tests/compose.test.ts`              | Compose API tests (33 tests)                                               |
+| `tests/yoga-comparison.test.ts`      | Yoga compatibility tests (44 tests)                                        |
 
 ## Architecture
 
@@ -137,6 +137,7 @@ Flexily is Yoga-compatible but follows CSS spec where Yoga doesn't:
 | `overflow:hidden/scroll` + `flexShrink:0` | Item expands to content size (ignores parent constraint) | Item shrinks to fit parent                                      | §4.5: automatic min-size = 0 for overflow containers |
 | `aspect-ratio` + implicit `stretch`       | Stretch overrides AR on cross-axis                       | AR fallback alignment = `flex-start`                            | CSS Alignment: AR prevents implicit stretch          |
 | **Flex-item default min-size**            | `0` (no auto floor)                                      | CSS preset: content-based minimum (auto rule); Yoga preset: `0` | §4.5: `min-block-size: auto = content-based minimum` |
+
 **`measureFunc` leaf main-axis position is NOT in this table** — it is not a semantic divergence. See [The two-level contract](#the-two-level-contract-semantics-vs-quantization) below.
 
 ## The two-level contract: semantics vs quantization
@@ -146,7 +147,7 @@ Flexily is Yoga-compatible but follows CSS spec where Yoga doesn't:
 1. **In CONTINUOUS space, the contract is Yoga semantics.** That is what the 20533 Yoga-oracle differential certified over 1728 `measureFunc`-leaf shapes, and it still stands.
 2. **Quantization to a discrete grid is TARGET-SPECIFIC policy.** The cell-grid policy's invariant is **exact tiling**: every shared edge is rounded exactly ONCE, by one function.
 
-Yoga's `floor`-the-position / `ceil`-the-right-edge for text is not semantics — it is a *subpixel quantization policy*, and reading it as semantics is the mistake this section exists to prevent.
+Yoga's `floor`-the-position / `ceil`-the-right-edge for text is not semantics — it is a _subpixel quantization policy_, and reading it as semantics is the mistake this section exists to prevent.
 
 **Both policies optimize the SAME value: never silently lose content.** At subpixel scale, loss means clipping a glyph, so Yoga accepts an invisible overlap with the neighbour to prevent it. On a cell grid the overlap **is** the loss — a whole-cell overpaint of exactly the cell holding an elision marker, so text is cut with nothing left to say so. Same principle, target-inverted policy.
 
