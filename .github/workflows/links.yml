@@ -1,4 +1,4 @@
-# vendor-kit: links@0bbe489151fc — generated; edit packages/km-infra/vendor-kit/templates/links.yml in km, then re-sync
+# vendor-kit: links@b023a1ce98bf — generated; edit km/packages/km-infra/vendor-kit/templates/links.yml in km, then re-sync
 name: links
 
 # Per-PR + weekly link checking via lychee. The cheapest fast-feedback layer
@@ -43,7 +43,8 @@ jobs:
           # an unmatched glob is skipped.
           # archive.org 503s under load; the mirror is the fallback for an
           # already-dead original, so checking it is non-signal — ruled @cto
-          # 2026-08-18.
+          # 2026-08-18. (A '#' inside `args: |` would reach lychee as an
+          # argument, which is why this reason lives up here.)
           args: |
             --max-concurrency 24
             --max-retries 2
