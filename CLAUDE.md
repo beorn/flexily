@@ -44,24 +44,28 @@ Flexily's value proposition is **performance**. Any change that MAY impact perfo
 
 ```bash
 # Check for CPU-heavy processes that would skew results
-top -l 1 -n 5 -stats command,cpu | head -10
+uptime | sed 's/.*load average[s]*: //' && (nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # BEFORE making changes
-bun bench bench/yoga-compare-warmup.bench.ts > /tmp/bench-before.txt
+bun bench bench/yoga-compare-warmup.bench.ts bench/yoga-compare-rich.bench.ts > /tmp/bench-before.txt
 
 # Make your changes...
 
 # Check CPU load again (should match pre-change conditions)
-top -l 1 -n 5 -stats command,cpu | head -10
+uptime | sed 's/.*load average[s]*: //' && (nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # AFTER making changes
-bun bench bench/yoga-compare-warmup.bench.ts > /tmp/bench-after.txt
+bun bench bench/yoga-compare-warmup.bench.ts bench/yoga-compare-rich.bench.ts > /tmp/bench-after.txt
 
 # Compare results - look for regressions
 diff /tmp/bench-before.txt /tmp/bench-after.txt
 ```
 
+**BOTH benchmark files, always.** `yoga-compare-warmup.bench.ts` contains **zero** `measureFunc` leaves, so on its own it is structurally blind to every code path that only text nodes reach — it can report a clean pass on a change it never executed. `yoga-compare-rich.bench.ts` exercises them. A gate that cannot see the changed path is not a gate.
+
 **Before each benchmark run**, verify no CPU-heavy processes (builds, other test suites, browsers, video encoding) are running. Inconsistent system load invalidates comparisons.
+
+**Know the instrument's floor before believing a delta.** On a loaded host this benchmark cannot resolve a difference smaller than roughly 10%, which is larger than the <5% bar below — so a number inside that band certifies nothing. Establish the floor with a **null control**: run the harness against two byte-identical copies of the code and see what difference it claims. Measured 2026-08-11 on a 32-core box under fleet load, the null control reported a median +3.66% and a 4-of-25 sign skew **from identical code**. If your measured delta sits inside the null envelope, the honest result is "no measurable difference on this host", not the number.
 
 **Changes that require benchmarking:**
 
@@ -101,18 +105,19 @@ src/
 
 ## Key Files
 
-| File                                 | Purpose                                                      |
-| ------------------------------------ | ------------------------------------------------------------ |
-| `src/create-flexily.ts`              | createFlexily + createBareFlexily + pipe + FlexilyNode mixin |
-| `src/text-layout.ts`                 | TextLayoutService, PreparedText interfaces                   |
-| `src/layout-zero.ts`                 | Core layout: computeLayout + layoutNode - **most critical**  |
-| `src/layout-helpers.ts`              | Edge resolution helpers (margins, padding, borders)          |
-| `src/layout-flex-lines.ts`           | Pre-alloc arrays, line breaking, flex distribution           |
-| `src/layout-measure.ts`              | measureNode - intrinsic sizing                               |
-| `src/node-zero.ts`                   | Node class - **second most performance-critical**            |
-| `bench/yoga-compare-warmup.bench.ts` | Main benchmark comparing Flexily vs Yoga                     |
-| `tests/compose.test.ts`              | Compose API tests (33 tests)                                 |
-| `tests/yoga-comparison.test.ts`      | Yoga compatibility tests (44 tests)                          |
+| File                                 | Purpose                                                                    |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `src/create-flexily.ts`              | createFlexily + createBareFlexily + pipe + FlexilyNode mixin               |
+| `src/text-layout.ts`                 | TextLayoutService, PreparedText interfaces                                 |
+| `src/layout-zero.ts`                 | Core layout: computeLayout + layoutNode - **most critical**                |
+| `src/layout-helpers.ts`              | Edge resolution helpers (margins, padding, borders)                        |
+| `src/layout-flex-lines.ts`           | Pre-alloc arrays, line breaking, flex distribution                         |
+| `src/layout-measure.ts`              | measureNode - intrinsic sizing                                             |
+| `src/node-zero.ts`                   | Node class - **second most performance-critical**                          |
+| `bench/yoga-compare-warmup.bench.ts` | Main benchmark vs Yoga — **no `measureFunc` leaves**; blind to text paths  |
+| `bench/yoga-compare-rich.bench.ts`   | Vs Yoga **with `measureFunc` leaves** — required alongside the warmup file |
+| `tests/compose.test.ts`              | Compose API tests (33 tests)                                               |
+| `tests/yoga-comparison.test.ts`      | Yoga compatibility tests (44 tests)                                        |
 
 ## Architecture
 
@@ -132,6 +137,25 @@ Flexily is Yoga-compatible but follows CSS spec where Yoga doesn't:
 | `overflow:hidden/scroll` + `flexShrink:0` | Item expands to content size (ignores parent constraint) | Item shrinks to fit parent                                      | §4.5: automatic min-size = 0 for overflow containers |
 | `aspect-ratio` + implicit `stretch`       | Stretch overrides AR on cross-axis                       | AR fallback alignment = `flex-start`                            | CSS Alignment: AR prevents implicit stretch          |
 | **Flex-item default min-size**            | `0` (no auto floor)                                      | CSS preset: content-based minimum (auto rule); Yoga preset: `0` | §4.5: `min-block-size: auto = content-based minimum` |
+
+**`measureFunc` leaf main-axis position is NOT in this table** — it is not a semantic divergence. See [The two-level contract](#the-two-level-contract-semantics-vs-quantization) below.
+
+## The two-level contract: semantics vs quantization
+
+**Flexily's contract has two levels, and they are not in tension.**
+
+1. **In CONTINUOUS space, the contract is Yoga semantics.** That is what the 20533 Yoga-oracle differential certified over 1728 `measureFunc`-leaf shapes, and it still stands.
+2. **Quantization to a discrete grid is TARGET-SPECIFIC policy.** The cell-grid policy's invariant is **exact tiling**: every shared edge is rounded exactly ONCE, by one function.
+
+Yoga's `floor`-the-position / `ceil`-the-right-edge for text is not semantics — it is a _subpixel quantization policy_, and reading it as semantics is the mistake this section exists to prevent.
+
+**Both policies optimize the SAME value: never silently lose content.** At subpixel scale, loss means clipping a glyph, so Yoga accepts an invisible overlap with the neighbour to prevent it. On a cell grid the overlap **is** the loss — a whole-cell overpaint of exactly the cell holding an elision marker, so text is cut with nothing left to say so. Same principle, target-inverted policy.
+
+This is also why the multi-target story needs no exception list: a canvas/DOM target takes continuous values or Yoga's subpixel policy; a terminal target takes tiling. One principle, resolved per target.
+
+**Concretely**: the main axis uses the telescoping `round(absChild) - round(absParent)` for `measureFunc` leaves and containers alike. Yoga's cross-axis leaf `Math.floor` is untouched. Guarded by a width SWEEP (`tests/main-axis-tiling.test.ts`), never a hand-picked width, because the failure mode is non-monotonic in container width. See also the "Measure leaf rounding vs box sibling" block in `tests/layout.test.ts`.
+
+**If you are here to restore Yoga fidelity**: the fidelity you are looking for is at level 1 and is intact — check the Yoga differential fuzz (451 cases) before changing anything at level 2.
 
 **Flex-item auto min-size (CSS §4.5 item-side, shipped under CSS preset)**: CSS §4.5 has two complementary rules. Flexily implements both — the _container_ side (overflow containers can shrink to 0) and the _item_ side (flex items default to a content-based minimum, not 0). Under Yoga preset (`flexShrink: 0` + `min: undefined → 0`) this is invisible because items never shrink. Under CSS preset (`flexShrink: 1` + `min: auto → content`), items keep their intrinsic content size when overflow is visible, and shrink to 0 when overflow is hidden/scroll/auto. The implementation derives content-size separately from `flex-basis` so `flex: 1 1 0` patterns keep their content. Aspect-ratio + definite cross-axis clamps the auto-min by the transferred-size suggestion. See `tests/auto-min-size.test.ts`.
 

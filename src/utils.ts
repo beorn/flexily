@@ -22,6 +22,89 @@ import type { MathExpr, Value } from "./types.js"
  */
 export const traversalStack: unknown[] = []
 
+export function styleValueMatches(current: Value, value: number, unit: number): boolean {
+  return current.unit === unit && Object.is(current.value, value)
+}
+
+/**
+ * Return true when setEdgeValue would leave the edge array unchanged.
+ */
+export function edgeValueMatches(
+  arr: [Value, Value, Value, Value, Value, Value],
+  edge: number,
+  value: number,
+  unit: number,
+): boolean {
+  switch (edge) {
+    case C.EDGE_LEFT:
+      return styleValueMatches(arr[0], value, unit)
+    case C.EDGE_TOP:
+      return styleValueMatches(arr[1], value, unit)
+    case C.EDGE_RIGHT:
+      return styleValueMatches(arr[2], value, unit)
+    case C.EDGE_BOTTOM:
+      return styleValueMatches(arr[3], value, unit)
+    case C.EDGE_HORIZONTAL:
+      return styleValueMatches(arr[0], value, unit) && styleValueMatches(arr[2], value, unit)
+    case C.EDGE_VERTICAL:
+      return styleValueMatches(arr[1], value, unit) && styleValueMatches(arr[3], value, unit)
+    case C.EDGE_ALL:
+      return (
+        styleValueMatches(arr[0], value, unit) &&
+        styleValueMatches(arr[1], value, unit) &&
+        styleValueMatches(arr[2], value, unit) &&
+        styleValueMatches(arr[3], value, unit)
+      )
+    case C.EDGE_START:
+      return styleValueMatches(arr[4], value, unit)
+    case C.EDGE_END:
+      return styleValueMatches(arr[5], value, unit)
+    default:
+      return true
+  }
+}
+
+function borderMatches(current: number, value: number): boolean {
+  return Object.is(current, value)
+}
+
+/**
+ * Return true when setEdgeBorder would leave the edge array unchanged.
+ */
+export function edgeBorderMatches(
+  arr: [number, number, number, number, number, number],
+  edge: number,
+  value: number,
+): boolean {
+  switch (edge) {
+    case C.EDGE_LEFT:
+      return borderMatches(arr[0], value)
+    case C.EDGE_TOP:
+      return borderMatches(arr[1], value)
+    case C.EDGE_RIGHT:
+      return borderMatches(arr[2], value)
+    case C.EDGE_BOTTOM:
+      return borderMatches(arr[3], value)
+    case C.EDGE_HORIZONTAL:
+      return borderMatches(arr[0], value) && borderMatches(arr[2], value)
+    case C.EDGE_VERTICAL:
+      return borderMatches(arr[1], value) && borderMatches(arr[3], value)
+    case C.EDGE_ALL:
+      return (
+        borderMatches(arr[0], value) &&
+        borderMatches(arr[1], value) &&
+        borderMatches(arr[2], value) &&
+        borderMatches(arr[3], value)
+      )
+    case C.EDGE_START:
+      return borderMatches(arr[4], value)
+    case C.EDGE_END:
+      return borderMatches(arr[5], value)
+    default:
+      return true
+  }
+}
+
 /**
  * Set a value on an edge array (supports all edge types including logical START/END).
  */

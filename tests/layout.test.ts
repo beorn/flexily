@@ -300,14 +300,29 @@ describe("Flexily Layout Engine", () => {
     })
   })
 
-  describe("Measure leaf rounding vs box sibling (Yoga-faithful — 20533)", () => {
-    // 20533 was filed as "measureFunc leaf floor collapses centered gaps". A
-    // Yoga-oracle differential (yoga-wasm-web) over 1728 measureFunc-leaf + box
-    // centered shapes found flexily == real Yoga in ALL of them: the floor is
-    // Yoga-FAITHFUL (added deliberately in 62d2cc8, which fixed 4 Ink center
-    // tests). floor->round would DIVERGE from Yoga. The differential fuzz never
-    // set a measureFunc, which is why this was misread as a flexily bug. These
-    // expectations are the values real Yoga produces (verified via the oracle).
+  describe("Measure leaf rounding vs box sibling (main-axis tiling — 20533)", () => {
+    // 20533 was filed as "measureFunc leaf floor collapses centered gaps", and
+    // the gap collapse was real: a `Math.floor` on the leaf's MAIN-axis position
+    // put the leaf one row above the edge its size had been rounded against, so
+    // it ate the gap row and the two halves of the free space came out 4/3
+    // against a content box that only spent 3 of 10 rows.
+    //
+    // A Yoga-oracle differential (yoga-wasm-web) over 1728 measureFunc-leaf +
+    // box centered shapes showed the floor was Yoga-FAITHFUL — real Yoga
+    // collapses the gap too — and the bead was closed on that fidelity. Yoga can
+    // afford it: it rounds to a device pixel grid, where a subpixel overlap
+    // between a text view and its neighbour is invisible. On a terminal cell
+    // grid the overlap is a whole cell, the later sibling paints over it, and
+    // when the earlier sibling was elided text the cell it destroys is the one
+    // holding the "…". Content then disappears with no marker at all.
+    //
+    // A shared edge must therefore be rounded by exactly ONE function for every
+    // node type, so the main axis now uses the same telescoping
+    // `round(absChild) - round(absParent)` for measureFunc leaves as for boxes.
+    // These expectations are the exactly-tiling values; they diverge from real
+    // Yoga by one row for a measure leaf sitting at a fractional justify offset,
+    // and that divergence is deliberate. The CROSS-axis `Math.floor` (62d2cc8,
+    // the one that fixed 4 Ink center tests) is untouched.
     function centeredColumn(rootH: number, gap: number, leafFirst: boolean) {
       const root = Node.create()
       root.setWidth(20)
@@ -331,18 +346,24 @@ describe("Flexily Layout Engine", () => {
       return { leaf, box }
     }
 
-    it("odd free space, box-first: box rounds / leaf floors (Yoga-faithful)", () => {
-      // rootH=10, content=1+1+gap1=3, free=7 -> 3.5 each side.
-      // box(idx0) rounds to 4, leaf(idx1) floors to 5 — matches real Yoga.
+    it("odd free space, box-first: leaf lands after the gap, not on it", () => {
+      // INVARIANT: every shared edge is rounded exactly once, so a leaf occupies
+      // the same edge its size was measured against — leaves tile like any box.
+      // rootH=10, content=1+1+gap1=3, free=7 -> 3.5 each side. box(idx0) at 4,
+      // gap row 5, leaf(idx1) at 6. Under the old floor the leaf sat at 5 and
+      // the gap row vanished.
       const { leaf, box } = centeredColumn(10, 1, false)
       expectLayout(box, { top: 4 })
-      expectLayout(leaf, { top: 5 })
+      expectLayout(leaf, { top: 6 })
     })
 
-    it("odd free space, leaf-first: leaf floors / box rounds (Yoga-faithful)", () => {
-      // leaf(idx0) floors to 3, box(idx1) rounds to 6 — matches real Yoga.
+    it("odd free space, leaf-first: leaf lands before the gap, not on top of it", () => {
+      // INVARIANT: every shared edge is rounded exactly once, so no cell is
+      // unowned — the mirror of the overlap case, and the same one rounding.
+      // leaf(idx0) at 4, gap row 5, box(idx1) at 6. Under the old floor the leaf
+      // sat at 3, leaving an unowned hole at row 5.
       const { leaf, box } = centeredColumn(10, 1, true)
-      expectLayout(leaf, { top: 3 })
+      expectLayout(leaf, { top: 4 })
       expectLayout(box, { top: 6 })
     })
 

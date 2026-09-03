@@ -355,7 +355,26 @@ silvery calls `calculateLayout()` on every render. The no-change case (cursor mo
 | Baseline alignment                        | Full spec (recursive first-child)        | Simplified (no recursive propagation)      | Recursive first-child                                          |
 | **Flex-item default min-size**            | `0` (no auto floor)                      | CSS preset: content-based min; Yoga: `0`   | §4.5 item rule: `min-block-size: auto = content-based minimum` |
 
+`measureFunc` leaf main-axis position is deliberately absent from this table — it is a quantization-policy difference, not a semantic divergence. See below.
+
 The `flexShrink` override for overflow containers (line ~1244 in layout-zero.ts) is the most significant _container-side_ divergence. Without it, `overflow:hidden` children inside constrained parents balloon to content size, defeating the purpose of clipping.
+
+### The two-level contract: semantics vs quantization
+
+**This is NOT a semantic divergence, and reading it as one is the mistake this section prevents.** The contract has two levels:
+
+1. **Continuous space → Yoga semantics.** Certified by the 20533 Yoga-oracle differential over 1728 `measureFunc`-leaf shapes, and still true. The Yoga differential fuzz (451 cases) guards it.
+2. **Quantization to a discrete grid → target-specific policy.** The cell-grid policy's invariant is exact tiling: edge-based rounding only tiles if each shared edge is rounded by exactly ONE function.
+
+Yoga's `floor`-position / `ceil`-right-edge for text is a _subpixel quantization policy_, not semantics.
+
+**Both policies optimize the same value — never silently lose content.** At subpixel scale, loss means clipping a glyph, so Yoga eats an invisible overlap with the neighbour to prevent it. On a cell grid the overlap IS the loss: a whole cell the later sibling paints over, and for elided text that cell is the one holding the "…", so content vanishes with no marker. Same principle, target-inverted policy — which is why the multi-target story needs no exception list (canvas/DOM takes continuous values or Yoga's subpixel policy; the terminal takes tiling).
+
+Flexily therefore gives `measureFunc` leaves the same telescoping main-axis position as every other child (`roundedAbsMainStart - roundedAbsParentMainStart`); the cross-axis leaf `Math.floor` is unaffected, as is the Ink center behavior that depends on it. The failure mode is non-monotonic in container width — which children sit past the 0.5 boundary shifts as flex redistributes a deficit — so it is guarded by a width SWEEP (`tests/main-axis-tiling.test.ts`), never by a hand-picked width.
+
+**Restoring Yoga's text rounding here does not restore fidelity** — level 1 is already intact. Check the differential fuzz before changing level 2.
+
+**`classic/` has NOT adopted the tiling policy, and that limits what it can adjudicate.** It still rounds a child's position with a local `Math.round` of the fractional offset (`classic/layout.ts`) while sizing by absolute edges — two functions for one shared edge — so it does not tile measure leaves the way `zero` now does. **classic is therefore not a reference for QUANTIZATION questions; it remains a reference for allocation behaviour.** If you are debugging a tiling or rounding disagreement, do not treat classic's answer as the oracle: the two are expected to differ at level 2. Whether classic should adopt the policy or be documented as deliberately Yoga-shaped is an open decision — the invariant actually worth testing is that classic and zero agree at LEVEL 1, on pre-quantization continuous values, which is what makes classic a reference at all and which nothing currently checks.
 
 ### Flex-item auto min-size (CSS §4.5, item-side rule — shipped under CSS preset)
 
@@ -559,10 +578,14 @@ After ANY change to `layout-zero.ts` or `node-zero.ts`:
 
 ```bash
 # 1. Check CPU load -- no heavy processes running
-top -l 1 -n 5 -stats command,cpu | head -10
+uptime | sed 's/.*load average[s]*: //' && (nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 # 2. Run benchmark (from the repo root)
-bun bench bench/yoga-compare-warmup.bench.ts
+# BOTH files: the warmup benchmark has zero measureFunc leaves and is blind to
+# text-only paths. Establish the harness floor with a null control (two
+# byte-identical copies) before believing any delta — under fleet load it has
+# reported +3.66% from identical code.
+bun bench bench/yoga-compare-warmup.bench.ts bench/yoga-compare-rich.bench.ts
 
 # 3. Compare against baseline:
 #    Flexily should be ~2x Yoga for flat trees
