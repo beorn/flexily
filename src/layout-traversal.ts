@@ -32,7 +32,7 @@ export function markSubtreeLayoutSeen(node: Node): void {
  * ancestor (iterative to avoid stack overflow).
  *
  * Required after a SIZING pass that ran the full algorithm over a subtree
- * (`measureByLayout` in layout-zero.ts). Such a pass lays the subtree out at
+ * (`sizeByLayout` in layout-zero.ts). Such a pass lays the subtree out at
  * absolute (0,0) with offsets 0 and overwrites layout.left/top/width/height
  * throughout, so every fingerprint it leaves behind describes a geometry the
  * positioning pass must not reuse. The plain `measureNode` path writes no

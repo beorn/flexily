@@ -17,11 +17,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   axis, so the text reported one line and the row came back one row tall.
   The container itself ended up correct in Phase 8, but the parent had
   already handed those rows to a `flexGrow` sibling, pushing every later
-  sibling down and off the frame. `measureNode` now hands the one case
+  sibling down and off the frame. `measureNode` now REPORTS the one case
   its shortcut cannot answer — a row whose children's max-content sum
-  overflows a definite main size — to the real algorithm instead of
-  approximating it, so the base size arrives already wrapped. Regression:
-  `tests/parent-flex-base-nested-row-wrap.test.ts`.
+  overflows a definite main size — and Phase 5b re-derives that base size
+  through the real algorithm, so the number arrives already wrapped.
+  Regression: `tests/parent-flex-base-nested-row-wrap.test.ts`.
+- **The re-derivation is paid for only where the base size can be seen.**
+  What the shortcut under-estimates is always a HEIGHT, so only a COLUMN
+  can distribute from it; a row's base sizes are widths, which are exact
+  at an unconstrained main axis. Phase 5b therefore skips row-direction
+  containers, and in a column runs the real algorithm only when the
+  container has a definite main size and a child that can absorb free
+  space in either direction, or wraps, or justifies other than
+  `flex-start`. Everywhere else the approximation never surfaces, because
+  Phase 8 advances by each child's actual laid-out size and Phase 9
+  shrink-wraps from the same. On the TUI-board benchmark under the Yoga
+  preset this is the difference between 533 and 261 `layoutNode` calls at
+  5x10, for identical output. Under the CSS preset, where every child is
+  shrinkable by default, the columns really do distribute and the calls
+  stay high: 431 at 5x10 and 3137 at 8x30 against 261 and 1217 before the
+  fix. That is the price of the correct base size on those trees.
 - **Phase 7a no longer reads flex-line children through a stale alias.**
   Measuring a child there can re-enter layout (a user `measureFunc` that
   lays out another tree, or the sizing pass above); the nested pass trims

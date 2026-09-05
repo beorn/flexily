@@ -25,6 +25,7 @@ import {
   MEASURE_MODE_MIN_CONTENT,
   Node,
 } from "../src/index.js"
+import * as stats from "../src/layout-stats.js"
 
 const CSS = { defaults: "css" as const }
 
@@ -128,6 +129,65 @@ function frame(rail: Node, cols: number) {
   return { root, head, header, list, pills, stats, footer }
 }
 
+/**
+ * The same head in a frame that distributes nothing: an INDEFINITE main axis,
+ * so there is no free space for anyone to absorb, no wrap and no justify
+ * offset. Nothing here reads the summed base sizes, so the approximate one is
+ * invisible — Phase 8 lays the head out for real and Phase 9 shrink-wraps the
+ * column from its children's actual sizes.
+ */
+function calmFrame(rail: Node, cols: number) {
+  const root = Node.create(CSS)
+  root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  root.setWidth(cols)
+
+  const head = Node.create(CSS)
+  head.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  head.setFlexShrink(0)
+  head.insertChild(label(10), 0)
+  head.insertChild(rail, 1)
+  head.insertChild(label(13), 2)
+  root.insertChild(head, 0)
+
+  const footer = label(6)
+  root.insertChild(footer, 1)
+
+  root.calculateLayout(cols, NaN, DIRECTION_LTR)
+  return { root, head, footer }
+}
+
+/**
+ * A fixed-height column with no flexGrow child that FITS under the
+ * approximation — head 3 plus body 6 of 10 rows — and overflows once the head
+ * is measured exactly, at 5 plus 6. The deficit has to come out of the
+ * shrinkable body, which only happens if the base size was made exact before
+ * the distribution ran. Summing the approximate base sizes cannot predict
+ * this: they are the under-estimates in question.
+ */
+function tightFrame(rail: Node) {
+  const root = Node.create(CSS)
+  root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  root.setWidth(120)
+  root.setHeight(10)
+
+  const head = Node.create(CSS)
+  head.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  head.setFlexShrink(0)
+  head.insertChild(label(10), 0)
+  head.insertChild(rail, 1)
+  head.insertChild(label(13), 2)
+  root.insertChild(head, 0)
+
+  const body = Node.create(CSS)
+  body.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  body.setMinHeight(0)
+  for (let i = 0; i < 6; i++) body.insertChild(label(6), i)
+  root.insertChild(body, 1)
+
+  root.calculateLayout(120, 10, DIRECTION_LTR)
+  return { root, head, body }
+}
+
 function tops(f: ReturnType<typeof frame>) {
   return {
     head: f.head.getComputedHeight(),
@@ -163,5 +223,45 @@ describe("a column's flex base size for a child holding a row with wrapped text"
     const f = frame(markerRow(prose(LENGTH)), 240)
     // Measured 2026-09-05 on flexily 0.7.3: list 14, pills 20, stats 21, footer 30.
     expect(tops(f)).toEqual({ head: 4, header: 4, list: 14, pills: 19, stats: 20, footer: 29 })
+  })
+
+  it("a column that distributes nothing keeps the fast path", () => {
+    // The rail wraps here too, but this frame hands the base size to nothing:
+    // no flexGrow sibling, no wrap, justify-content flex-start, and it fits.
+    // The head is still the right height, and flexily must not pay for a
+    // sizing pass to get there — the same count as a rail that never wrapped.
+    const wrapped = calmFrame(markerRow(prose(LENGTH)), 120)
+    const wrappedSizingCalls = stats.layoutSizingCalls
+    expect(wrapped.head.getComputedHeight()).toBe(5)
+    expect(wrapped.footer.getComputedTop()).toBe(5)
+
+    const flat = calmFrame(markerRow(prose(40)), 120)
+    const flatSizingCalls = stats.layoutSizingCalls
+    expect(flat.head.getComputedHeight()).toBe(3)
+    expect(wrappedSizingCalls).toBe(flatSizingCalls)
+  })
+
+  it("a column that does distribute pays for the exact base size", () => {
+    // Same rail, same wrap, but now a flexGrow sibling consumes the free space
+    // derived from the head's base size, so the approximate one would reach the
+    // output. flexily re-derives it through the real algorithm, which costs
+    // sizing passes the non-wrapping control never runs.
+    frame(markerRow(prose(LENGTH)), 120)
+    const wrappedSizingCalls = stats.layoutSizingCalls
+    frame(markerRow(prose(40)), 120)
+    const flatSizingCalls = stats.layoutSizingCalls
+    expect(wrappedSizingCalls).toBeGreaterThan(flatSizingCalls)
+  })
+
+  it("a fixed-height column that only overflows once the base size is exact", () => {
+    // Head 3 + body 6 fits the 10 rows under the approximation; head 5 + body 6
+    // does not. The shrinkable body must give up the row, and nothing may land
+    // below the frame. Before the fix the column saw 9 of 10, distributed
+    // nothing, and let the body run one row past the bottom.
+    const f = tightFrame(markerRow(prose(LENGTH)))
+    expect(f.head.getComputedHeight()).toBe(5)
+    expect(f.body.getComputedTop()).toBe(5)
+    expect(f.body.getComputedHeight()).toBe(5)
+    expect(f.body.getComputedTop() + f.body.getComputedHeight()).toBe(10)
   })
 })

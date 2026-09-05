@@ -17,17 +17,6 @@ import { resolveEdgeValue, resolveEdgeBorderValue, isRowDirection } from "./layo
 import { incMeasureNodeCalls, incLayoutCacheHits } from "./layout-stats.js"
 
 /**
- * The real layout algorithm, run as a sizing pass, injected by the caller.
- *
- * `layout-measure.ts` must not import `layout-zero.ts` — that is an import
- * cycle — so the one case the shrink-wrap shortcut below cannot answer is
- * handed back out through this parameter. The implementation lays `node` out
- * at the given constraints and leaves the result in `node.layout`; see
- * `measureByLayout` in layout-zero.ts.
- */
-export type MeasureLayoutFn = (node: Node, availableWidth: number, availableHeight: number, direction: number) => void
-
-/**
  * Measure a node to get its intrinsic size without computing positions.
  * This is a lightweight alternative to layoutNode for sizing-only passes.
  *
@@ -37,16 +26,13 @@ export type MeasureLayoutFn = (node: Node, availableWidth: number, availableHeig
  * @param availableWidth - Available width (NaN for unconstrained)
  * @param availableHeight - Available height (NaN for unconstrained)
  * @param direction - Layout direction (LTR or RTL)
- * @param layoutSizingPass - The real algorithm, for the one case the shortcut
- *   is unsound (a row overflowing a definite main size — see below)
+ * @returns Whether the result is APPROXIMATE — an under-estimate, because the
+ *   shrink-wrap shortcut met an overflowing row at or below `node`. The caller
+ *   decides what to do about it; `layout-zero.ts` Phase 5 re-derives such a
+ *   base size through the real algorithm when it is about to distribute from
+ *   it, and keeps the approximation when it is not. See the block below.
  */
-export function measureNode(
-  node: Node,
-  availableWidth: number,
-  availableHeight: number,
-  direction: number,
-  layoutSizingPass: MeasureLayoutFn,
-): void {
+export function measureNode(node: Node, availableWidth: number, availableHeight: number, direction: number): boolean {
   incMeasureNodeCalls()
   const style = node.style
   const layout = node.layout
@@ -55,7 +41,7 @@ export function measureNode(
   if (style.display === C.DISPLAY_NONE) {
     layout.width = 0
     layout.height = 0
-    return
+    return false
   }
 
   // Calculate spacing
@@ -157,7 +143,7 @@ export function measureNode(
 
     layout.width = Math.round(nodeWidth)
     layout.height = Math.round(nodeHeight)
-    return
+    return false
   }
 
   // Handle leaf nodes without measureFunc
@@ -170,7 +156,7 @@ export function measureNode(
     }
     layout.width = Math.round(nodeWidth)
     layout.height = Math.round(nodeHeight)
-    return
+    return false
   }
 
   // For container nodes, we need to measure children to compute intrinsic size
@@ -191,7 +177,7 @@ export function measureNode(
     if (Number.isNaN(nodeHeight)) nodeHeight = minInnerHeight
     layout.width = Math.round(nodeWidth)
     layout.height = Math.round(nodeHeight)
-    return
+    return false
   }
 
   const isRow = isRowDirection(style.flexDirection)
@@ -203,6 +189,9 @@ export function measureNode(
   let totalMainSize = 0
   let maxCrossSize = 0
   let itemCount = 0
+  // Set when this measurement, or any measurement below it, took the
+  // shrink-wrap shortcut on a row that overflows a definite main size.
+  let approx = false
 
   for (const child of node.children) {
     // Skip absolute/hidden children (same filter as count pass)
@@ -234,16 +223,20 @@ export function measureNode(
     const cached = child.getCachedLayout(childAvailW, childAvailH)
     if (cached) {
       incLayoutCacheHits()
+      // The verdict rides in the cache entry, so a hit reports the same
+      // approximate-ness the miss would have.
+      if (cached.approx) approx = true
     } else {
       // Save/restore layout around measureNode — it overwrites node.layout
       const savedW = child.layout.width
       const savedH = child.layout.height
-      measureNode(child, childAvailW, childAvailH, direction, layoutSizingPass)
+      const childApprox = measureNode(child, childAvailW, childAvailH, direction)
       measuredW = child.layout.width
       measuredH = child.layout.height
       child.layout.width = savedW
       child.layout.height = savedH
-      child.setCachedLayout(childAvailW, childAvailH, measuredW, measuredH)
+      child.setCachedLayout(childAvailW, childAvailH, measuredW, measuredH, childApprox)
+      if (childApprox) approx = true
     }
 
     const childMainSize = cached ? (isRow ? cached.width : cached.height) : isRow ? measuredW : measuredH
@@ -268,11 +261,12 @@ export function measureNode(
   // overflows it, the real algorithm shrinks them (or breaks them across
   // lines), and wrappable text inside then needs MORE rows than it reported
   // here — max-content is its one-line floor, so this measurement can only
-  // under-estimate the cross size. A parent distributing free space from that
-  // under-estimate puts every later sibling that many rows too low.
+  // under-estimate the cross size.
   //
-  // There is exactly one flexible-length resolution in this engine and it is
-  // layoutNode's. Run it instead of approximating it here.
+  // This function does not resolve that: there is exactly one flexible-length
+  // resolution in the engine and it is layoutNode's. It reports the
+  // under-estimate instead, and layout-zero.ts Phase 5 pays for the real
+  // algorithm only when it is about to distribute free space from the number.
   //
   // Row-only by construction: line wrapping keys off the INLINE size, which
   // for a row is the main axis this function deliberately leaves NaN. A
@@ -285,8 +279,7 @@ export function measureNode(
   // Laying such a row out for real would wrap its text at width 0; the
   // shrink-wrap answer (max-content, one line) is the better estimate there.
   if (isRow && mainAxisSize > 0 && totalMainSize > mainAxisSize) {
-    layoutSizingPass(node, availableWidth, availableHeight, direction)
-    return
+    approx = true
   }
 
   // Compute final node size
@@ -303,4 +296,5 @@ export function measureNode(
 
   layout.width = Math.round(nodeWidth)
   layout.height = Math.round(nodeHeight)
+  return approx
 }

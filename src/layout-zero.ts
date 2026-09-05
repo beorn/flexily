@@ -63,7 +63,7 @@ import {
   incLayoutPositioningCalls,
   incLayoutCacheHits,
 } from "./layout-stats.js"
-import { measureNode, type MeasureLayoutFn } from "./layout-measure.js"
+import { measureNode } from "./layout-measure.js"
 import {
   MAX_FLEX_LINES,
   _lineCrossSizes,
@@ -102,46 +102,32 @@ export function computeLayout(
 }
 
 /**
- * Run the real algorithm as a sizing pass on `measureNode`'s behalf, for the
- * one case its shrink-wrap shortcut cannot answer: a row whose children
- * overflow a definite main size (see layout-measure.ts). Injected rather than
- * imported — layout-measure.ts importing this module would be a cycle.
+ * Re-derive a child's flex base size with the REAL algorithm, for the one case
+ * `measureNode`'s shrink-wrap shortcut cannot answer: a row whose children
+ * overflow a definite main size (see layout-measure.ts). Phase 5 calls this
+ * only for a child measureNode flagged approximate, and only when this
+ * container is about to distribute from the number.
  *
- * This variant does NOT bracket the module line-scratch arrays, and is for the
- * phases that run BEFORE this node breaks its own lines (Phase 3's fit-width
- * pre-measure and Phase 5's base sizes). Such a call is no more exposed than
- * Phase 8's own recursion into a child, which corrupts those arrays already.
- * Bracketing costs ~34 allocations per call in a zero-allocation engine —
- * measured at a 1.5x slowdown of the TUI-board benchmark — so the phases that
- * DO hold live line data use `measureByLayoutDuringLines` instead.
+ * Leaves the exact size in `node.layout`; the caller save/restores as it does
+ * around measureNode.
  */
-const measureByLayout: MeasureLayoutFn = (node, availableWidth, availableHeight, direction) => {
+function sizeByLayout(node: Node, availableWidth: number, availableHeight: number, direction: number): void {
   layoutNode(node, availableWidth, availableHeight, 0, 0, 0, 0, direction)
   // The pass just overwrote layout.left/top/width/height throughout the
   // subtree, at absolute (0,0) with offsets 0, and left a VALID fingerprint on
   // every node it touched. Both halves are poison for the positioning pass: a
   // fingerprint hit would keep an origin-relative position, and on this node
-  // measureNode's caller additionally restores layout.width/height to their
-  // pre-measure values the moment we return — "Bug 1: measureNode corruption"
+  // the caller additionally restores layout.width/height to their pre-measure
+  // values the moment we return — "Bug 1: measureNode corruption"
   // (src/CLAUDE.md) one level up. Drop the whole subtree's fingerprints so the
   // real pass recomputes every node it is about to reposition. The plain
   // measureNode path writes no fingerprints at all; this restores parity.
+  //
+  // No enterLayout/exitLayout bracket: Phase 5 runs before this container
+  // breaks its own lines, so no live line data is in the module scratch
+  // arrays, and the nested pass is no more exposed than Phase 8's own
+  // recursion into a child.
   invalidateFingerprintsAround(node)
-}
-
-/**
- * `measureByLayout` for the phases that run BETWEEN line breaking and Phase 8
- * (Phase 6c's baseline pre-measure, Phase 7a's line cross-size estimate). Those
- * hold live per-line data in the module scratch arrays, so the nested pass is
- * bracketed the way a re-entrant `calculateLayout()` from a measureFunc is.
- */
-const measureByLayoutDuringLines: MeasureLayoutFn = (node, availableWidth, availableHeight, direction) => {
-  const saved = enterLayout()
-  try {
-    measureByLayout(node, availableWidth, availableHeight, direction)
-  } finally {
-    exitLayout(saved)
-  }
 }
 
 /**
@@ -278,7 +264,7 @@ function layoutNode(
   if (style.fitWidth !== undefined && style.fitWidth.length > 0) {
     let maxContent = 0
     for (const child of node.children) {
-      measureNode(child, NaN, NaN, direction, measureByLayout)
+      measureNode(child, NaN, NaN, direction)
       maxContent += child.layout.width
     }
     // Add gaps + padding + border. gap[0] is column gap (row layout's between-children).
@@ -522,6 +508,12 @@ function layoutNode(
   let relativeCount = 0
   let totalAutoMargins = 0 // Count auto margins during this pass
   let hasBaselineAlignment = style.alignItems === C.ALIGN_BASELINE
+  // Whether any child's base size is an under-estimate from measureNode's
+  // shortcut, and whether any child can absorb free space in either
+  // direction. All three feed the re-derivation decision after this loop.
+  let anyBaseApprox = false
+  let anyFlexGrow = false
+  let anyFlexShrink = false
 
   for (const child of node.children) {
     // Mark relativeIndex (-1 for absolute/hidden, 0+ for relative)
@@ -595,6 +587,10 @@ function layoutNode(
     const autoMinNeedsContent =
       minValEarly.unit === C.UNIT_AUTO && childStyle.overflow === C.OVERFLOW_VISIBLE && !isFitContentEarly
     let baseSize = 0
+    // Set when the base size below came from measureNode's shrink-wrap
+    // shortcut over a row that overflows a definite main size, i.e. it is an
+    // under-estimate. Only the auto-sized-container branch can produce one.
+    let baseApprox = false
     let contentMinSize = 0
     if (childStyle.flexBasis.unit === C.UNIT_POINT) {
       baseSize = childStyle.flexBasis.value
@@ -678,6 +674,7 @@ function layoutNode(
           incLayoutCacheHits()
           _t?.cacheHit(_tn, sizingW, sizingH, cached.width, cached.height)
           baseSize = isRow ? cached.width : cached.height
+          baseApprox = cached.approx
         } else {
           _t?.cacheMiss(_tn, sizingW, sizingH)
           // Use measureNode for sizing-only pass (faster than full layoutNode)
@@ -687,7 +684,7 @@ function layoutNode(
           // in Phase 9 would skip re-computation and preserve the corrupted values.
           const savedW = child.layout.width
           const savedH = child.layout.height
-          measureNode(child, sizingW, sizingH, direction, measureByLayout)
+          baseApprox = measureNode(child, sizingW, sizingH, direction)
           const measuredW = child.layout.width
           const measuredH = child.layout.height
           child.layout.width = savedW
@@ -695,7 +692,7 @@ function layoutNode(
           _t?.measureSaveRestore(_tn, savedW, savedH, measuredW, measuredH)
           baseSize = isRow ? measuredW : measuredH
           // Cache the result for potential reuse
-          child.setCachedLayout(sizingW, sizingH, measuredW, measuredH)
+          child.setCachedLayout(sizingW, sizingH, measuredW, measuredH, baseApprox)
         }
       } else {
         // For auto-sized LEAF children without measureFunc, use padding + border as minimum
@@ -970,6 +967,14 @@ function layoutNode(
     // Store base and main size (start from base size - distribution happens from here)
     cflex.baseSize = baseSize
     cflex.mainSize = baseSize
+    cflex.baseApprox = baseApprox
+    if (baseApprox) anyBaseApprox = true
+    if (childStyle.flexGrow > 0) anyFlexGrow = true
+    // cflex.flexShrink is the EFFECTIVE factor this same loop just derived,
+    // all four rules included (explicit value, overflow container, measured
+    // flexGrow leaf, fit-content). Reading it back is not a second
+    // implementation of them — it is the one implementation's answer.
+    if (cflex.flexShrink > 0) anyFlexShrink = true
     cflex.frozen = false // Will be set during distribution
 
     // Free space calculation uses BASE sizes (per Yoga/CSS spec algorithm)
@@ -983,6 +988,80 @@ function layoutNode(
     // Check for baseline alignment
     if (!hasBaselineAlignment && childStyle.alignSelf === C.ALIGN_BASELINE) {
       hasBaselineAlignment = true
+    }
+  }
+
+  // =========================================================================
+  // PHASE 5b: Re-derive approximate base sizes, but only where they can matter
+  // =========================================================================
+  // measureNode reports an under-estimate rather than resolving it (see
+  // layout-measure.ts): a row that overflows a definite main size reports its
+  // text as one line when the real algorithm would wrap it to several.
+  //
+  // What is under-estimated is always a HEIGHT. The detection fires on a row
+  // overflowing its inline size, and what it gets wrong is that row's CROSS
+  // size; the flag then bubbles up as a height under-estimate at every level
+  // (a column's main size, then that column's parent row's cross size, and so
+  // on). So only a COLUMN can distribute from the bad number. A row's base
+  // sizes are WIDTHS, and a width is never approximate here: measured at an
+  // unconstrained main axis, a nested row's percent width resolves to NaN and
+  // a point width is exact either way. A row's cross axis comes from its
+  // children's ACTUAL layout — the stretch override, or Phase 9's max of
+  // child.layout — and its multi-line cross sizes from Phase 7a's estimate at
+  // NaN width, which a sizing pass at NaN width could not improve. Hence the
+  // `!isRow` guard: the flag keeps bubbling THROUGH rows, only the action is
+  // column-only.
+  //
+  // For a column, three things read the summed base sizes:
+  //
+  //  - Free space is distributed from them, so a short one hands a flexGrow
+  //    sibling rows that are not free, or under-states the deficit a
+  //    shrinkable sibling must absorb. That is the failure
+  //    tests/parent-flex-base-nested-row-wrap.test.ts pins, both directions.
+  //  - justify-content other than flex-start positions the line from the
+  //    remaining space, which is that same sum. flex-start ignores it.
+  //  - flex-wrap breaks lines from hypothetical main sizes, i.e. base sizes.
+  //
+  // Everything else already works from each child's ACTUAL laid-out size:
+  // Phase 8 advances mainPos by child.layout when it did not override, and
+  // Phase 9 shrink-wraps this container from child.layout too, explicitly
+  // "not pre-computed flex.mainSize". So outside those three the
+  // approximation never surfaces and the sizing pass would be pure cost — 68
+  // of them on flexily's TUI-board benchmark, for a byte-identical tree.
+  //
+  // The flexibility test asks only whether a child CAN absorb free space, not
+  // whether this container currently has any to absorb. Predicting that from
+  // the summed base sizes is what cannot be done here: they are the
+  // under-estimates in question, so a sum that fits can overflow once exact,
+  // and any bound on the deficit under-predicts by construction. Asking
+  // instead is cheap and has no false negative. `cflex.flexShrink` is the
+  // EFFECTIVE factor the loop above just derived, all four of its rules
+  // included, so reading it back is not a second implementation of them.
+  if (anyBaseApprox && !isRow) {
+    const baseSizesReachOutput =
+      style.flexWrap !== C.WRAP_NO_WRAP ||
+      style.justifyContent !== C.JUSTIFY_FLEX_START ||
+      (!Number.isNaN(mainAxisSize) && (anyFlexGrow || anyFlexShrink))
+    if (baseSizesReachOutput) {
+      const sizingW = crossAxisSize
+      const sizingH = NaN
+      for (const child of node.children) {
+        const cflex = child.flex
+        if (cflex.relativeIndex < 0 || !cflex.baseApprox) continue
+        // Same save/restore contract as the measureNode call this replaces.
+        const savedW = child.layout.width
+        const savedH = child.layout.height
+        sizeByLayout(child, sizingW, sizingH, direction)
+        const exactW = child.layout.width
+        const exactMain = child.layout.height
+        child.layout.width = savedW
+        child.layout.height = savedH
+        child.setCachedLayout(sizingW, sizingH, exactW, exactMain, false)
+        totalBaseMain += exactMain - cflex.baseSize
+        cflex.baseSize = exactMain
+        cflex.mainSize = exactMain
+        cflex.baseApprox = false
+      }
     }
   }
 
@@ -1212,13 +1291,13 @@ function layoutNode(
             // check in Phase 9 would skip re-computation and preserve corrupted values.
             const savedW = child.layout.width
             const savedH = child.layout.height
-            measureNode(child, child.flex.mainSize, NaN, direction, measureByLayoutDuringLines)
+            const baselineApprox = measureNode(child, child.flex.mainSize, NaN, direction)
             childWidth = child.layout.width
             childHeight = child.layout.height
             child.layout.width = savedW
             child.layout.height = savedH
             _t?.measureSaveRestore(_tn, savedW, savedH, childWidth, childHeight)
-            child.setCachedLayout(child.flex.mainSize, NaN, childWidth, childHeight)
+            child.setCachedLayout(child.flex.mainSize, NaN, childWidth, childHeight, baselineApprox)
           }
         }
 
@@ -1323,7 +1402,7 @@ function layoutNode(
           // filling the available space.
           const savedW = child.layout.width
           const savedH = child.layout.height
-          measureNode(child, NaN, NaN, direction, measureByLayoutDuringLines)
+          measureNode(child, NaN, NaN, direction)
           childCross = isRow ? child.layout.height : child.layout.width
           child.layout.width = savedW
           child.layout.height = savedH
@@ -2022,10 +2101,11 @@ function layoutNode(
       // the container itself but not from its PARENT, which had already
       // distributed free space from the short base size and put every later
       // sibling (wrapped lines - 1) rows too low, off the bottom of the frame.
-      // measureNode now hands that one case — a row whose children overflow a
-      // definite main size — to the real algorithm (`measureByLayout` above),
-      // so the base size arrives already wrapped. Regression:
-      // tests/parent-flex-base-nested-row-wrap.test.ts.
+      // measureNode now REPORTS that one case — a row whose children overflow
+      // a definite main size — and Phase 5b re-derives the base size through
+      // the real algorithm when this container is about to distribute from it,
+      // so the number arrives already wrapped wherever it can be seen.
+      // Regression: tests/parent-flex-base-nested-row-wrap.test.ts.
       const hasMeasure = child.hasMeasureFunc() && child.children.length === 0
       const flexDistributionChangedSize = child.flex.mainSize !== child.flex.baseSize
       if (

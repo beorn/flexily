@@ -221,6 +221,7 @@ interface FlexInfo {
   lineIndex
   relativeIndex
   baseline
+  baseApprox
 
   // Constraint fingerprinting (mutated at end of layoutNode)
   lastAvailW
@@ -262,7 +263,9 @@ Returns a stable `_measureResult` object (mutated in place) to avoid allocation 
 
 ### Layout Cache (Per-Node)
 
-2-entry cache (`_lc0`, `_lc1`) for sizing passes. Stores `availW, availH -> computedW, computedH`. Cleared at start of each `calculateLayout()` pass. Returns a stable `_layoutResult` object. Uses `-1` as invalidation sentinel (not `NaN`, because `Object.is(NaN, NaN)` is true and would cause false hits).
+2-entry cache (`_lc0`, `_lc1`) for sizing passes. Stores `availW, availH -> computedW, computedH, approx`. Cleared at start of each `calculateLayout()` pass. Returns a stable `_layoutResult` object. Uses `-1` as invalidation sentinel (not `NaN`, because `Object.is(NaN, NaN)` is true and would cause false hits).
+
+`approx` rides with the size because it is a property of THAT query, not of the node: `measureNode` sets it when its shrink-wrap shortcut met a row overflowing a definite main size at or below the node, and a hit must report the same verdict a miss would. Storing it on the node instead lets a neighbouring query's answer leak — the same node is measured at several constraints in one pass (Phase 5 at the cross size, Phase 7a at NaN/NaN), and the last writer would win. Phase 5b consumes it; see `baseApprox` in FlexInfo. What it marks is always a HEIGHT under-estimate, which is why Phase 5b acts on it in column-direction containers only and lets it bubble through rows untouched.
 
 ## Caching and Dirty Tracking
 
