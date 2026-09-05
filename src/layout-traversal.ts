@@ -28,6 +28,38 @@ export function markSubtreeLayoutSeen(node: Node): void {
 }
 
 /**
+ * Invalidate the constraint fingerprint of a node, every descendant, and every
+ * ancestor (iterative to avoid stack overflow).
+ *
+ * Required after a SIZING pass that ran the full algorithm over a subtree
+ * (`measureByLayout` in layout-zero.ts). Such a pass lays the subtree out at
+ * absolute (0,0) with offsets 0 and overwrites layout.left/top/width/height
+ * throughout, so every fingerprint it leaves behind describes a geometry the
+ * positioning pass must not reuse. The plain `measureNode` path writes no
+ * fingerprints at all; this restores that property.
+ *
+ * The ANCESTORS matter as much as the subtree: a node's position is written by
+ * its parent's Phase 8, so a clean-and-valid ancestor that skips its own layout
+ * strands every overwritten position below it at the sizing pass's value. The
+ * ancestors above the layoutNode call that triggered this are mid-pass and will
+ * rewrite their own fingerprints on the way out, so clearing them costs nothing.
+ */
+export function invalidateFingerprintsAround(node: Node): void {
+  traversalStack.length = 0
+  traversalStack.push(node)
+  while (traversalStack.length > 0) {
+    const current = traversalStack.pop() as Node
+    current.flex.layoutValid = false
+    for (const child of current.children) {
+      traversalStack.push(child)
+    }
+  }
+  for (let ancestor = node.getParent(); ancestor !== null; ancestor = ancestor.getParent()) {
+    ancestor.flex.layoutValid = false
+  }
+}
+
+/**
  * Count total nodes in tree (iterative to avoid stack overflow).
  */
 export function countNodes(node: Node): number {

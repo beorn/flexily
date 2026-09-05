@@ -17,6 +17,17 @@ import { resolveEdgeValue, resolveEdgeBorderValue, isRowDirection } from "./layo
 import { incMeasureNodeCalls, incLayoutCacheHits } from "./layout-stats.js"
 
 /**
+ * The real layout algorithm, run as a sizing pass, injected by the caller.
+ *
+ * `layout-measure.ts` must not import `layout-zero.ts` — that is an import
+ * cycle — so the one case the shrink-wrap shortcut below cannot answer is
+ * handed back out through this parameter. The implementation lays `node` out
+ * at the given constraints and leaves the result in `node.layout`; see
+ * `measureByLayout` in layout-zero.ts.
+ */
+export type MeasureLayoutFn = (node: Node, availableWidth: number, availableHeight: number, direction: number) => void
+
+/**
  * Measure a node to get its intrinsic size without computing positions.
  * This is a lightweight alternative to layoutNode for sizing-only passes.
  *
@@ -26,12 +37,15 @@ import { incMeasureNodeCalls, incLayoutCacheHits } from "./layout-stats.js"
  * @param availableWidth - Available width (NaN for unconstrained)
  * @param availableHeight - Available height (NaN for unconstrained)
  * @param direction - Layout direction (LTR or RTL)
+ * @param layoutSizingPass - The real algorithm, for the one case the shortcut
+ *   is unsound (a row overflowing a definite main size — see below)
  */
 export function measureNode(
   node: Node,
   availableWidth: number,
   availableHeight: number,
-  direction: number = C.DIRECTION_LTR,
+  direction: number,
+  layoutSizingPass: MeasureLayoutFn,
 ): void {
   incMeasureNodeCalls()
   const style = node.style
@@ -224,7 +238,7 @@ export function measureNode(
       // Save/restore layout around measureNode — it overwrites node.layout
       const savedW = child.layout.width
       const savedH = child.layout.height
-      measureNode(child, childAvailW, childAvailH, direction)
+      measureNode(child, childAvailW, childAvailH, direction, layoutSizingPass)
       measuredW = child.layout.width
       measuredH = child.layout.height
       child.layout.width = savedW
@@ -243,6 +257,36 @@ export function measureNode(
   // Add gaps
   if (itemCount > 1) {
     totalMainSize += mainGap * (itemCount - 1)
+  }
+
+  // The shortcut's one unsound case: a row overflowing a definite main size.
+  //
+  // The loop above measured every child at an UNCONSTRAINED main axis
+  // (childAvailW = NaN), i.e. at max-content. That stands in for the child's
+  // real main size only while the flex algorithm would leave it alone. When
+  // this row has a DEFINITE main size and the children's max-content sum
+  // overflows it, the real algorithm shrinks them (or breaks them across
+  // lines), and wrappable text inside then needs MORE rows than it reported
+  // here — max-content is its one-line floor, so this measurement can only
+  // under-estimate the cross size. A parent distributing free space from that
+  // under-estimate puts every later sibling that many rows too low.
+  //
+  // There is exactly one flexible-length resolution in this engine and it is
+  // layoutNode's. Run it instead of approximating it here.
+  //
+  // Row-only by construction: line wrapping keys off the INLINE size, which
+  // for a row is the main axis this function deliberately leaves NaN. A
+  // column's children take their inline size from childAvailW = crossAxisSize,
+  // definite whenever the column's own width is, so the shortcut holds there.
+  //
+  // `> 0` rather than `!Number.isNaN`: a `width: 100%` row measured against an
+  // unconstrained parent resolves to 0 (resolveValue's percent-against-NaN
+  // rule), which is an artifact of that approximation and not a real budget.
+  // Laying such a row out for real would wrap its text at width 0; the
+  // shrink-wrap answer (max-content, one line) is the better estimate there.
+  if (isRow && mainAxisSize > 0 && totalMainSize > mainAxisSize) {
+    layoutSizingPass(node, availableWidth, availableHeight, direction)
+    return
   }
 
   // Compute final node size

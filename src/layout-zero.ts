@@ -55,7 +55,7 @@ import {
   isEdgeAuto,
   resolveEdgeBorderValue,
 } from "./layout-helpers.js"
-import { propagatePositionDelta } from "./layout-traversal.js"
+import { propagatePositionDelta, invalidateFingerprintsAround } from "./layout-traversal.js"
 import {
   resetLayoutStats,
   incLayoutNodeCalls,
@@ -63,7 +63,7 @@ import {
   incLayoutPositioningCalls,
   incLayoutCacheHits,
 } from "./layout-stats.js"
-import { measureNode } from "./layout-measure.js"
+import { measureNode, type MeasureLayoutFn } from "./layout-measure.js"
 import {
   MAX_FLEX_LINES,
   _lineCrossSizes,
@@ -97,6 +97,49 @@ export function computeLayout(
     layoutNode(root, availableWidth, availableHeight, 0, 0, 0, 0, direction)
   } finally {
     // Restore line state for outer pass (no-op at depth 0)
+    exitLayout(saved)
+  }
+}
+
+/**
+ * Run the real algorithm as a sizing pass on `measureNode`'s behalf, for the
+ * one case its shrink-wrap shortcut cannot answer: a row whose children
+ * overflow a definite main size (see layout-measure.ts). Injected rather than
+ * imported — layout-measure.ts importing this module would be a cycle.
+ *
+ * This variant does NOT bracket the module line-scratch arrays, and is for the
+ * phases that run BEFORE this node breaks its own lines (Phase 3's fit-width
+ * pre-measure and Phase 5's base sizes). Such a call is no more exposed than
+ * Phase 8's own recursion into a child, which corrupts those arrays already.
+ * Bracketing costs ~34 allocations per call in a zero-allocation engine —
+ * measured at a 1.5x slowdown of the TUI-board benchmark — so the phases that
+ * DO hold live line data use `measureByLayoutDuringLines` instead.
+ */
+const measureByLayout: MeasureLayoutFn = (node, availableWidth, availableHeight, direction) => {
+  layoutNode(node, availableWidth, availableHeight, 0, 0, 0, 0, direction)
+  // The pass just overwrote layout.left/top/width/height throughout the
+  // subtree, at absolute (0,0) with offsets 0, and left a VALID fingerprint on
+  // every node it touched. Both halves are poison for the positioning pass: a
+  // fingerprint hit would keep an origin-relative position, and on this node
+  // measureNode's caller additionally restores layout.width/height to their
+  // pre-measure values the moment we return — "Bug 1: measureNode corruption"
+  // (src/CLAUDE.md) one level up. Drop the whole subtree's fingerprints so the
+  // real pass recomputes every node it is about to reposition. The plain
+  // measureNode path writes no fingerprints at all; this restores parity.
+  invalidateFingerprintsAround(node)
+}
+
+/**
+ * `measureByLayout` for the phases that run BETWEEN line breaking and Phase 8
+ * (Phase 6c's baseline pre-measure, Phase 7a's line cross-size estimate). Those
+ * hold live per-line data in the module scratch arrays, so the nested pass is
+ * bracketed the way a re-entrant `calculateLayout()` from a measureFunc is.
+ */
+const measureByLayoutDuringLines: MeasureLayoutFn = (node, availableWidth, availableHeight, direction) => {
+  const saved = enterLayout()
+  try {
+    measureByLayout(node, availableWidth, availableHeight, direction)
+  } finally {
     exitLayout(saved)
   }
 }
@@ -235,7 +278,7 @@ function layoutNode(
   if (style.fitWidth !== undefined && style.fitWidth.length > 0) {
     let maxContent = 0
     for (const child of node.children) {
-      measureNode(child, NaN, NaN, direction)
+      measureNode(child, NaN, NaN, direction, measureByLayout)
       maxContent += child.layout.width
     }
     // Add gaps + padding + border. gap[0] is column gap (row layout's between-children).
@@ -644,7 +687,7 @@ function layoutNode(
           // in Phase 9 would skip re-computation and preserve the corrupted values.
           const savedW = child.layout.width
           const savedH = child.layout.height
-          measureNode(child, sizingW, sizingH, direction)
+          measureNode(child, sizingW, sizingH, direction, measureByLayout)
           const measuredW = child.layout.width
           const measuredH = child.layout.height
           child.layout.width = savedW
@@ -1169,7 +1212,7 @@ function layoutNode(
             // check in Phase 9 would skip re-computation and preserve corrupted values.
             const savedW = child.layout.width
             const savedH = child.layout.height
-            measureNode(child, child.flex.mainSize, NaN, direction)
+            measureNode(child, child.flex.mainSize, NaN, direction, measureByLayoutDuringLines)
             childWidth = child.layout.width
             childHeight = child.layout.height
             child.layout.width = savedW
@@ -1225,12 +1268,17 @@ function layoutNode(
     for (let lineIdx = 0; lineIdx < numLines; lineIdx++) {
       _lineCrossOffsets[lineIdx] = cumulativeCrossOffset
 
-      // Calculate max cross size for this line using pre-collected _lineChildren
-      const lineChildren = _lineChildren[lineIdx]!
-      const lineLength = lineChildren.length
+      // Calculate max cross size for this line using pre-collected _lineChildren.
+      // Indexed through the module binding on every iteration, never through a
+      // local alias: measuring a child below re-enters layout (a user measureFunc
+      // laying out another tree, or measureNode's sizing fallback), the nested
+      // pass TRIMS _lineChildren[lineIdx] in place, and exitLayout restores the
+      // scratch arrays by REBINDING them — so an alias captured before the call
+      // still points at the trimmed array and reads undefined past its new end.
+      const lineLength = _lineChildren[lineIdx]!.length
       let maxLineCross = 0
       for (let i = 0; i < lineLength; i++) {
-        const child = lineChildren[i]!
+        const child = _lineChildren[lineIdx]![i]!
         // Estimate child cross size (will be computed more precisely during layout)
         const childStyle = child.style
         const crossDim = isRow ? childStyle.height : childStyle.width
@@ -1275,7 +1323,7 @@ function layoutNode(
           // filling the available space.
           const savedW = child.layout.width
           const savedH = child.layout.height
-          measureNode(child, NaN, NaN, direction)
+          measureNode(child, NaN, NaN, direction, measureByLayoutDuringLines)
           childCross = isRow ? child.layout.height : child.layout.width
           child.layout.width = savedW
           child.layout.height = savedH
@@ -1966,9 +2014,18 @@ function layoutNode(
       // size at unconstrained main axis, but layoutNode recomputes with actual
       // cross-axis constraints. For containers with children that wrap text,
       // layoutNode's result is correct because it accounts for the actual width
-      // after flex distribution of grandchildren. The Phase 5 measureNode pass
-      // measures row children with NaN main width, so text doesn't wrap —
-      // producing height=1 instead of the correct wrapped height.
+      // after flex distribution of grandchildren.
+      //
+      // The Phase 5 measureNode pass used to measure row children at NaN main
+      // width in every case, so text didn't wrap and it reported height=1
+      // instead of the wrapped height. Declining to override here hid that from
+      // the container itself but not from its PARENT, which had already
+      // distributed free space from the short base size and put every later
+      // sibling (wrapped lines - 1) rows too low, off the bottom of the frame.
+      // measureNode now hands that one case — a row whose children overflow a
+      // definite main size — to the real algorithm (`measureByLayout` above),
+      // so the base size arrives already wrapped. Regression:
+      // tests/parent-flex-base-nested-row-wrap.test.ts.
       const hasMeasure = child.hasMeasureFunc() && child.children.length === 0
       const flexDistributionChangedSize = child.flex.mainSize !== child.flex.baseSize
       if (

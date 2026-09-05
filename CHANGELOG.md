@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Stale flex base size for a nested row with wrapped text.** A column
+  distributed its free space from a base size that was short by
+  `wrapped lines - 1` rows whenever an auto-height child contained a row
+  with a flexible, wrappable child. Phase 5 pre-measured the child with
+  `measureNode`, which sizes a row's children at an unconstrained main
+  axis, so the text reported one line and the row came back one row tall.
+  The container itself ended up correct in Phase 8, but the parent had
+  already handed those rows to a `flexGrow` sibling, pushing every later
+  sibling down and off the frame. `measureNode` now hands the one case
+  its shortcut cannot answer — a row whose children's max-content sum
+  overflows a definite main size — to the real algorithm instead of
+  approximating it, so the base size arrives already wrapped. Regression:
+  `tests/parent-flex-base-nested-row-wrap.test.ts`.
+- **Phase 7a no longer reads flex-line children through a stale alias.**
+  Measuring a child there can re-enter layout (a user `measureFunc` that
+  lays out another tree, or the sizing pass above); the nested pass trims
+  the shared `_lineChildren` line array in place and `exitLayout` restores
+  the scratch arrays by rebinding them, so an alias captured before the
+  call read past the trimmed end.
+
 ## [0.7.2] - 2026-05-18
 
 ### Added
