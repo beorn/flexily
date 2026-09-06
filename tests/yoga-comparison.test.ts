@@ -1231,6 +1231,51 @@ describe("Yoga Comparison: FlexGrow", () => {
 // ============================================================================
 
 describe("Yoga Comparison: NestedLayouts", () => {
+  it.each([
+    ["row", Flexily.FLEX_DIRECTION_ROW, "left", Flexily.EDGE_LEFT, -2],
+    ["row", Flexily.FLEX_DIRECTION_ROW, "left", Flexily.EDGE_LEFT, 2],
+    ["column", Flexily.FLEX_DIRECTION_COLUMN, "left", Flexily.EDGE_LEFT, -2],
+    ["column", Flexily.FLEX_DIRECTION_COLUMN, "left", Flexily.EDGE_LEFT, 2],
+    ["row", Flexily.FLEX_DIRECTION_ROW, "top", Flexily.EDGE_TOP, -2],
+    ["row", Flexily.FLEX_DIRECTION_ROW, "top", Flexily.EDGE_TOP, 2],
+    ["column", Flexily.FLEX_DIRECTION_COLUMN, "top", Flexily.EDGE_TOP, -2],
+    ["column", Flexily.FLEX_DIRECTION_COLUMN, "top", Flexily.EDGE_TOP, 2],
+  ] as const)(
+    "allocated auto margins: %s (%i), %s (%i) margin %i",
+    (_directionName, direction, _edgeName, edge, margin) => {
+      // The parent's allocation is already a border box. Descendants must use
+      // that box minus padding, not a width/height with the margin applied twice.
+      const rootConfig = { width: 69, height: 69, flexDirection: direction }
+      const childConfig = { flexGrow: 1, padding: 2, margin: { edge, value: margin } }
+      const contentConfig = { widthPercent: 100, heightPercent: 100 }
+      const fRoot = createFlexilyNode(rootConfig)
+      const fChild = createFlexilyNode(childConfig)
+      fChild.insertChild(createFlexilyNode(contentConfig), 0)
+      fRoot.insertChild(fChild, 0)
+      const yRoot = createYogaNode(rootConfig)
+      const yChild = createYogaNode(childConfig)
+      yChild.insertChild(createYogaNode(contentConfig), 0)
+      yRoot.insertChild(yChild, 0)
+
+      try {
+        // Include a resize round trip: cached descendants must receive the same
+        // content-box constraints as a first layout, in both axes.
+        for (const size of [69, 47, 69]) {
+          fRoot.setWidth(size)
+          fRoot.setHeight(size)
+          yRoot.setWidth(size)
+          yRoot.setHeight(size)
+          fRoot.calculateLayout(size, size, Flexily.DIRECTION_LTR)
+          yRoot.calculateLayout(size, size, yoga.DIRECTION_LTR)
+          expect(getFlexilyLayout(fRoot)).toEqual(getYogaLayout(yRoot))
+        }
+      } finally {
+        yRoot.freeRecursive()
+        fRoot.freeRecursive()
+      }
+    },
+  )
+
   it("nested-flex: multiple nesting levels", () => {
     const fRoot = Flexily.Node.create(YOGA_OPTS)
     fRoot.setWidth(100)

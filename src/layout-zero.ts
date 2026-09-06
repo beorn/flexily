@@ -1876,6 +1876,8 @@ function layoutNode(
         crossDimForLayoutCall.unit === C.UNIT_FIT_CONTENT ||
         crossDimForLayoutCall.unit === C.UNIT_SNUG_CONTENT
       const mainDimForLayoutCall = isRow ? childStyle.width : childStyle.height
+      const mainIsAutoForLayoutCall =
+        mainDimForLayoutCall.unit === C.UNIT_AUTO || mainDimForLayoutCall.unit === C.UNIT_UNDEFINED
       const mainIsPercentForLayoutCall = mainDimForLayoutCall.unit === C.UNIT_PERCENT
       const crossIsPercentForLayoutCall = crossDimForLayoutCall.unit === C.UNIT_PERCENT
 
@@ -1913,6 +1915,11 @@ function layoutNode(
       // so the child can compute min(intrinsic, available).
       const crossIsFitContent =
         crossDimForLayoutCall.unit === C.UNIT_FIT_CONTENT || crossDimForLayoutCall.unit === C.UNIT_SNUG_CONTENT
+      // Allocated sizes below are border boxes; layoutNode's auto sizing takes
+      // a margin-box budget and subtracts declared margins. Restore them once
+      // here, or descendants use a different content box from the parent's
+      // final override. Percent and cross-axis fit-content constraints remain
+      // containing-block sizes. Cached margins exclude distributed auto margins.
       const passWidthToChild =
         isRow && mainIsAutoChild && !flexGrowHasDefiniteMainBudget && !flexDistChanged && !hasMeasureLeaf
           ? NaN
@@ -1925,8 +1932,8 @@ function layoutNode(
                 : !isRow && crossIsFitContent
                   ? crossAxisSize
                   : isRow
-                    ? mainSizeToPass
-                    : childWidth
+                    ? mainSizeToPass + (mainIsAutoForLayoutCall ? cflex.marginL + cflex.marginR : 0)
+                    : childWidth + (crossIsAutoForLayoutCall ? cflex.marginL + cflex.marginR : 0)
       const passHeightToChild =
         !isRow && mainIsAutoChild && !flexGrowHasDefiniteMainBudget && !flexDistChanged && !hasMeasureLeaf
           ? NaN
@@ -1939,8 +1946,8 @@ function layoutNode(
                 : isRow && crossIsFitContent
                   ? crossAxisSize
                   : !isRow
-                    ? mainSizeToPass
-                    : childHeight
+                    ? mainSizeToPass + (mainIsAutoForLayoutCall ? cflex.marginT + cflex.marginB : 0)
+                    : childHeight + (crossIsAutoForLayoutCall ? cflex.marginT + cflex.marginB : 0)
 
       // Recurse to layout any grandchildren
       // Pass the child's FLOAT absolute position (margin box start, before child's own margin)
