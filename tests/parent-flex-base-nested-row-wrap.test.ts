@@ -191,6 +191,40 @@ function tightFrame(rail: Node) {
   return { root, head, body }
 }
 
+/**
+ * The tight frame with a head that CAN shrink: CSS defaults, no flexShrink 0
+ * and no explicit min-height, so its automatic minimum is its content. That
+ * floor is derived by Node.getMinContent, whose cross-axis rule (the tallest
+ * child) gives the wrapped rail one line, the same under-estimate Phase 5b
+ * corrects in the base size. If only the base size is made exact, the shrink
+ * pass clamps the head back to the short floor, the changed size reads as a
+ * real distribution, and Phase 8 overrides the head to a height it does not
+ * have while it paints all five rows over the body. silvery's wrapped tab bar
+ * under a long panel was exactly this (yrd watch, 2026-09-05).
+ */
+function shrinkFrame(rail: Node) {
+  const root = Node.create(CSS)
+  root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  root.setWidth(120)
+  root.setHeight(10)
+
+  const head = Node.create(CSS)
+  head.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  head.insertChild(label(10), 0)
+  head.insertChild(rail, 1)
+  head.insertChild(label(13), 2)
+  root.insertChild(head, 0)
+
+  const body = Node.create(CSS)
+  body.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  body.setMinHeight(0)
+  for (let i = 0; i < 20; i++) body.insertChild(label(6), i)
+  root.insertChild(body, 1)
+
+  root.calculateLayout(120, 10, DIRECTION_LTR)
+  return { root, head, body }
+}
+
 /** The calm frame's head: a title line, the rail, a bottom line. */
 function headOf(rail: Node, opt: { defaults: "css" | "yoga" }): Node {
   const head = Node.create(opt)
@@ -336,6 +370,18 @@ describe("a column's flex base size for a child holding a row with wrapped text"
     // below the frame. Before the fix the column saw 9 of 10, distributed
     // nothing, and let the body run one row past the bottom.
     const f = tightFrame(markerRow(prose(LENGTH)))
+    expect(f.head.getComputedHeight()).toBe(5)
+    expect(f.body.getComputedTop()).toBe(5)
+    expect(f.body.getComputedHeight()).toBe(5)
+    expect(f.body.getComputedTop() + f.body.getComputedHeight()).toBe(10)
+  })
+
+  it("a shrinkable head with an automatic minimum keeps its exact height under shrink", () => {
+    // Head 5 + body 20 in 10 rows: the body (min-height 0) absorbs all of it,
+    // the head is its own content-based minimum. Before the floor followed the
+    // exact base size the head came out 3 rows tall (its one-line rail floor),
+    // painting five, and the body started on row 3 over its last two rows.
+    const f = shrinkFrame(markerRow(prose(LENGTH)))
     expect(f.head.getComputedHeight()).toBe(5)
     expect(f.body.getComputedTop()).toBe(5)
     expect(f.body.getComputedHeight()).toBe(5)

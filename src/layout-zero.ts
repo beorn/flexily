@@ -1090,6 +1090,39 @@ function layoutNode(
         cflex.baseSize = exactMain
         cflex.mainSize = exactMain
         cflex.baseApprox = false
+        // The child's automatic minimum (CSS §4.5, `min-height: auto` under
+        // overflow visible, the CSS preset's default) came from
+        // Node.getMinContent above, whose cross-axis rule — the tallest child
+        // — shares the approximation just corrected: a row's min-content
+        // HEIGHT at this width is the height it wraps to, which is exactMain.
+        // Left at the short floor, the shrink pass below clamps the child to
+        // it, `mainSize !== baseSize` then reads as a real distribution, and
+        // Phase 8 overrides the child to a height it does not have: silvery's
+        // wrapped tab bar was laid out one line tall under a long panel while
+        // painting two, so the panel overpainted its second line (yrd watch,
+        // 2026-09-05). The same clamps as the auto path apply: a definite
+        // max-* bounds the specified-size suggestion; a flagged child never
+        // carries a definite flex-basis or main size (only the auto-sized
+        // container branch flags), so that cap is infinite here.
+        const childStyle = child.style
+        const minVal = isRow ? childStyle.minWidth : childStyle.minHeight
+        const mainDim = isRow ? childStyle.width : childStyle.height
+        const autoMinApplies =
+          minVal.unit === C.UNIT_AUTO &&
+          childStyle.overflow === C.OVERFLOW_VISIBLE &&
+          mainDim.unit !== C.UNIT_FIT_CONTENT &&
+          mainDim.unit !== C.UNIT_SNUG_CONTENT
+        if (autoMinApplies) {
+          let exactMin = exactMain
+          const maxVal = isRow ? childStyle.maxWidth : childStyle.maxHeight
+          if (maxVal.unit === C.UNIT_POINT || maxVal.unit === C.UNIT_PERCENT) {
+            const maxResolved = resolveValue(maxVal, mainAxisSize)
+            if (!Number.isNaN(maxResolved) && maxResolved !== Infinity) {
+              exactMin = Math.min(exactMin, maxResolved)
+            }
+          }
+          if (exactMin > cflex.minMain) cflex.minMain = exactMin
+        }
       }
     }
   }
