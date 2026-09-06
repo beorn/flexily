@@ -26,10 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   What the shortcut under-estimates is always a HEIGHT, so only a COLUMN
   can distribute from it; a row's base sizes are widths, which are exact
   at an unconstrained main axis. Phase 5b therefore skips row-direction
-  containers, and in a column runs the real algorithm only when the
-  container has a definite main size and a child that can absorb free
-  space in either direction, or wraps, or justifies other than
-  `flex-start`. Everywhere else the approximation never surfaces, because
+  containers, and in a column runs the real algorithm only when a reader
+  of the summed base sizes is armed: a definite main size together with a
+  `flexGrow` child, a shrinkable child, `flex-wrap`, a `justify-content`
+  other than `flex-start`, or a main-axis auto margin. Wrap, justify and
+  auto margins need that definite main size, because line breaking takes
+  every child onto one line when it is indefinite and the remaining space
+  is then zero. A max main size is also covered, for the shrink-wrap path
+  that resolves it separately. Everywhere else the approximation never
+  surfaces, because
   Phase 8 advances by each child's actual laid-out size and Phase 9
   shrink-wraps from the same. On the TUI-board benchmark under the Yoga
   preset this is the difference between 533 and 261 `layoutNode` calls at

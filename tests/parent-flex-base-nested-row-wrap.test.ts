@@ -18,12 +18,15 @@
 import { describe, expect, it } from "vitest"
 import {
   DIRECTION_LTR,
+  EDGE_TOP,
   FLEX_DIRECTION_COLUMN,
   FLEX_DIRECTION_ROW,
+  JUSTIFY_CENTER,
   MEASURE_MODE_AT_MOST,
   MEASURE_MODE_EXACTLY,
   MEASURE_MODE_MIN_CONTENT,
   Node,
+  WRAP_WRAP,
 } from "../src/index.js"
 import * as stats from "../src/layout-stats.js"
 
@@ -188,6 +191,80 @@ function tightFrame(rail: Node) {
   return { root, head, body }
 }
 
+/** The calm frame's head: a title line, the rail, a bottom line. */
+function headOf(rail: Node, opt: { defaults: "css" | "yoga" }): Node {
+  const head = Node.create(opt)
+  head.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  head.setFlexShrink(0)
+  head.insertChild(label(10), 0)
+  head.insertChild(rail, 1)
+  head.insertChild(label(13), 2)
+  return head
+}
+
+/**
+ * An auto-height column carrying a property that LOOKS like a base-size reader
+ * and cannot be one on an indefinite main axis: breakIntoLines takes every
+ * child onto line 0 when mainAxisSize is NaN, and the justify path sets the
+ * remaining space to 0 for the same reason.
+ */
+function looseFrame(rail: Node, arm: (root: Node) => void) {
+  const root = Node.create(CSS)
+  root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  root.setWidth(120)
+  arm(root)
+  const head = headOf(rail, CSS)
+  root.insertChild(head, 0)
+  const footer = label(6)
+  root.insertChild(footer, 1)
+  root.calculateLayout(120, NaN, DIRECTION_LTR)
+  return { root, head, footer }
+}
+
+/**
+ * An auto-height column with a max. `applyMinMax` applies a finite max as a
+ * ceiling even to an auto size, so the max makes this column's main axis
+ * DEFINITE — which is what arms the shrink clause. Head 3 + body 6 sits under
+ * the 10-row max while the base size is approximate; head 5 + body 6 does not,
+ * and the shrinkable body has to give up the row.
+ */
+function maxFrame(rail: Node) {
+  const root = Node.create(CSS)
+  root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  root.setWidth(120)
+  root.setMaxHeight(10)
+  const head = headOf(rail, CSS)
+  root.insertChild(head, 0)
+  const body = Node.create(CSS)
+  body.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  body.setMinHeight(0)
+  for (let i = 0; i < 6; i++) body.insertChild(label(6), i)
+  root.insertChild(body, 1)
+  root.calculateLayout(120, NaN, DIRECTION_LTR)
+  return { root, head, body }
+}
+
+/**
+ * A definite-height column under Yoga defaults, so nothing grows or shrinks
+ * and the only reader left is the footer's auto top margin, which absorbs the
+ * remaining space computed from the summed base sizes.
+ */
+function marginFrame(rail: Node) {
+  const YOGA = { defaults: "yoga" as const }
+  const root = Node.create(YOGA)
+  root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+  root.setWidth(120)
+  root.setHeight(10)
+  const head = headOf(rail, YOGA)
+  root.insertChild(head, 0)
+  const footer = Node.create(YOGA)
+  footer.setHeight(1)
+  footer.setMarginAuto(EDGE_TOP)
+  root.insertChild(footer, 1)
+  root.calculateLayout(120, 10, DIRECTION_LTR)
+  return { root, head, footer }
+}
+
 function tops(f: ReturnType<typeof frame>) {
   return {
     head: f.head.getComputedHeight(),
@@ -263,5 +340,53 @@ describe("a column's flex base size for a child holding a row with wrapped text"
     expect(f.body.getComputedTop()).toBe(5)
     expect(f.body.getComputedHeight()).toBe(5)
     expect(f.body.getComputedTop() + f.body.getComputedHeight()).toBe(10)
+  })
+
+  it("flex-wrap on an indefinite main axis arms nothing", () => {
+    // breakIntoLines puts every child on line 0 when the main axis is NaN, so
+    // the wrap cannot read a base size and must not buy a sizing pass.
+    const wrapped = looseFrame(markerRow(prose(LENGTH)), (r) => r.setFlexWrap(WRAP_WRAP))
+    const wrappedSizingCalls = stats.layoutSizingCalls
+    expect(wrapped.head.getComputedHeight()).toBe(5)
+    expect(wrapped.footer.getComputedTop()).toBe(5)
+
+    looseFrame(markerRow(prose(40)), (r) => r.setFlexWrap(WRAP_WRAP))
+    expect(wrappedSizingCalls).toBe(stats.layoutSizingCalls)
+  })
+
+  it("justify-content on an indefinite main axis arms nothing", () => {
+    // The justify path sets the remaining space to 0 for an auto-sized
+    // container, so centring cannot read a base size either.
+    const wrapped = looseFrame(markerRow(prose(LENGTH)), (r) => r.setJustifyContent(JUSTIFY_CENTER))
+    const wrappedSizingCalls = stats.layoutSizingCalls
+    expect(wrapped.head.getComputedHeight()).toBe(5)
+    expect(wrapped.footer.getComputedTop()).toBe(5)
+
+    looseFrame(markerRow(prose(40)), (r) => r.setJustifyContent(JUSTIFY_CENTER))
+    expect(wrappedSizingCalls).toBe(stats.layoutSizingCalls)
+  })
+
+  it("a max-height column gives the deficit to its shrinkable sibling", () => {
+    // The max clamps this auto-height column to 10, which makes its main axis
+    // definite, so the shrink clause arms and the base size is read. Phase 6a
+    // has a SECOND max path, for a genuinely indefinite main axis, that the
+    // predicate also covers; a finite point max cannot reach it, because
+    // applyMinMax has already turned the column definite by then.
+    const f = maxFrame(markerRow(prose(LENGTH)))
+    expect(f.root.getComputedHeight()).toBe(10)
+    expect(f.head.getComputedHeight()).toBe(5)
+    expect(f.body.getComputedTop()).toBe(5)
+    expect(f.body.getComputedHeight()).toBe(5)
+    expect(f.body.getComputedTop() + f.body.getComputedHeight()).toBe(10)
+  })
+
+  it("an auto main margin absorbs space measured from the base sizes", () => {
+    // Yoga defaults, so nothing grows or shrinks: the footer's auto top margin
+    // is the only reader, and it takes the remaining space from the summed
+    // base sizes. A short head sends the footer past the bottom of the frame.
+    const f = marginFrame(markerRow(prose(LENGTH)))
+    expect(f.head.getComputedHeight()).toBe(5)
+    expect(f.footer.getComputedTop()).toBe(9)
+    expect(f.footer.getComputedTop() + f.footer.getComputedHeight()).toBe(10)
   })
 })

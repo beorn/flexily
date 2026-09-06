@@ -1012,15 +1012,31 @@ function layoutNode(
   // `!isRow` guard: the flag keeps bubbling THROUGH rows, only the action is
   // column-only.
   //
-  // For a column, three things read the summed base sizes:
+  // For a column, each reader of the summed base sizes is mirrored below by
+  // the engine condition that gates it, rather than by a re-derivation of it:
   //
-  //  - Free space is distributed from them, so a short one hands a flexGrow
-  //    sibling rows that are not free, or under-states the deficit a
-  //    shrinkable sibling must absorb. That is the failure
-  //    tests/parent-flex-base-nested-row-wrap.test.ts pins, both directions.
+  //  - Flex distribution: free space comes from the sum, so a short one hands
+  //    a flexGrow sibling rows that are not free, or under-states the deficit
+  //    a shrinkable sibling must absorb. Both directions are pinned in
+  //    tests/parent-flex-base-nested-row-wrap.test.ts.
+  //  - flex-wrap: breakIntoLines splits on hypothetical main sizes, i.e. base
+  //    sizes — but only with a definite main axis. Its first line reads
+  //    "No wrapping or unconstrained", and NaN takes every child onto line 0.
   //  - justify-content other than flex-start positions the line from the
-  //    remaining space, which is that same sum. flex-start ignores it.
-  //  - flex-wrap breaks lines from hypothetical main sizes, i.e. base sizes.
+  //    remaining space, the same sum — again only with a definite main axis:
+  //    "For auto-sized containers (NaN mainAxisSize), there's no remaining
+  //    space to justify" sets it to 0.
+  //  - Main-axis auto margins absorb that same remaining space, ahead of
+  //    justify-content, so they read the sum under the same condition.
+  //  - A max main size distributes even in SHRINK-WRAP mode: Phase 6a's
+  //    "Shrink-wrap mode - check if max constraint applies" resolves the max
+  //    and shrinks the line into it. That is the one reader an indefinite main
+  //    axis does not disarm. It is covered DEFENSIVELY: a finite point max
+  //    cannot reach it, because applyMinMax applies a finite max as a ceiling
+  //    even to an auto size, so such a column is already definite here and the
+  //    clause above catches it. What is left is a percent max against an
+  //    indefinite parent, which applyMinMax skips. Do not delete the clause as
+  //    dead without re-checking that.
   //
   // Everything else already works from each child's ACTUAL laid-out size:
   // Phase 8 advances mainPos by child.layout when it did not override, and
@@ -1029,19 +1045,32 @@ function layoutNode(
   // approximation never surfaces and the sizing pass would be pure cost — 68
   // of them on flexily's TUI-board benchmark, for a byte-identical tree.
   //
-  // The flexibility test asks only whether a child CAN absorb free space, not
-  // whether this container currently has any to absorb. Predicting that from
-  // the summed base sizes is what cannot be done here: they are the
+  // Every test below asks only whether a reader is ARMED, never whether it
+  // currently has free space to move. Predicting that from the summed base
+  // sizes is the one thing that cannot be done here: they are the
   // under-estimates in question, so a sum that fits can overflow once exact,
-  // and any bound on the deficit under-predicts by construction. Asking
-  // instead is cheap and has no false negative. `cflex.flexShrink` is the
-  // EFFECTIVE factor the loop above just derived, all four of its rules
-  // included, so reading it back is not a second implementation of them.
+  // and any bound on the deficit under-predicts by construction. That applies
+  // to the max clause too — Phase 6a's own `lineTotalBaseMain > maxMain` guard
+  // reads the same approximate numbers — so the max is tested for being
+  // resolvable, not for being exceeded. `cflex.flexShrink` is the EFFECTIVE
+  // factor the loop above just derived, all four of its rules included, so
+  // reading it back is not a second implementation of them.
   if (anyBaseApprox && !isRow) {
+    const mainDefinite = !Number.isNaN(mainAxisSize)
+    // Resolved exactly as Phase 6a resolves it, under !isRow: the max main
+    // value is style.maxHeight, against availableHeight.
+    let maxMainCanShrink = false
+    if (!mainDefinite && style.maxHeight.unit !== C.UNIT_UNDEFINED) {
+      maxMainCanShrink = !Number.isNaN(resolveValue(style.maxHeight, availableHeight))
+    }
     const baseSizesReachOutput =
-      style.flexWrap !== C.WRAP_NO_WRAP ||
-      style.justifyContent !== C.JUSTIFY_FLEX_START ||
-      (!Number.isNaN(mainAxisSize) && (anyFlexGrow || anyFlexShrink))
+      (mainDefinite &&
+        (anyFlexGrow ||
+          anyFlexShrink ||
+          style.flexWrap !== C.WRAP_NO_WRAP ||
+          style.justifyContent !== C.JUSTIFY_FLEX_START ||
+          totalAutoMargins > 0)) ||
+      (maxMainCanShrink && anyFlexShrink)
     if (baseSizesReachOutput) {
       const sizingW = crossAxisSize
       const sizingH = NaN
