@@ -135,6 +135,8 @@ Text measurement backends:
 
 ## Installation
 
+> Install from npm; a git install resolves the TypeScript source and runs only under Bun.
+
 ```bash
 npm install flexily
 ```
