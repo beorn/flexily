@@ -19,6 +19,7 @@
  */
 
 import { describe, expect, it } from "vitest"
+import * as C from "../src/constants.js"
 import {
   DIRECTION_LTR,
   DIRECTION_RTL,
@@ -851,6 +852,57 @@ describe("Fuzz: multi-step constraint sweep", () => {
           `Full lifecycle differs at finalWidth=${finalWidth} (widths: ${widths.join("→")}, ${diffs.length} diffs):\n${detail}`,
         )
       }
+    })
+  }
+})
+
+describe("Fuzz: container query resize", () => {
+  // Existing random trees never generate CQ or math widths. Keep a CQ ancestor
+  // above a fixed-size intermediate node so unchanged child constraints cannot
+  // hide a stale query-size cache entry.
+  for (let seed = 0; seed < 64; seed++) {
+    it(`seed=${seed}: cqi and math descendants match fresh layout after shrink`, () => {
+      const rng = createRng(seed * 1049 + 23)
+      const initialWidth = 120 + Math.floor(rng() * 80)
+      const finalWidth = 30 + Math.floor(rng() * 60)
+      const percentage = 10 + Math.floor(rng() * 11)
+      const formula = seed % 4
+
+      function build(width: number) {
+        const cq = Node.create()
+        cq.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+        cq.setWidth(width)
+        const box = Node.create()
+        box.setWidth(60)
+        const leaf = Node.create()
+        const cqi = { value: percentage, unit: C.UNIT_CQI }
+        const point = { value: formula === 2 ? 50 : 1, unit: C.UNIT_POINT }
+        if (formula === 0) leaf.setWidthCqi(percentage)
+        else {
+          leaf.style.width = {
+            value: 0,
+            unit: C.UNIT_CALC,
+            expr:
+              formula === 1
+                ? { fn: "max", args: [point, cqi] }
+                : formula === 2
+                  ? { fn: "min", args: [point, cqi] }
+                  : { fn: "clamp", args: [point, cqi, { value: 60, unit: C.UNIT_POINT }] },
+          }
+        }
+        box.insertChild(leaf, 0)
+        cq.insertChild(box, 0)
+        return cq
+      }
+
+      const reused = build(initialWidth)
+      reused.calculateLayout(initialWidth, NaN, DIRECTION_LTR)
+      reused.setWidth(finalWidth)
+      reused.calculateLayout(finalWidth, NaN, DIRECTION_LTR)
+
+      const fresh = build(finalWidth)
+      fresh.calculateLayout(finalWidth, NaN, DIRECTION_LTR)
+      expect(diffLayouts(getLayout(fresh), getLayout(reused))).toEqual([])
     })
   }
 })

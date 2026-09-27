@@ -334,10 +334,16 @@ function layoutNode(
   // cqi values then resolve to 0, so this dead-end is explicit instead of
   // accidentally feeding child intrinsic size back into the query size.
   if (style.containerType !== C.CONTAINER_TYPE_NORMAL) {
+    if (!Object.is(node.getFrozenQuerySize(), nodeWidth)) {
+      // Descendants may have identical box constraints but depend on this CQ
+      // size through cqi or a math expression. Their fingerprints are stale.
+      invalidateFingerprintsAround(node)
+    }
     node._setFrozenQuerySize(nodeWidth)
   } else {
     // Not a CQ container — clear any stale freeze from prior layout passes when
     // the user toggled containerType off. Cheap; no-op if already NaN.
+    if (!Number.isNaN(node.getFrozenQuerySize())) invalidateFingerprintsAround(node)
     node._setFrozenQuerySize(NaN)
   }
 

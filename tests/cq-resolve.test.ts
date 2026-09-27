@@ -18,6 +18,35 @@ import * as C from "../src/constants.js"
 import { createFlexily } from "../src/index.js"
 
 describe("[A0.1 Pass 2] CQ descendant resolution — width/height", () => {
+  test("shrinking a CQ container refreshes cqi in a nested descendant", () => {
+    function build(width: number) {
+      const flex = createFlexily()
+      const cq = flex.createNode()
+      cq.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+      cq.setWidth(width)
+
+      const box = flex.createNode()
+      box.setWidth(30)
+      const leaf = flex.createNode()
+      leaf.setWidthCqi(10)
+      box.insertChild(leaf, 0)
+      cq.insertChild(box, 0)
+      return { flex, cq, leaf }
+    }
+
+    const reused = build(200)
+    reused.flex.calculateLayout(reused.cq, 200, 100)
+    expect(reused.leaf.getComputedWidth()).toBe(20)
+
+    reused.cq.setWidth(100)
+    reused.flex.calculateLayout(reused.cq, 100, 100)
+
+    const fresh = build(100)
+    fresh.flex.calculateLayout(fresh.cq, 100, 100)
+    expect(reused.leaf.getComputedWidth()).toBe(fresh.leaf.getComputedWidth())
+    expect(reused.leaf.getComputedWidth()).toBe(10)
+  })
+
   test("child setWidthCqi(50) resolves against CQ ancestor's frozen 200 → 100", () => {
     const flex = createFlexily()
     const cq = flex.createNode()
