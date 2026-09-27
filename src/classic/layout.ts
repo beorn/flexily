@@ -8,7 +8,7 @@
 import * as C from "../constants.js"
 import type { Node } from "./node.js"
 import type { Value } from "../types.js"
-import { resolveValue, applyMinMax } from "../utils.js"
+import { resolveValue, applyMinMax, pctIndefinite } from "../utils.js"
 import { log } from "../logger.js"
 
 // ============================================================================
@@ -761,8 +761,9 @@ function layoutNode(
       if (Number.isNaN(mainAxisSize)) {
         // Shrink-wrap mode - check if max constraint applies
         const maxMainVal = isRow ? style.maxWidth : style.maxHeight
-        if (maxMainVal.unit !== C.UNIT_UNDEFINED) {
-          const maxMain = resolveValue(maxMainVal, isRow ? availableWidth : availableHeight)
+        const availableMain = isRow ? availableWidth : availableHeight
+        if (maxMainVal.unit !== C.UNIT_UNDEFINED && !pctIndefinite(maxMainVal, availableMain)) {
+          const maxMain = resolveValue(maxMainVal, availableMain)
           if (!Number.isNaN(maxMain) && lineTotalBaseMain + lineTotalGaps > maxMain) {
             const innerMain = isRow ? innerLeft + innerRight : innerTop + innerBottom
             effectiveMainSize = maxMain - innerMain

@@ -377,6 +377,11 @@ export function evaluateMathExpr(expr: MathExpr, availableSize: number, queryInl
   return val
 }
 
+/** True when a percentage constraint has no definite size to resolve against. */
+export function pctIndefinite(value: Value, available: number): boolean {
+  return value.unit === C.UNIT_PERCENT && Number.isNaN(available)
+}
+
 /**
  * Apply min/max constraints to a size.
  *
@@ -400,7 +405,7 @@ export function applyMinMax(size: number, min: Value, max: Value, available: num
 
   if (max.unit !== C.UNIT_UNDEFINED) {
     // Skip percent max when available is NaN — can't resolve meaningfully
-    if (max.unit === C.UNIT_PERCENT && Number.isNaN(available)) {
+    if (pctIndefinite(max, available)) {
       // Skip: percent against NaN resolves to 0, which would be wrong
     } else {
       const maxValue = resolveValue(max, available)
@@ -425,7 +430,7 @@ export function applyMinMax(size: number, min: Value, max: Value, available: num
 
   if (min.unit !== C.UNIT_UNDEFINED) {
     // Skip percent min when available is NaN — can't resolve meaningfully
-    if (min.unit === C.UNIT_PERCENT && Number.isNaN(available)) {
+    if (pctIndefinite(min, available)) {
       // Skip: percent against NaN resolves to 0, which would be wrong
     } else {
       const minValue = resolveValue(min, available)

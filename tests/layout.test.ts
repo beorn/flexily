@@ -49,6 +49,7 @@ import {
   WRAP_WRAP_REVERSE,
 } from "../src/index.js"
 import { createChild, expectLayout, expectWidth } from "./test-utils.js"
+import { Node as ClassicNode } from "../src/index-classic.js"
 
 describe("Flexily Layout Engine", () => {
   describe("Basic Layout", () => {
@@ -1727,6 +1728,52 @@ describe("Flexily Layout Engine", () => {
   // Bug fixes: min/max sizing edge cases
   // ==========================================================================
   describe("min/max sizing edge cases", () => {
+    it("keeps intrinsic width when a percentage max has no definite size to constrain", () => {
+      // @failure #26246: resolving an indefinite maxWidth=100% as zero erases content.
+      // @level l0 @consumer Silvery CSS-preset layout @testonly none
+      const root = Node.create({ defaults: "css" })
+      root.setWidth(100)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      root.setAlignItems(ALIGN_FLEX_START)
+
+      const child = Node.create({ defaults: "css" })
+      child.setMaxWidthPercent(100)
+      child.setFlexDirection(FLEX_DIRECTION_ROW)
+      const content = Node.create({ defaults: "css" })
+      content.setWidth(30)
+      content.setHeight(1)
+      child.insertChild(content, 0)
+      root.insertChild(child, 0)
+
+      root.calculateLayout(100, NaN, DIRECTION_LTR)
+
+      expect(child.getComputedWidth()).toBe(30)
+      root.free()
+    })
+
+    it("keeps the same intrinsic width through the classic engine", () => {
+      // @failure #26246: the exported classic engine has its own Phase 6 max reader.
+      // @level l0 @consumer flexily/classic @testonly none
+      const root = ClassicNode.create({ defaults: "css" })
+      root.setWidth(100)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      root.setAlignItems(ALIGN_FLEX_START)
+
+      const child = ClassicNode.create({ defaults: "css" })
+      child.setMaxWidthPercent(100)
+      child.setFlexDirection(FLEX_DIRECTION_ROW)
+      const content = ClassicNode.create({ defaults: "css" })
+      content.setWidth(30)
+      content.setHeight(1)
+      child.insertChild(content, 0)
+      root.insertChild(child, 0)
+
+      root.calculateLayout(100, NaN, DIRECTION_LTR)
+
+      expect(child.getComputedWidth()).toBe(30)
+      root.free()
+    })
+
     it("should respect minWidth percent", () => {
       const root = Node.create()
       root.setWidth(100)
