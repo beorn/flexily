@@ -14,6 +14,7 @@
  * @consumer any column whose auto-height children contain rows with wrapped
  *           text: silvery's yrd watch RUNNER box, its detail pane, every
  *           bordered card with a gutter + prose row
+ * @testonly none
  */
 import { describe, expect, it } from "vitest"
 import {
