@@ -717,7 +717,10 @@ function layoutNode(
       const minVal = isRow ? childStyle.minWidth : childStyle.minHeight
       const maxVal = isRow ? childStyle.maxWidth : childStyle.maxHeight
       const minMain = minVal.unit !== C.UNIT_UNDEFINED ? resolveValue(minVal, mainAxisSize) : 0
-      const maxMain = maxVal.unit !== C.UNIT_UNDEFINED ? resolveValue(maxVal, mainAxisSize) : Infinity
+      const maxMain =
+        maxVal.unit !== C.UNIT_UNDEFINED && !pctIndefinite(maxVal, mainAxisSize)
+          ? resolveValue(maxVal, mainAxisSize)
+          : Infinity
 
       // Clamp base size to get hypothetical size (CSS Flexbox spec)
       const hypotheticalSize = Math.max(minMain, Math.min(maxMain, baseSize))

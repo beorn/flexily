@@ -928,7 +928,10 @@ function layoutNode(
     } else {
       cflex.minMain = 0
     }
-    cflex.maxMain = maxVal.unit !== C.UNIT_UNDEFINED ? resolveValue(maxVal, mainAxisSize) : Infinity
+    cflex.maxMain =
+      maxVal.unit !== C.UNIT_UNDEFINED && !pctIndefinite(maxVal, mainAxisSize)
+        ? resolveValue(maxVal, mainAxisSize)
+        : Infinity
 
     // Store flex factors from style
     cflex.flexGrow = childStyle.flexGrow
@@ -1060,7 +1063,11 @@ function layoutNode(
     // Resolved exactly as Phase 6a resolves it, under !isRow: the max main
     // value is style.maxHeight, against availableHeight.
     let maxMainCanShrink = false
-    if (!mainDefinite && style.maxHeight.unit !== C.UNIT_UNDEFINED) {
+    if (
+      !mainDefinite &&
+      style.maxHeight.unit !== C.UNIT_UNDEFINED &&
+      !pctIndefinite(style.maxHeight, availableHeight)
+    ) {
       maxMainCanShrink = !Number.isNaN(resolveValue(style.maxHeight, availableHeight))
     }
     const baseSizesReachOutput =
