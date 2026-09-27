@@ -18,7 +18,7 @@
  */
 import { describe, expect, test } from "vitest"
 import * as C from "../src/constants.js"
-import { createFlexily } from "../src/index.js"
+import { createFlexily, parseLength, LengthSyntaxError } from "../src/index.js"
 import type { MathExpr, Value } from "../src/types.js"
 import { evaluateMathExpr, resolveValue } from "../src/utils.js"
 
@@ -254,5 +254,68 @@ describe("[A0.3] property tests", () => {
         expect(result).toBeLessThanOrEqual(hi)
       }
     }
+  })
+})
+
+describe("[A0.3a] parsed length expressions", () => {
+  /** @failure A math string was silently ignored or evaluated before its CQ size froze. @level l2 @consumer Silvery Box dimensions */
+  test("nested arithmetic resolves with percent and frozen cqi", () => {
+    const parsed = parseLength("clamp(10px, max(20%, 2 * 10cqi - 4), 60px)")
+    expect(parsed.unit).toBe(C.UNIT_CALC)
+    expect(resolveValue(parsed, 100, 200)).toBe(36)
+    expect(resolveValue(parsed, 100, 400)).toBe(60)
+    expect(resolveValue(parseLength("3cqmin + 2"), 100, 200)).toBe(8)
+  })
+
+  /** @failure Invalid math could reach layout as NaN or a default zero. @level l1 @consumer Box style author */
+  test.each(["min()", "clamp(1, 2)", "max(1,)", "2cqb", "2cqmax", "1cqi * 2cqi", "1 / 0", "10px garbage"])(
+    "throws a typed error with the bad input: %s",
+    (input) => {
+      expect(() => parseLength(input)).toThrow(LengthSyntaxError)
+      expect(() => parseLength(input)).toThrow(input)
+    },
+  )
+
+  /** @failure A changed AST with the same CALC wrapper left the previous layout cached. @level l2 @consumer React rerender */
+  test("changed expression dirties layout; equal expression does not", () => {
+    const flex = createFlexily()
+    const outer = flex.createNode()
+    outer.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+    outer.setContainSize(true)
+    outer.setWidth(200)
+    const box = flex.createNode()
+    outer.insertChild(box, 0)
+    box.setWidth(parseLength("max(1, 10cqi)"))
+    flex.calculateLayout(outer, 200, 100)
+    expect(box.getComputedWidth()).toBe(20)
+    expect(box.isDirty()).toBe(false)
+
+    box.setWidth(parseLength("max(1, 10cqi)"))
+    expect(box.isDirty()).toBe(false)
+    box.setWidth(parseLength("max(1, 20cqi)"))
+    expect(box.isDirty()).toBe(true)
+    flex.calculateLayout(outer, 200, 100)
+    expect(box.getComputedWidth()).toBe(40)
+  })
+
+  /** @failure Height math and dimension bounds lost the frozen CQ context at separate resolve sites. @level l2 @consumer Box height and min/max props */
+  test("height and min/max constraints use the nearest frozen inline size", () => {
+    const flex = createFlexily()
+    const outer = flex.createNode()
+    outer.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+    outer.setContainSize(true)
+    outer.setWidth(200)
+    const box = flex.createNode()
+    box.setWidth(10)
+    box.setMinWidth(parseLength("max(1, 20cqi)"))
+    box.setMaxWidth(parseLength("min(80, 30cqi)"))
+    box.setHeight(parseLength("max(1, 10cqi)"))
+    outer.insertChild(box, 0)
+    flex.calculateLayout(outer, 200, 100)
+    expect(box.getComputedWidth()).toBe(40)
+    expect(box.getComputedHeight()).toBe(20)
+    box.setWidth(100)
+    flex.calculateLayout(outer, 200, 100)
+    expect(box.getComputedWidth()).toBe(60)
   })
 })

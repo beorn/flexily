@@ -130,7 +130,8 @@ export {
 } from "./constants.js"
 
 // Types
-export type { BaselineFunc, Layout, MeasureFunc, Style, Value } from "./types.js"
+export type { BaselineFunc, Layout, MeasureFunc, Style, Value, MathExpr } from "./types.js"
+export { parseLength, LengthSyntaxError } from "./parse-length.js"
 
 // Utility functions
 export { createDefaultStyle, createValue } from "./types.js"

@@ -22,8 +22,25 @@ import type { MathExpr, Value } from "./types.js"
  */
 export const traversalStack: unknown[] = []
 
-export function styleValueMatches(current: Value, value: number, unit: number): boolean {
-  return current.unit === unit && Object.is(current.value, value)
+export function styleValueMatches(current: Value, value: number, unit: number, expr?: MathExpr): boolean {
+  if (current.unit !== unit || !Object.is(current.value, value)) return false
+  return unit !== C.UNIT_CALC || mathExprMatches(current.expr, expr)
+}
+
+export function needsQueryInlineSize(value: Value): boolean {
+  return value.unit === C.UNIT_CQI || value.unit === C.UNIT_CQMIN || value.unit === C.UNIT_CALC
+}
+
+function mathExprMatches(a: MathExpr | undefined, b: MathExpr | undefined): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  if ("unit" in a) return "unit" in b && a.unit === b.unit && Object.is(a.value, b.value)
+  if ("op" in a) return "op" in b && a.op === b.op && mathExprMatches(a.left, b.left) && mathExprMatches(a.right, b.right)
+  if (!("fn" in b) || a.fn !== b.fn || a.args.length !== b.args.length) return false
+  for (let i = 0; i < a.args.length; i++) {
+    if (!mathExprMatches(a.args[i], b.args[i])) return false
+  }
+  return true
 }
 
 /**
@@ -346,6 +363,16 @@ export function evaluateMathExpr(expr: MathExpr, availableSize: number, queryInl
   if ("unit" in expr) {
     return resolveValue(expr, availableSize, queryInlineSize)
   }
+  if ("op" in expr) {
+    const left = evaluateMathExpr(expr.left, availableSize, queryInlineSize)
+    const right = evaluateMathExpr(expr.right, availableSize, queryInlineSize)
+    switch (expr.op) {
+      case "+": return left + right
+      case "-": return left - right
+      case "*": return left * right
+      case "/": return left / right
+    }
+  }
   if (expr.fn === "min") {
     if (expr.args.length === 0) return 0
     let acc = Infinity
@@ -392,7 +419,7 @@ export function evaluateMathExpr(expr: MathExpr, availableSize: number, queryInl
  * since resolveValue returns 0 for percent-against-NaN, which would incorrectly
  * clamp sizes to 0.
  */
-export function applyMinMax(size: number, min: Value, max: Value, available: number): number {
+export function applyMinMax(size: number, min: Value, max: Value, available: number, queryInlineSize = NaN): number {
   let result = size
 
   // Apply max first, then min. CSS spec: when min > max, min wins.
@@ -403,7 +430,7 @@ export function applyMinMax(size: number, min: Value, max: Value, available: num
     if (max.unit === C.UNIT_PERCENT && Number.isNaN(available)) {
       // Skip: percent against NaN resolves to 0, which would be wrong
     } else {
-      const maxValue = resolveValue(max, available)
+      const maxValue = resolveValue(max, available, queryInlineSize)
       if (!Number.isNaN(maxValue)) {
         // Apply max as ceiling even when size is NaN (auto-sized).
         // This constrains children's layout to the max bound.
@@ -428,7 +455,7 @@ export function applyMinMax(size: number, min: Value, max: Value, available: num
     if (min.unit === C.UNIT_PERCENT && Number.isNaN(available)) {
       // Skip: percent against NaN resolves to 0, which would be wrong
     } else {
-      const minValue = resolveValue(min, available)
+      const minValue = resolveValue(min, available, queryInlineSize)
       if (!Number.isNaN(minValue)) {
         // Only apply min to definite sizes. When size is NaN (auto-sized),
         // skip — the post-shrink-wrap applyMinMax call will floor it.

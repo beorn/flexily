@@ -36,6 +36,7 @@ export type MathExpr =
   | { readonly fn: "min"; readonly args: readonly MathExpr[] }
   | { readonly fn: "max"; readonly args: readonly MathExpr[] }
   | { readonly fn: "clamp"; readonly args: readonly [MathExpr, MathExpr, MathExpr] }
+  | { readonly op: "+" | "-" | "*" | "/"; readonly left: MathExpr; readonly right: MathExpr }
 
 /**
  * Measure function signature for intrinsic sizing.

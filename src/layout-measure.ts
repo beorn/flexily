@@ -12,7 +12,7 @@
 
 import * as C from "./constants.js"
 import type { Node } from "./node-zero.js"
-import { resolveValue, applyMinMax } from "./utils.js"
+import { resolveValue, applyMinMax, findContainerQuerySize, needsQueryInlineSize } from "./utils.js"
 import { resolveEdgeValue, resolveEdgeBorderValue, isRowDirection } from "./layout-helpers.js"
 import { incMeasureNodeCalls, incLayoutCacheHits } from "./layout-stats.js"
 
@@ -36,6 +36,11 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
   incMeasureNodeCalls()
   const style = node.style
   const layout = node.layout
+  const queryInlineSize = (
+    needsQueryInlineSize(style.width) || needsQueryInlineSize(style.height) ||
+    needsQueryInlineSize(style.minWidth) || needsQueryInlineSize(style.maxWidth) ||
+    needsQueryInlineSize(style.minHeight) || needsQueryInlineSize(style.maxHeight)
+  ) ? findContainerQuerySize(node) : NaN
 
   // Handle display: none
   if (style.display === C.DISPLAY_NONE) {
@@ -67,20 +72,20 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
   let nodeWidth: number
   if (style.width.unit === C.UNIT_POINT) {
     nodeWidth = style.width.value
-  } else if (style.width.unit === C.UNIT_PERCENT) {
-    nodeWidth = resolveValue(style.width, availableWidth)
+  } else if (style.width.unit === C.UNIT_PERCENT || style.width.unit === C.UNIT_CQI || style.width.unit === C.UNIT_CQMIN || style.width.unit === C.UNIT_CALC) {
+    nodeWidth = resolveValue(style.width, availableWidth, queryInlineSize)
   } else if (Number.isNaN(availableWidth)) {
     nodeWidth = NaN
   } else {
     nodeWidth = availableWidth - marginLeft - marginRight
   }
-  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
+  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth, queryInlineSize)
 
   let nodeHeight: number
   if (style.height.unit === C.UNIT_POINT) {
     nodeHeight = style.height.value
-  } else if (style.height.unit === C.UNIT_PERCENT) {
-    nodeHeight = resolveValue(style.height, availableHeight)
+  } else if (style.height.unit === C.UNIT_PERCENT || style.height.unit === C.UNIT_CQI || style.height.unit === C.UNIT_CQMIN || style.height.unit === C.UNIT_CALC) {
+    nodeHeight = resolveValue(style.height, availableHeight, queryInlineSize)
   } else if (Number.isNaN(availableHeight)) {
     nodeHeight = NaN
   } else {
@@ -95,13 +100,13 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
     const heightIsAuto = Number.isNaN(nodeHeight) || style.height.unit === C.UNIT_AUTO
     if (widthIsAuto && !heightIsAuto && !Number.isNaN(nodeHeight)) {
       nodeWidth = nodeHeight * aspectRatio
-      nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
+      nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth, queryInlineSize)
     } else if (heightIsAuto && !widthIsAuto && !Number.isNaN(nodeWidth)) {
       nodeHeight = nodeWidth / aspectRatio
     }
   }
 
-  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight)
+  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight, queryInlineSize)
 
   // Content area
   const innerLeft = borderLeft + paddingLeft
@@ -291,8 +296,8 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
   }
 
   // Apply min/max again after shrink-wrap
-  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
-  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight)
+  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth, queryInlineSize)
+  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight, queryInlineSize)
 
   layout.width = Math.round(nodeWidth)
   layout.height = Math.round(nodeHeight)

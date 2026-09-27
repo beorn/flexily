@@ -74,7 +74,7 @@ function isStyleValue(value: unknown): value is Value {
 }
 
 function styleValuesEqual(current: Value, next: Value): boolean {
-  return styleValueMatches(current, next.value, next.unit) && current.expr === next.expr
+  return styleValueMatches(current, next.value, next.unit, next.expr)
 }
 
 function styleArraysEqual(current: readonly unknown[], next: readonly unknown[]): boolean {
@@ -306,11 +306,12 @@ export class Node {
     this._style = createDefaultStyle(preset)
   }
 
-  private setStyleValue(key: StyleValueKey, value: number, unit: number): void {
-    if (styleValueMatches(this._style[key], value, unit)) {
+  private setStyleValue(key: StyleValueKey, value: number | Value, unit = C.UNIT_POINT): void {
+    const next = typeof value === "number" ? { value, unit } : value
+    if (styleValueMatches(this._style[key], next.value, next.unit, next.expr)) {
       return
     }
-    this._style[key] = { value, unit }
+    this._style[key] = next
     this.markDirty()
   }
 
@@ -1305,9 +1306,9 @@ export class Node {
    *
    * @param value - Width in points
    */
-  setWidth(value: number): void {
+  setWidth(value: number | Value): void {
     // NaN means "auto" in Yoga API
-    if (Number.isNaN(value)) {
+    if (typeof value === "number" && Number.isNaN(value)) {
       this.setStyleValue("width", 0, C.UNIT_AUTO)
     } else {
       this.setStyleValue("width", value, C.UNIT_POINT)
@@ -1382,9 +1383,9 @@ export class Node {
    *
    * @param value - Height in points
    */
-  setHeight(value: number): void {
+  setHeight(value: number | Value): void {
     // NaN means "auto" in Yoga API
-    if (Number.isNaN(value)) {
+    if (typeof value === "number" && Number.isNaN(value)) {
       this.setStyleValue("height", 0, C.UNIT_AUTO)
     } else {
       this.setStyleValue("height", value, C.UNIT_POINT)
@@ -1430,7 +1431,7 @@ export class Node {
    *
    * @param value - Minimum width in points
    */
-  setMinWidth(value: number): void {
+  setMinWidth(value: number | Value): void {
     this.setStyleValue("minWidth", value, C.UNIT_POINT)
   }
 
@@ -1448,7 +1449,7 @@ export class Node {
    *
    * @param value - Minimum height in points
    */
-  setMinHeight(value: number): void {
+  setMinHeight(value: number | Value): void {
     this.setStyleValue("minHeight", value, C.UNIT_POINT)
   }
 
@@ -1466,7 +1467,7 @@ export class Node {
    *
    * @param value - Maximum width in points
    */
-  setMaxWidth(value: number): void {
+  setMaxWidth(value: number | Value): void {
     this.setStyleValue("maxWidth", value, C.UNIT_POINT)
   }
 
@@ -1484,7 +1485,7 @@ export class Node {
    *
    * @param value - Maximum height in points
    */
-  setMaxHeight(value: number): void {
+  setMaxHeight(value: number | Value): void {
     this.setStyleValue("maxHeight", value, C.UNIT_POINT)
   }
 
@@ -1566,7 +1567,7 @@ export class Node {
    *
    * @param value - Flex basis in points
    */
-  setFlexBasis(value: number): void {
+  setFlexBasis(value: number | Value): void {
     this.setStyleValue("flexBasis", value, C.UNIT_POINT)
   }
 

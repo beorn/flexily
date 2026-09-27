@@ -314,7 +314,7 @@ function layoutNode(
     nodeWidth = availableWidth - marginLeft - marginRight
   }
   // Apply min/max constraints (works even with NaN available for point-based constraints)
-  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
+  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth, ownQueryInlineSize)
 
   // ============================================================================
   // PHASE 3a: Freeze container-query inline-size (A0.1 — Pass 1 of two-phase layout)
@@ -347,7 +347,7 @@ function layoutNode(
   } else if (style.height.unit === C.UNIT_PERCENT) {
     // Percentage against NaN (auto-sized parent) resolves to 0 via resolveValue
     nodeHeight = resolveValue(style.height, availableHeight)
-  } else if (style.height.unit === C.UNIT_CQI || style.height.unit === C.UNIT_CQMIN) {
+  } else if (style.height.unit === C.UNIT_CQI || style.height.unit === C.UNIT_CQMIN || style.height.unit === C.UNIT_CALC) {
     // CSS: `height: 50cqi` means 50% of CQ container's *inline* size, expressed as height.
     // Phase 1 supports cqi/cqmin (inline-size only); cqb arrives later.
     nodeHeight = resolveValue(style.height, availableHeight, ownQueryInlineSize)
@@ -370,7 +370,7 @@ function layoutNode(
       // Height is defined, width is auto: width = height * aspectRatio
       nodeWidth = nodeHeight * aspectRatio
       // Re-apply min/max for derived width
-      nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
+      nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth, ownQueryInlineSize)
     } else if (heightIsAuto && !widthIsAuto && !Number.isNaN(nodeWidth)) {
       // Width is defined, height is auto: height = width / aspectRatio
       nodeHeight = nodeWidth / aspectRatio
@@ -379,7 +379,7 @@ function layoutNode(
   }
 
   // Apply min/max constraints (works even with NaN available for point-based constraints)
-  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight)
+  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight, ownQueryInlineSize)
 
   // Content area (inside border and padding)
   // When node dimensions are NaN (unconstrained), content dimensions are also NaN
@@ -915,8 +915,8 @@ function layoutNode(
         let autoMin = childStyle.overflow === C.OVERFLOW_VISIBLE ? contentMinSize : 0
         // Clamp by definite max-* (CSS spec: auto min-size includes a "specified
         // size suggestion" that's bounded by max-* if specified).
-        if (maxVal.unit === C.UNIT_POINT || maxVal.unit === C.UNIT_PERCENT) {
-          const maxResolved = resolveValue(maxVal, mainAxisSize)
+        if (maxVal.unit === C.UNIT_POINT || maxVal.unit === C.UNIT_PERCENT || maxVal.unit === C.UNIT_CQI || maxVal.unit === C.UNIT_CQMIN || maxVal.unit === C.UNIT_CALC) {
+          const maxResolved = resolveValue(maxVal, mainAxisSize, findContainerQuerySize(child))
           if (!Number.isNaN(maxResolved) && maxResolved !== Infinity) {
             autoMin = Math.min(autoMin, maxResolved)
           }
@@ -924,11 +924,11 @@ function layoutNode(
         cflex.minMain = autoMin
       }
     } else if (minVal.unit !== C.UNIT_UNDEFINED) {
-      cflex.minMain = resolveValue(minVal, mainAxisSize)
+      cflex.minMain = resolveValue(minVal, mainAxisSize, findContainerQuerySize(child))
     } else {
       cflex.minMain = 0
     }
-    cflex.maxMain = maxVal.unit !== C.UNIT_UNDEFINED ? resolveValue(maxVal, mainAxisSize) : Infinity
+    cflex.maxMain = maxVal.unit !== C.UNIT_UNDEFINED ? resolveValue(maxVal, mainAxisSize, findContainerQuerySize(child)) : Infinity
 
     // Store flex factors from style
     cflex.flexGrow = childStyle.flexGrow
@@ -1115,8 +1115,8 @@ function layoutNode(
         if (autoMinApplies) {
           let exactMin = exactMain
           const maxVal = isRow ? childStyle.maxWidth : childStyle.maxHeight
-          if (maxVal.unit === C.UNIT_POINT || maxVal.unit === C.UNIT_PERCENT) {
-            const maxResolved = resolveValue(maxVal, mainAxisSize)
+          if (maxVal.unit === C.UNIT_POINT || maxVal.unit === C.UNIT_PERCENT || maxVal.unit === C.UNIT_CQI || maxVal.unit === C.UNIT_CQMIN || maxVal.unit === C.UNIT_CALC) {
+            const maxResolved = resolveValue(maxVal, mainAxisSize, findContainerQuerySize(child))
             if (!Number.isNaN(maxResolved) && maxResolved !== Infinity) {
               exactMin = Math.min(exactMin, maxResolved)
             }
@@ -1161,7 +1161,7 @@ function layoutNode(
         // Shrink-wrap mode - check if max constraint applies
         const maxMainVal = isRow ? style.maxWidth : style.maxHeight
         if (maxMainVal.unit !== C.UNIT_UNDEFINED) {
-          const maxMain = resolveValue(maxMainVal, isRow ? availableWidth : availableHeight)
+          const maxMain = resolveValue(maxMainVal, isRow ? availableWidth : availableHeight, ownQueryInlineSize)
           if (!Number.isNaN(maxMain) && lineTotalBaseMain + lineTotalGaps > maxMain) {
             const innerMain = isRow ? innerLeft + innerRight : innerTop + innerBottom
             effectiveMainSize = maxMain - innerMain
@@ -1844,8 +1844,9 @@ function layoutNode(
       // Apply cross-axis min/max constraints
       const crossMinVal = isRow ? childStyle.minHeight : childStyle.minWidth
       const crossMaxVal = isRow ? childStyle.maxHeight : childStyle.maxWidth
-      const crossMin = crossMinVal.unit !== C.UNIT_UNDEFINED ? resolveValue(crossMinVal, crossAxisSize) : 0
-      const crossMax = crossMaxVal.unit !== C.UNIT_UNDEFINED ? resolveValue(crossMaxVal, crossAxisSize) : Infinity
+      const childQueryInlineSize = findContainerQuerySize(child)
+      const crossMin = crossMinVal.unit !== C.UNIT_UNDEFINED ? resolveValue(crossMinVal, crossAxisSize, childQueryInlineSize) : 0
+      const crossMax = crossMaxVal.unit !== C.UNIT_UNDEFINED ? resolveValue(crossMaxVal, crossAxisSize, childQueryInlineSize) : Infinity
 
       // Apply constraints - for NaN (shrink-wrap), use min as floor
       if (Number.isNaN(childCrossSize)) {
@@ -2447,8 +2448,8 @@ function layoutNode(
 
   // Re-apply min/max constraints after any shrink-wrap adjustments
   // This ensures containers don't violate their constraints after auto-sizing
-  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
-  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight)
+  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth, ownQueryInlineSize)
+  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight, ownQueryInlineSize)
 
   // Re-enforce box model constraint: minimum size = padding + border
   // This must be applied AFTER applyMinMax since min/max can't reduce below padding+border
