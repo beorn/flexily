@@ -26,13 +26,13 @@ import { incMeasureNodeCalls, incLayoutCacheHits } from "./layout-stats.js"
  * @param availableWidth - Available width (NaN for unconstrained)
  * @param availableHeight - Available height (NaN for unconstrained)
  * @param direction - Layout direction (LTR or RTL)
+ * @returns Whether the result is APPROXIMATE — an under-estimate, because the
+ *   shrink-wrap shortcut met an overflowing row at or below `node`. The caller
+ *   decides what to do about it; `layout-zero.ts` Phase 5 re-derives such a
+ *   base size through the real algorithm when it is about to distribute from
+ *   it, and keeps the approximation when it is not. See the block below.
  */
-export function measureNode(
-  node: Node,
-  availableWidth: number,
-  availableHeight: number,
-  direction: number = C.DIRECTION_LTR,
-): void {
+export function measureNode(node: Node, availableWidth: number, availableHeight: number, direction: number): boolean {
   incMeasureNodeCalls()
   const style = node.style
   const layout = node.layout
@@ -41,7 +41,7 @@ export function measureNode(
   if (style.display === C.DISPLAY_NONE) {
     layout.width = 0
     layout.height = 0
-    return
+    return false
   }
 
   // Calculate spacing
@@ -143,7 +143,7 @@ export function measureNode(
 
     layout.width = Math.round(nodeWidth)
     layout.height = Math.round(nodeHeight)
-    return
+    return false
   }
 
   // Handle leaf nodes without measureFunc
@@ -156,7 +156,7 @@ export function measureNode(
     }
     layout.width = Math.round(nodeWidth)
     layout.height = Math.round(nodeHeight)
-    return
+    return false
   }
 
   // For container nodes, we need to measure children to compute intrinsic size
@@ -177,7 +177,7 @@ export function measureNode(
     if (Number.isNaN(nodeHeight)) nodeHeight = minInnerHeight
     layout.width = Math.round(nodeWidth)
     layout.height = Math.round(nodeHeight)
-    return
+    return false
   }
 
   const isRow = isRowDirection(style.flexDirection)
@@ -189,6 +189,9 @@ export function measureNode(
   let totalMainSize = 0
   let maxCrossSize = 0
   let itemCount = 0
+  // Set when this measurement, or any measurement below it, took the
+  // shrink-wrap shortcut on a row that overflows a definite main size.
+  let approx = false
 
   for (const child of node.children) {
     // Skip absolute/hidden children (same filter as count pass)
@@ -220,16 +223,20 @@ export function measureNode(
     const cached = child.getCachedLayout(childAvailW, childAvailH)
     if (cached) {
       incLayoutCacheHits()
+      // The verdict rides in the cache entry, so a hit reports the same
+      // approximate-ness the miss would have.
+      if (cached.approx) approx = true
     } else {
       // Save/restore layout around measureNode — it overwrites node.layout
       const savedW = child.layout.width
       const savedH = child.layout.height
-      measureNode(child, childAvailW, childAvailH, direction)
+      const childApprox = measureNode(child, childAvailW, childAvailH, direction)
       measuredW = child.layout.width
       measuredH = child.layout.height
       child.layout.width = savedW
       child.layout.height = savedH
-      child.setCachedLayout(childAvailW, childAvailH, measuredW, measuredH)
+      child.setCachedLayout(childAvailW, childAvailH, measuredW, measuredH, childApprox)
+      if (childApprox) approx = true
     }
 
     const childMainSize = cached ? (isRow ? cached.width : cached.height) : isRow ? measuredW : measuredH
@@ -243,6 +250,36 @@ export function measureNode(
   // Add gaps
   if (itemCount > 1) {
     totalMainSize += mainGap * (itemCount - 1)
+  }
+
+  // The shortcut's one unsound case: a row overflowing a definite main size.
+  //
+  // The loop above measured every child at an UNCONSTRAINED main axis
+  // (childAvailW = NaN), i.e. at max-content. That stands in for the child's
+  // real main size only while the flex algorithm would leave it alone. When
+  // this row has a DEFINITE main size and the children's max-content sum
+  // overflows it, the real algorithm shrinks them (or breaks them across
+  // lines), and wrappable text inside then needs MORE rows than it reported
+  // here — max-content is its one-line floor, so this measurement can only
+  // under-estimate the cross size.
+  //
+  // This function does not resolve that: there is exactly one flexible-length
+  // resolution in the engine and it is layoutNode's. It reports the
+  // under-estimate instead, and layout-zero.ts Phase 5 pays for the real
+  // algorithm only when it is about to distribute free space from the number.
+  //
+  // Row-only by construction: line wrapping keys off the INLINE size, which
+  // for a row is the main axis this function deliberately leaves NaN. A
+  // column's children take their inline size from childAvailW = crossAxisSize,
+  // definite whenever the column's own width is, so the shortcut holds there.
+  //
+  // `> 0` rather than `!Number.isNaN`: a `width: 100%` row measured against an
+  // unconstrained parent resolves to 0 (resolveValue's percent-against-NaN
+  // rule), which is an artifact of that approximation and not a real budget.
+  // Laying such a row out for real would wrap its text at width 0; the
+  // shrink-wrap answer (max-content, one line) is the better estimate there.
+  if (isRow && mainAxisSize > 0 && totalMainSize > mainAxisSize) {
+    approx = true
   }
 
   // Compute final node size
@@ -259,4 +296,5 @@ export function measureNode(
 
   layout.width = Math.round(nodeWidth)
   layout.height = Math.round(nodeHeight)
+  return approx
 }

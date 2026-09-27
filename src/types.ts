@@ -82,6 +82,12 @@ export interface LayoutCacheEntry {
   availH: number // Available height (may be NaN)
   computedW: number // Computed width
   computedH: number // Computed height
+  // measureNode's shrink-wrap shortcut hit a row that overflows a definite
+  // main size somewhere at or below this node, so the size above is an
+  // under-estimate (see layout-measure.ts). Cached alongside the size because
+  // it is a property of THIS query, not of the node: a hit must not report a
+  // neighbouring query's verdict.
+  approx: boolean
 }
 
 /**
@@ -141,6 +147,14 @@ export interface FlexInfo {
   relativeIndex: number
   /** Computed baseline offset for ALIGN_BASELINE (zero-alloc: avoids per-pass array) */
   baseline: number
+  /**
+   * Phase 5 derived this child's base size from `measureNode`, and the answer
+   * is an under-estimate because the shrink-wrap shortcut met an overflowing
+   * row somewhere below (see layout-measure.ts). Phase 5 re-derives the base
+   * size through the real algorithm only if this container will actually
+   * distribute from it.
+   */
+  baseApprox: boolean
 
   // Constraint fingerprinting for layout caching
   /** Last availableWidth passed to layoutNode */

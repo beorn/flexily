@@ -55,7 +55,7 @@ import {
   isEdgeAuto,
   resolveEdgeBorderValue,
 } from "./layout-helpers.js"
-import { propagatePositionDelta } from "./layout-traversal.js"
+import { propagatePositionDelta, invalidateFingerprintsAround } from "./layout-traversal.js"
 import {
   resetLayoutStats,
   incLayoutNodeCalls,
@@ -99,6 +99,35 @@ export function computeLayout(
     // Restore line state for outer pass (no-op at depth 0)
     exitLayout(saved)
   }
+}
+
+/**
+ * Re-derive a child's flex base size with the REAL algorithm, for the one case
+ * `measureNode`'s shrink-wrap shortcut cannot answer: a row whose children
+ * overflow a definite main size (see layout-measure.ts). Phase 5 calls this
+ * only for a child measureNode flagged approximate, and only when this
+ * container is about to distribute from the number.
+ *
+ * Leaves the exact size in `node.layout`; the caller save/restores as it does
+ * around measureNode.
+ */
+function sizeByLayout(node: Node, availableWidth: number, availableHeight: number, direction: number): void {
+  layoutNode(node, availableWidth, availableHeight, 0, 0, 0, 0, direction)
+  // The pass just overwrote layout.left/top/width/height throughout the
+  // subtree, at absolute (0,0) with offsets 0, and left a VALID fingerprint on
+  // every node it touched. Both halves are poison for the positioning pass: a
+  // fingerprint hit would keep an origin-relative position, and on this node
+  // the caller additionally restores layout.width/height to their pre-measure
+  // values the moment we return — "Bug 1: measureNode corruption"
+  // (src/CLAUDE.md) one level up. Drop the whole subtree's fingerprints so the
+  // real pass recomputes every node it is about to reposition. The plain
+  // measureNode path writes no fingerprints at all; this restores parity.
+  //
+  // No enterLayout/exitLayout bracket: Phase 5 runs before this container
+  // breaks its own lines, so no live line data is in the module scratch
+  // arrays, and the nested pass is no more exposed than Phase 8's own
+  // recursion into a child.
+  invalidateFingerprintsAround(node)
 }
 
 /**
@@ -479,6 +508,12 @@ function layoutNode(
   let relativeCount = 0
   let totalAutoMargins = 0 // Count auto margins during this pass
   let hasBaselineAlignment = style.alignItems === C.ALIGN_BASELINE
+  // Whether any child's base size is an under-estimate from measureNode's
+  // shortcut, and whether any child can absorb free space in either
+  // direction. All three feed the re-derivation decision after this loop.
+  let anyBaseApprox = false
+  let anyFlexGrow = false
+  let anyFlexShrink = false
 
   for (const child of node.children) {
     // Mark relativeIndex (-1 for absolute/hidden, 0+ for relative)
@@ -552,6 +587,10 @@ function layoutNode(
     const autoMinNeedsContent =
       minValEarly.unit === C.UNIT_AUTO && childStyle.overflow === C.OVERFLOW_VISIBLE && !isFitContentEarly
     let baseSize = 0
+    // Set when the base size below came from measureNode's shrink-wrap
+    // shortcut over a row that overflows a definite main size, i.e. it is an
+    // under-estimate. Only the auto-sized-container branch can produce one.
+    let baseApprox = false
     let contentMinSize = 0
     if (childStyle.flexBasis.unit === C.UNIT_POINT) {
       baseSize = childStyle.flexBasis.value
@@ -635,6 +674,7 @@ function layoutNode(
           incLayoutCacheHits()
           _t?.cacheHit(_tn, sizingW, sizingH, cached.width, cached.height)
           baseSize = isRow ? cached.width : cached.height
+          baseApprox = cached.approx
         } else {
           _t?.cacheMiss(_tn, sizingW, sizingH)
           // Use measureNode for sizing-only pass (faster than full layoutNode)
@@ -644,7 +684,7 @@ function layoutNode(
           // in Phase 9 would skip re-computation and preserve the corrupted values.
           const savedW = child.layout.width
           const savedH = child.layout.height
-          measureNode(child, sizingW, sizingH, direction)
+          baseApprox = measureNode(child, sizingW, sizingH, direction)
           const measuredW = child.layout.width
           const measuredH = child.layout.height
           child.layout.width = savedW
@@ -652,7 +692,7 @@ function layoutNode(
           _t?.measureSaveRestore(_tn, savedW, savedH, measuredW, measuredH)
           baseSize = isRow ? measuredW : measuredH
           // Cache the result for potential reuse
-          child.setCachedLayout(sizingW, sizingH, measuredW, measuredH)
+          child.setCachedLayout(sizingW, sizingH, measuredW, measuredH, baseApprox)
         }
       } else {
         // For auto-sized LEAF children without measureFunc, use padding + border as minimum
@@ -927,6 +967,14 @@ function layoutNode(
     // Store base and main size (start from base size - distribution happens from here)
     cflex.baseSize = baseSize
     cflex.mainSize = baseSize
+    cflex.baseApprox = baseApprox
+    if (baseApprox) anyBaseApprox = true
+    if (childStyle.flexGrow > 0) anyFlexGrow = true
+    // cflex.flexShrink is the EFFECTIVE factor this same loop just derived,
+    // all four rules included (explicit value, overflow container, measured
+    // flexGrow leaf, fit-content). Reading it back is not a second
+    // implementation of them — it is the one implementation's answer.
+    if (cflex.flexShrink > 0) anyFlexShrink = true
     cflex.frozen = false // Will be set during distribution
 
     // Free space calculation uses BASE sizes (per Yoga/CSS spec algorithm)
@@ -940,6 +988,142 @@ function layoutNode(
     // Check for baseline alignment
     if (!hasBaselineAlignment && childStyle.alignSelf === C.ALIGN_BASELINE) {
       hasBaselineAlignment = true
+    }
+  }
+
+  // =========================================================================
+  // PHASE 5b: Re-derive approximate base sizes, but only where they can matter
+  // =========================================================================
+  // measureNode reports an under-estimate rather than resolving it (see
+  // layout-measure.ts): a row that overflows a definite main size reports its
+  // text as one line when the real algorithm would wrap it to several.
+  //
+  // What is under-estimated is always a HEIGHT. The detection fires on a row
+  // overflowing its inline size, and what it gets wrong is that row's CROSS
+  // size; the flag then bubbles up as a height under-estimate at every level
+  // (a column's main size, then that column's parent row's cross size, and so
+  // on). So only a COLUMN can distribute from the bad number. A row's base
+  // sizes are WIDTHS, and a width is never approximate here: measured at an
+  // unconstrained main axis, a nested row's percent width resolves to NaN and
+  // a point width is exact either way. A row's cross axis comes from its
+  // children's ACTUAL layout — the stretch override, or Phase 9's max of
+  // child.layout — and its multi-line cross sizes from Phase 7a's estimate at
+  // NaN width, which a sizing pass at NaN width could not improve. Hence the
+  // `!isRow` guard: the flag keeps bubbling THROUGH rows, only the action is
+  // column-only.
+  //
+  // For a column, each reader of the summed base sizes is mirrored below by
+  // the engine condition that gates it, rather than by a re-derivation of it:
+  //
+  //  - Flex distribution: free space comes from the sum, so a short one hands
+  //    a flexGrow sibling rows that are not free, or under-states the deficit
+  //    a shrinkable sibling must absorb. Both directions are pinned in
+  //    tests/parent-flex-base-nested-row-wrap.test.ts.
+  //  - flex-wrap: breakIntoLines splits on hypothetical main sizes, i.e. base
+  //    sizes — but only with a definite main axis. Its first line reads
+  //    "No wrapping or unconstrained", and NaN takes every child onto line 0.
+  //  - justify-content other than flex-start positions the line from the
+  //    remaining space, the same sum — again only with a definite main axis:
+  //    "For auto-sized containers (NaN mainAxisSize), there's no remaining
+  //    space to justify" sets it to 0.
+  //  - Main-axis auto margins absorb that same remaining space, ahead of
+  //    justify-content, so they read the sum under the same condition.
+  //  - A max main size distributes even in SHRINK-WRAP mode: Phase 6a's
+  //    "Shrink-wrap mode - check if max constraint applies" resolves the max
+  //    and shrinks the line into it. That is the one reader an indefinite main
+  //    axis does not disarm. It is covered DEFENSIVELY: a finite point max
+  //    cannot reach it, because applyMinMax applies a finite max as a ceiling
+  //    even to an auto size, so such a column is already definite here and the
+  //    clause above catches it. What is left is a percent max against an
+  //    indefinite parent, which applyMinMax skips. Do not delete the clause as
+  //    dead without re-checking that.
+  //
+  // Everything else already works from each child's ACTUAL laid-out size:
+  // Phase 8 advances mainPos by child.layout when it did not override, and
+  // Phase 9 shrink-wraps this container from child.layout too, explicitly
+  // "not pre-computed flex.mainSize". So outside those three the
+  // approximation never surfaces and the sizing pass would be pure cost — 68
+  // of them on flexily's TUI-board benchmark, for a byte-identical tree.
+  //
+  // Every test below asks only whether a reader is ARMED, never whether it
+  // currently has free space to move. Predicting that from the summed base
+  // sizes is the one thing that cannot be done here: they are the
+  // under-estimates in question, so a sum that fits can overflow once exact,
+  // and any bound on the deficit under-predicts by construction. That applies
+  // to the max clause too — Phase 6a's own `lineTotalBaseMain > maxMain` guard
+  // reads the same approximate numbers — so the max is tested for being
+  // resolvable, not for being exceeded. `cflex.flexShrink` is the EFFECTIVE
+  // factor the loop above just derived, all four of its rules included, so
+  // reading it back is not a second implementation of them.
+  if (anyBaseApprox && !isRow) {
+    const mainDefinite = !Number.isNaN(mainAxisSize)
+    // Resolved exactly as Phase 6a resolves it, under !isRow: the max main
+    // value is style.maxHeight, against availableHeight.
+    let maxMainCanShrink = false
+    if (!mainDefinite && style.maxHeight.unit !== C.UNIT_UNDEFINED) {
+      maxMainCanShrink = !Number.isNaN(resolveValue(style.maxHeight, availableHeight))
+    }
+    const baseSizesReachOutput =
+      (mainDefinite &&
+        (anyFlexGrow ||
+          anyFlexShrink ||
+          style.flexWrap !== C.WRAP_NO_WRAP ||
+          style.justifyContent !== C.JUSTIFY_FLEX_START ||
+          totalAutoMargins > 0)) ||
+      (maxMainCanShrink && anyFlexShrink)
+    if (baseSizesReachOutput) {
+      const sizingW = crossAxisSize
+      const sizingH = NaN
+      for (const child of node.children) {
+        const cflex = child.flex
+        if (cflex.relativeIndex < 0 || !cflex.baseApprox) continue
+        // Same save/restore contract as the measureNode call this replaces.
+        const savedW = child.layout.width
+        const savedH = child.layout.height
+        sizeByLayout(child, sizingW, sizingH, direction)
+        const exactW = child.layout.width
+        const exactMain = child.layout.height
+        child.layout.width = savedW
+        child.layout.height = savedH
+        child.setCachedLayout(sizingW, sizingH, exactW, exactMain, false)
+        totalBaseMain += exactMain - cflex.baseSize
+        cflex.baseSize = exactMain
+        cflex.mainSize = exactMain
+        cflex.baseApprox = false
+        // The child's automatic minimum (CSS §4.5, `min-height: auto` under
+        // overflow visible, the CSS preset's default) came from
+        // Node.getMinContent above, whose cross-axis rule — the tallest child
+        // — shares the approximation just corrected: a row's min-content
+        // HEIGHT at this width is the height it wraps to, which is exactMain.
+        // Left at the short floor, the shrink pass below clamps the child to
+        // it, `mainSize !== baseSize` then reads as a real distribution, and
+        // Phase 8 overrides the child to a height it does not have: silvery's
+        // wrapped tab bar was laid out one line tall under a long panel while
+        // painting two, so the panel overpainted its second line (yrd watch,
+        // 2026-09-05). The same clamps as the auto path apply: a definite
+        // max-* bounds the specified-size suggestion; a flagged child never
+        // carries a definite flex-basis or main size (only the auto-sized
+        // container branch flags), so that cap is infinite here.
+        const childStyle = child.style
+        const minVal = isRow ? childStyle.minWidth : childStyle.minHeight
+        const mainDim = isRow ? childStyle.width : childStyle.height
+        const autoMinApplies =
+          minVal.unit === C.UNIT_AUTO &&
+          childStyle.overflow === C.OVERFLOW_VISIBLE &&
+          mainDim.unit !== C.UNIT_FIT_CONTENT &&
+          mainDim.unit !== C.UNIT_SNUG_CONTENT
+        if (autoMinApplies) {
+          let exactMin = exactMain
+          const maxVal = isRow ? childStyle.maxWidth : childStyle.maxHeight
+          if (maxVal.unit === C.UNIT_POINT || maxVal.unit === C.UNIT_PERCENT) {
+            const maxResolved = resolveValue(maxVal, mainAxisSize)
+            if (!Number.isNaN(maxResolved) && maxResolved !== Infinity) {
+              exactMin = Math.min(exactMin, maxResolved)
+            }
+          }
+          if (exactMin > cflex.minMain) cflex.minMain = exactMin
+        }
+      }
     }
   }
 
@@ -1169,13 +1353,13 @@ function layoutNode(
             // check in Phase 9 would skip re-computation and preserve corrupted values.
             const savedW = child.layout.width
             const savedH = child.layout.height
-            measureNode(child, child.flex.mainSize, NaN, direction)
+            const baselineApprox = measureNode(child, child.flex.mainSize, NaN, direction)
             childWidth = child.layout.width
             childHeight = child.layout.height
             child.layout.width = savedW
             child.layout.height = savedH
             _t?.measureSaveRestore(_tn, savedW, savedH, childWidth, childHeight)
-            child.setCachedLayout(child.flex.mainSize, NaN, childWidth, childHeight)
+            child.setCachedLayout(child.flex.mainSize, NaN, childWidth, childHeight, baselineApprox)
           }
         }
 
@@ -1225,12 +1409,17 @@ function layoutNode(
     for (let lineIdx = 0; lineIdx < numLines; lineIdx++) {
       _lineCrossOffsets[lineIdx] = cumulativeCrossOffset
 
-      // Calculate max cross size for this line using pre-collected _lineChildren
-      const lineChildren = _lineChildren[lineIdx]!
-      const lineLength = lineChildren.length
+      // Calculate max cross size for this line using pre-collected _lineChildren.
+      // Indexed through the module binding on every iteration, never through a
+      // local alias: measuring a child below re-enters layout (a user measureFunc
+      // laying out another tree, or measureNode's sizing fallback), the nested
+      // pass TRIMS _lineChildren[lineIdx] in place, and exitLayout restores the
+      // scratch arrays by REBINDING them — so an alias captured before the call
+      // still points at the trimmed array and reads undefined past its new end.
+      const lineLength = _lineChildren[lineIdx]!.length
       let maxLineCross = 0
       for (let i = 0; i < lineLength; i++) {
-        const child = lineChildren[i]!
+        const child = _lineChildren[lineIdx]![i]!
         // Estimate child cross size (will be computed more precisely during layout)
         const childStyle = child.style
         const crossDim = isRow ? childStyle.height : childStyle.width
@@ -1973,9 +2162,19 @@ function layoutNode(
       // size at unconstrained main axis, but layoutNode recomputes with actual
       // cross-axis constraints. For containers with children that wrap text,
       // layoutNode's result is correct because it accounts for the actual width
-      // after flex distribution of grandchildren. The Phase 5 measureNode pass
-      // measures row children with NaN main width, so text doesn't wrap —
-      // producing height=1 instead of the correct wrapped height.
+      // after flex distribution of grandchildren.
+      //
+      // The Phase 5 measureNode pass used to measure row children at NaN main
+      // width in every case, so text didn't wrap and it reported height=1
+      // instead of the wrapped height. Declining to override here hid that from
+      // the container itself but not from its PARENT, which had already
+      // distributed free space from the short base size and put every later
+      // sibling (wrapped lines - 1) rows too low, off the bottom of the frame.
+      // measureNode now REPORTS that one case — a row whose children overflow
+      // a definite main size — and Phase 5b re-derives the base size through
+      // the real algorithm when this container is about to distribute from it,
+      // so the number arrives already wrapped wherever it can be seen.
+      // Regression: tests/parent-flex-base-nested-row-wrap.test.ts.
       const hasMeasure = child.hasMeasureFunc() && child.children.length === 0
       const flexDistributionChangedSize = child.flex.mainSize !== child.flex.baseSize
       if (

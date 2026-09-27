@@ -208,9 +208,10 @@ export class Node {
     width: 0,
     height: 0,
   }
-  private _layoutResult: { width: number; height: number } = {
+  private _layoutResult: { width: number; height: number; approx: boolean } = {
     width: 0,
     height: 0,
+    approx: false,
   }
 
   // Static counters for cache statistics (reset per layout pass)
@@ -249,6 +250,7 @@ export class Node {
     lineIndex: 0,
     relativeIndex: -1,
     baseline: 0,
+    baseApprox: false,
     // Constraint fingerprinting
     lastAvailW: NaN,
     lastAvailH: NaN,
@@ -894,7 +896,7 @@ export class Node {
    *
    * NaN dimensions are handled specially via Object.is (NaN === NaN is false, but Object.is(NaN, NaN) is true).
    */
-  getCachedLayout(availW: number, availH: number): { width: number; height: number } | null {
+  getCachedLayout(availW: number, availH: number): { width: number; height: number; approx: boolean } | null {
     // Never return cached layout for dirty nodes - content may have changed
     if (this._isDirty) {
       return null
@@ -904,12 +906,14 @@ export class Node {
     if (lc0 && Object.is(lc0.availW, availW) && Object.is(lc0.availH, availH)) {
       this._layoutResult.width = lc0.computedW
       this._layoutResult.height = lc0.computedH
+      this._layoutResult.approx = lc0.approx
       return this._layoutResult
     }
     const lc1 = this._lc1
     if (lc1 && Object.is(lc1.availW, availW) && Object.is(lc1.availH, availH)) {
       this._layoutResult.width = lc1.computedW
       this._layoutResult.height = lc1.computedH
+      this._layoutResult.approx = lc1.approx
       return this._layoutResult
     }
     return null
@@ -919,26 +923,28 @@ export class Node {
    * Cache a computed layout result for the given available dimensions.
    * Zero-allocation: lazily allocates cache entries once, then reuses.
    */
-  setCachedLayout(availW: number, availH: number, computedW: number, computedH: number): void {
+  setCachedLayout(availW: number, availH: number, computedW: number, computedH: number, approx: boolean): void {
     // Rotate entries: copy _lc0 values to _lc1, then update _lc0
     if (this._lc0) {
       // Lazily allocate _lc1 on first rotation
       if (!this._lc1) {
-        this._lc1 = { availW: NaN, availH: NaN, computedW: 0, computedH: 0 }
+        this._lc1 = { availW: NaN, availH: NaN, computedW: 0, computedH: 0, approx: false }
       }
       this._lc1.availW = this._lc0.availW
       this._lc1.availH = this._lc0.availH
       this._lc1.computedW = this._lc0.computedW
       this._lc1.computedH = this._lc0.computedH
+      this._lc1.approx = this._lc0.approx
     }
     // Lazily allocate _lc0 on first use
     if (!this._lc0) {
-      this._lc0 = { availW: 0, availH: 0, computedW: 0, computedH: 0 }
+      this._lc0 = { availW: 0, availH: 0, computedW: 0, computedH: 0, approx: false }
     }
     this._lc0.availW = availW
     this._lc0.availH = availH
     this._lc0.computedW = computedW
     this._lc0.computedH = computedH
+    this._lc0.approx = approx
   }
 
   /**
