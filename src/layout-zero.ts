@@ -374,8 +374,11 @@ function layoutNode(
     // If both are defined or both are auto, aspectRatio doesn't apply at this stage
   }
 
-  // Apply min/max constraints (works even with NaN available for point-based constraints)
-  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, containingHeight, ownQueryInlineSize)
+  // Interim ceiling-as-size guard (#26388): don't seed an intrinsic
+  // auto height from a percentage cap. Definite sizes keep their parent basis;
+  // Phase 9 applies the containing-block ceiling after content sizing.
+  const earlyHeightBasis = Number.isNaN(nodeHeight) ? availableHeight : containingHeight
+  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, earlyHeightBasis, ownQueryInlineSize)
 
   // Content area (inside border and padding)
   // When node dimensions are NaN (unconstrained), content dimensions are also NaN

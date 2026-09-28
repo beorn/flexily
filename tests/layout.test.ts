@@ -1930,6 +1930,39 @@ describe("Flexily Layout Engine", () => {
       expect(child.getComputedHeight()).toBeLessThanOrEqual(30)
       root.free()
     })
+
+    /**
+     * @failure A parent percentage maximum turns an intrinsic auto row into a
+     * definite cross size, stretching a fitting modal to the whole screen.
+     * @level l0
+     * @consumer Silvery ModalOverlay's auto row with maxHeight="100%".
+     * @testonly none
+     * Existing percentage rows grow into their caps and miss intrinsic sizing.
+     */
+    it.each([
+      { intrinsic: 16, expected: 16 },
+      { intrinsic: 50, expected: 36 },
+    ])("caps an intrinsic row of $intrinsic at the parent height", ({ intrinsic, expected }) => {
+      const root = Node.create()
+      root.setWidth(120)
+      root.setHeight(36)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      root.setJustifyContent(JUSTIFY_CENTER)
+
+      const row = createChild(root, 0, { width: 120 })
+      row.setFlexDirection(FLEX_DIRECTION_ROW)
+      row.setMaxHeightPercent(100)
+      const guard = createChild(row, 0, { width: 72 })
+      guard.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      createChild(guard, 0, { width: 72, height: intrinsic })
+
+      try {
+        root.calculateLayout(120, 36, DIRECTION_LTR)
+        expect(row.getComputedHeight()).toBe(expected)
+      } finally {
+        root.freeRecursive()
+      }
+    })
   })
 
   describe("Measure Mode Semantics (unconstrained widths)", () => {
