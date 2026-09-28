@@ -1,37 +1,21 @@
 /**
- * A0.1 — Pass 1 freeze of container-query inline-size.
- *
- * Validates that `layoutNode` captures a CQ container's inline-size BEFORE
- * descending into child layout, exposing it via `node.getFrozenQuerySize()`.
- *
- * What this commit ships:
- *
- *   - `CONTAINER_TYPE_INLINE_SIZE` flag triggers freeze
- *   - `CONTAINER_TYPE_NORMAL` (default) leaves the freeze cleared (NaN)
- *   - Frozen size equals the constraint-derived inline-size (not post-
- *     shrink-wrap from children)
- *   - Nested CQ containers each freeze independently
- *
- * What lands next (Pass 2 consumption):
- *
- *   - Descendants resolve their own `cqi`/`cqmin` against the nearest CQ
- *     ancestor's frozen size via `findContainerQuerySize` (a parent-walk
- *     traversal helper).
- *
- * Until Pass 2 lands, the freeze is observable but unconsumed: cqi values
- * on children continue to resolve to 0 (no ancestor walk yet).
+ * CQ containers freeze their inline-size before laying out descendants.
+ * The root provides an implicit viewport query container; normal non-root
+ * nodes have no freeze. Explicit nested containers freeze independently.
  */
 import { describe, expect, test } from "vitest"
 import * as C from "../src/constants.js"
 import { createFlexily } from "../src/index.js"
 
 describe("[A0.1 Pass 1] CQ container freeze", () => {
-  test("default node has no freeze (NaN)", () => {
+  test("normal root freezes the implicit viewport inline-size", () => {
     const flex = createFlexily()
     const node = flex.createNode()
-    node.setWidth(200)
     flex.calculateLayout(node, 200, 100)
-    expect(node.getFrozenQuerySize()).toBeNaN()
+    expect(node.getFrozenQuerySize()).toBe(200)
+
+    flex.calculateLayout(node, 320, 100)
+    expect(node.getFrozenQuerySize()).toBe(320)
   })
 
   test("CONTAINER_TYPE_INLINE_SIZE freezes node's inline-size after layout", () => {
@@ -43,16 +27,19 @@ describe("[A0.1 Pass 1] CQ container freeze", () => {
     expect(node.getFrozenQuerySize()).toBe(160)
   })
 
-  test("setContainerType(NORMAL) clears prior freeze on re-layout", () => {
+  test("setContainerType(NORMAL) clears a non-root container freeze on re-layout", () => {
     const flex = createFlexily()
+    const root = flex.createNode()
+    root.setWidth(200)
     const node = flex.createNode()
+    root.insertChild(node, 0)
     node.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
     node.setWidth(100)
-    flex.calculateLayout(node, 200, 100)
+    flex.calculateLayout(root, 200, 100)
     expect(node.getFrozenQuerySize()).toBe(100)
 
     node.setContainerType(C.CONTAINER_TYPE_NORMAL)
-    flex.calculateLayout(node, 200, 100)
+    flex.calculateLayout(root, 200, 100)
     expect(node.getFrozenQuerySize()).toBeNaN()
   })
 

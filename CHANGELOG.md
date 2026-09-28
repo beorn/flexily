@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-28
+
+### Added
+
+- Parsed lengths through `parseLength`, including `calc()`, `min()`, `max()` and
+  `clamp()`. Existing dimension setters accept the resulting values alongside
+  numbers; the evaluator resolves percentages, `ch`, `lh` and `cqi` using the
+  supplied layout context. Invalid syntax raises `LengthError`.
+
+### Changed
+
+- The root supplies an implicit query container for `cqi` when no explicit
+  container ancestor exists. Legacy CQ setters follow the root's inline-size
+  as it changes; explicit nested containers still take precedence.
+- The Tests workflow now fails when tests fail.
+
 ### Fixed
 
 - **Stale flex base size for a nested row with wrapped text.** A column

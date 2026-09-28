@@ -10,8 +10,8 @@
  * in Pass 2b (next commit).
  *
  * The walk skips self (a CQ container's own width does NOT resolve against
- * its OWN frozen size — it resolves against its parent's CQ context, or NaN
- * if no enclosing CQ ancestor exists). This matches CSS's containment model.
+ * its OWN frozen size — it resolves against its parent's CQ context, with
+ * the root viewport providing the implicit fallback).
  */
 import { describe, expect, test } from "vitest"
 import * as C from "../src/constants.js"
@@ -114,18 +114,18 @@ describe("[A0.1 Pass 2] CQ descendant resolution — width/height", () => {
     expect(child.getComputedWidth()).toBe(40)
   })
 
-  test("descendant without CQ ancestor resolves cqi to 0 (no CQ context)", () => {
+  test("descendant without explicit CQ ancestor resolves against the root viewport", () => {
     const flex = createFlexily()
     const parent = flex.createNode()
     parent.setWidth(200)
 
     const child = flex.createNode()
-    child.setWidthCqi(50) // No CQ ancestor → 0
+    child.setWidthCqi(50) // Implicit viewport: 50% of 200 = 100
 
     parent.insertChild(child, 0)
     flex.calculateLayout(parent, 200, 100)
 
-    expect(child.getComputedWidth()).toBe(0)
+    expect(child.getComputedWidth()).toBe(100)
   })
 
   test("CQ container's OWN cqi width resolves against its PARENT's CQ context (not self)", () => {

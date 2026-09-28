@@ -9,9 +9,7 @@
  *   - `setWidthCqi` / `setHeightCqi` node setters preserve unit + mark dirty
  *   - Defensive: cqi against NaN queryInlineSize → 0 (same shape as percent against NaN)
  *
- * Layout-pass integration (passing queryInlineSize through `layoutNode`) lands
- * in the next A0.1 commit (Pass 1 freeze). This commit ships only the parse +
- * resolve surface.
+ * Layout uses the nearest explicit CQ container, or the implicit root viewport.
  */
 import { describe, expect, test } from "vitest"
 import * as C from "../src/constants.js"
@@ -89,47 +87,37 @@ describe("[A0.1] resolveValue — container-query units", () => {
 })
 
 describe("[A0.1] node setters — setWidthCqi / setHeightCqi", () => {
-  // These setters store { value, unit: UNIT_CQI } on the node style and call markDirty.
-  // The LAYOUT-PASS integration (threading queryInlineSize from a CQ ancestor down to
-  // resolveValue at the consuming site) lands in the next commit (Pass 1 freeze).
-  // Until then, the layout fallback for the unrecognized cqi unit is engine-default
-  // behavior (typically auto = stretch to availableWidth/Height), which is intentional —
-  // a cqi value should resolve to ZERO at first paint when no CQ ancestor exists, and
-  // these assertions will tighten once Pass 1 threads queryInlineSize through.
-
-  test("setWidthCqi changes layout output vs an explicit setWidth", () => {
+  // Legacy setters resolve against the root viewport when no explicit CQ
+  // ancestor exists. Changing viewport width must resize both width and height
+  // cqi values, while point-valued dimensions remain fixed.
+  test("setWidthCqi follows viewport inline-size while numeric width stays fixed", () => {
     const flex = createFlexily()
-    const a = flex.createNode()
-    a.setWidth(50)
-    flex.calculateLayout(a, 100, 100)
-    const explicitWidth = a.getComputedWidth()
+    const explicit = flex.createNode()
+    explicit.setWidth(50)
+    const queried = flex.createNode()
+    queried.setWidthCqi(50)
 
-    const b = flex.createNode()
-    b.setWidthCqi(50)
-    flex.calculateLayout(b, 100, 100)
-    const cqiWidth = b.getComputedWidth()
-
-    // setWidth(50) → 50; setWidthCqi(50) takes a different path (no CQ ancestor in
-    // this test → effectively auto sizing). Concrete pinned value lands once Pass 1
-    // threads queryInlineSize. For now: must NOT equal the explicit-50 outcome.
-    expect(explicitWidth).toBe(50)
-    expect(cqiWidth).not.toBe(50)
+    for (const viewportWidth of [100, 200]) {
+      flex.calculateLayout(explicit, viewportWidth, 100)
+      flex.calculateLayout(queried, viewportWidth, 100)
+      expect(explicit.getComputedWidth()).toBe(50)
+      expect(queried.getComputedWidth()).toBe(viewportWidth / 2)
+    }
   })
 
-  test("setHeightCqi changes layout output vs an explicit setHeight", () => {
+  test("setHeightCqi follows viewport inline-size while numeric height stays fixed", () => {
     const flex = createFlexily()
-    const a = flex.createNode()
-    a.setHeight(50)
-    flex.calculateLayout(a, 100, 100)
-    const explicitHeight = a.getComputedHeight()
+    const explicit = flex.createNode()
+    explicit.setHeight(50)
+    const queried = flex.createNode()
+    queried.setHeightCqi(50)
 
-    const b = flex.createNode()
-    b.setHeightCqi(50)
-    flex.calculateLayout(b, 100, 100)
-    const cqiHeight = b.getComputedHeight()
-
-    expect(explicitHeight).toBe(50)
-    expect(cqiHeight).not.toBe(50)
+    for (const viewportWidth of [100, 200]) {
+      flex.calculateLayout(explicit, viewportWidth, 160)
+      flex.calculateLayout(queried, viewportWidth, 160)
+      expect(explicit.getComputedHeight()).toBe(50)
+      expect(queried.getComputedHeight()).toBe(viewportWidth / 2)
+    }
   })
 
   test("setWidthCqi + setWidthPercent stack last-write-wins (style replaced, not merged)", () => {
