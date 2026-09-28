@@ -164,8 +164,8 @@ function sizeByLayout(node: Node, availableWidth: number, availableHeight: numbe
 /**
  * Layout a node and its children.
  *
- * @param absX - Absolute X position from document root (for Yoga-compatible edge rounding)
- * @param absY - Absolute Y position from document root (for Yoga-compatible edge rounding)
+ * @param absX - Absolute flow margin-box X origin, excluding own margin and relative inset
+ * @param absY - Absolute flow margin-box Y origin, excluding own margin and relative inset
  */
 function layoutNode(
   node: Node,
@@ -347,7 +347,7 @@ function layoutNode(
   nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, containingWidth, ownQueryInlineSize)
 
   // ============================================================================
-  // PHASE 3a: Freeze container-query inline-size (A0.1 — Pass 1 of two-phase layout)
+  // PHASE 3 (continued): Resolve height and parent allocation
   // ============================================================================
   //
   let nodeHeight: number
@@ -412,6 +412,7 @@ function layoutNode(
   const contentWidth = Number.isNaN(nodeWidth) ? NaN : Math.max(0, nodeWidth - innerLeft - innerRight)
   const contentHeight = Number.isNaN(nodeHeight) ? NaN : Math.max(0, nodeHeight - innerTop - innerBottom)
 
+  // PHASE 3a: Freeze container-query inline-size (A0.1 — Pass 1 of two-phase layout)
   // Freeze the used inline size after aspect ratio and parent allocation, but
   // before intrinsic child contributions. NaN keeps indefinite queries explicit.
   if (style.containerType !== C.CONTAINER_TYPE_NORMAL || node.getParent() === null) {
