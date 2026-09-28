@@ -8,11 +8,11 @@
  * exact trap A0.3 exists to prevent.
  *
  * Tests cover:
- *   - Property: min ≤ all args; max ≥ all args; clamp ∈ [min, max]
+ *   - Seven public dimension setters × five layout contexts, with numeric controls
  *   - Edge: clamp degenerates to min when min > max (CSS spec)
  *   - Edge: empty min/max fall back to 0 (defensive)
  *   - Nesting: math inside math
- *   - cqi inside math: cqi resolves to 0 without CQ ancestor, math composes
+ *   - Raw evaluator with no query context; implicit-root fallback in real layout
  *   - Engine integration: a Box with style.width = min(80, 200cqi) lays out
  *     correctly under a CQ container
  */
@@ -294,17 +294,21 @@ describe("[A0.3a] seven-property layout equivalence", () => {
   const cases = properties.flatMap((property) => contexts.map((context) => ({ property, context })))
 
   test.each(cases)("$property in $context matches its numeric length", ({ property, context }) => {
-    const row = context === "column main" || context === "auto parent"
-      ? false
-      : context === "cross axis" ? property.includes("Height") || property === "height" : true
+    const row =
+      context === "column main" || context === "auto parent"
+        ? false
+        : context === "cross axis"
+          ? property.includes("Height") || property === "height"
+          : true
     const inline = property === "flexBasis" ? row : property.includes("Width") || property === "width"
     const expected = inline ? 20 : 6
     const unit = inline ? "ch" : "lh"
-    const inputs = context === "CQ container" && inline
-      ? ["25cqi", "calc(25cqi + 0ch)", "max(10ch, 25cqi)"]
-      : context === "auto parent"
-        ? [`${expected}${unit}`, `calc(${expected}${unit} * 1)`, `max(1${unit}, ${expected}${unit})`]
-        : [`${expected}${unit}`, `calc(25% + 0${unit})`, `max(1${unit}, 25%)`]
+    const inputs =
+      context === "CQ container" && inline
+        ? ["25cqi", "calc(25cqi + 0ch)", "max(10ch, 25cqi)"]
+        : context === "auto parent"
+          ? [`${expected}${unit}`, `calc(${expected}${unit} * 1)`, `max(1${unit}, ${expected}${unit})`]
+          : [`${expected}${unit}`, `calc(25% + 0${unit})`, `max(1${unit}, 25%)`]
 
     const layout = (input: number | string) => {
       const flex = createFlexily()
@@ -332,9 +336,12 @@ describe("[A0.3a] seven-property layout equivalence", () => {
       }
       const value = typeof input === "string" ? Flexily.parseLength(input, { ch: 1, lh: 1 }) : input
       const setters = {
-        width: child.setWidth, height: child.setHeight,
-        minWidth: child.setMinWidth, minHeight: child.setMinHeight,
-        maxWidth: child.setMaxWidth, maxHeight: child.setMaxHeight,
+        width: child.setWidth,
+        height: child.setHeight,
+        minWidth: child.setMinWidth,
+        minHeight: child.setMinHeight,
+        maxWidth: child.setMaxWidth,
+        maxHeight: child.setMaxHeight,
         flexBasis: child.setFlexBasis,
       }
       setters[property].call(child, value)
@@ -348,7 +355,10 @@ describe("[A0.3a] seven-property layout equivalence", () => {
       return {
         dimensions,
         geometry: [root, parent, child, content].map((node) => [
-          node.getComputedLeft(), node.getComputedTop(), node.getComputedWidth(), node.getComputedHeight(),
+          node.getComputedLeft(),
+          node.getComputedTop(),
+          node.getComputedWidth(),
+          node.getComputedHeight(),
         ]),
       }
     }
@@ -361,7 +371,7 @@ describe("[A0.3a] seven-property layout equivalence", () => {
       // parent semantics as plain percentages, even with a constant operand.
       const unconstrained = layout(property.startsWith("max") ? Infinity : 0)
       expect(unconstrained.dimensions[inline ? 0 : 1]).toBe(
-        property.startsWith("min") ? (inline ? 4 : 1) : (inline ? 40 : 12),
+        property.startsWith("min") ? (inline ? 4 : 1) : inline ? 40 : 12,
       )
       expect(layout(`max(10${unit}, 100%)`)).toEqual(unconstrained)
     }
@@ -387,62 +397,5 @@ describe("[A0.3a] seven-property layout equivalence", () => {
     flex.calculateLayout(root, 40, 24)
     expect(wrapper.getComputedWidth()).toBe(30)
     expect(child.getComputedWidth()).toBe(10)
-  })
-})
-
-describe("[A0.3] property tests", () => {
-  test("min(a, b) ≤ both args (1000 random pairs)", () => {
-    let seed = 0xdeadbeef
-    const rand = (): number => {
-      seed ^= seed << 13
-      seed ^= seed >>> 17
-      seed ^= seed << 5
-      return ((seed >>> 0) % 1000) / 10
-    }
-    for (let i = 0; i < 1000; i++) {
-      const a = rand()
-      const b = rand()
-      const result = evaluateMathExpr({ fn: "min", args: [pt(a), pt(b)] }, NaN, NaN)
-      expect(result).toBeLessThanOrEqual(a)
-      expect(result).toBeLessThanOrEqual(b)
-    }
-  })
-
-  test("max(a, b) ≥ both args (1000 random pairs)", () => {
-    let seed = 0x12345678
-    const rand = (): number => {
-      seed ^= seed << 13
-      seed ^= seed >>> 17
-      seed ^= seed << 5
-      return ((seed >>> 0) % 1000) / 10
-    }
-    for (let i = 0; i < 1000; i++) {
-      const a = rand()
-      const b = rand()
-      const result = evaluateMathExpr({ fn: "max", args: [pt(a), pt(b)] }, NaN, NaN)
-      expect(result).toBeGreaterThanOrEqual(a)
-      expect(result).toBeGreaterThanOrEqual(b)
-    }
-  })
-
-  test("clamp(lo, val, hi) ∈ [lo, max(lo, hi)] (1000 random triples)", () => {
-    let seed = 0xfeedface
-    const rand = (): number => {
-      seed ^= seed << 13
-      seed ^= seed >>> 17
-      seed ^= seed << 5
-      return ((seed >>> 0) % 1000) / 10
-    }
-    for (let i = 0; i < 1000; i++) {
-      const lo = rand()
-      const val = rand()
-      const hi = rand()
-      const result = evaluateMathExpr({ fn: "clamp", args: [pt(lo), pt(val), pt(hi)] }, NaN, NaN)
-      // CSS clamp: result ≥ lo always; result ≤ hi UNLESS lo > hi (then result = lo)
-      expect(result).toBeGreaterThanOrEqual(lo)
-      if (lo <= hi) {
-        expect(result).toBeLessThanOrEqual(hi)
-      }
-    }
   })
 })

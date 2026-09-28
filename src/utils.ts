@@ -265,7 +265,8 @@ export function isDevModeAssertionsEnabled(): boolean {
 
 /**
  * Walk up the parent chain from `node`, return the nearest ancestor's frozen
- * container-query inline-size (set by Pass 1 of layoutNode). NaN if no CQ ancestor.
+ * container-query inline-size (set by Pass 1 of layoutNode). The layout root
+ * is the implicit viewport container. NaN if no ancestor has been frozen yet.
  *
  * Used at resolveValue call sites for cqi/cqmin units (A0.1 Pass 2 consumption).
  * The walk skips `node` itself — a CQ container's OWN width/height/padding values
@@ -274,8 +275,8 @@ export function isDevModeAssertionsEnabled(): boolean {
  * + `width: 50cqi` would create a self-referential cycle; CSS resolves this by
  * defining `cqi` against the *parent* containment context.
  *
- * O(tree depth). Acceptable since (a) trees in terminal UIs are shallow and
- * (b) cqi resolutions are rare per layout pass.
+ * O(tree depth), computed once for each node's own layout/measurement context.
+ * Direct child resolutions reuse the context derived by their parent.
  */
 export function findContainerQuerySize(node: Node): number {
   let cur: Node | null = node.getParent()
@@ -285,6 +286,19 @@ export function findContainerQuerySize(node: Node): number {
     cur = cur.getParent()
   }
   return NaN
+}
+
+/** Dimensional values; excludes auto, content-sizing keywords and scalar operands. */
+export function isLength(unit: number): boolean {
+  return (
+    unit === C.UNIT_POINT ||
+    unit === C.UNIT_PERCENT ||
+    unit === C.UNIT_CQI ||
+    unit === C.UNIT_CQMIN ||
+    unit === C.UNIT_CALC ||
+    unit === C.UNIT_CH ||
+    unit === C.UNIT_LH
+  )
 }
 
 /**
@@ -395,9 +409,16 @@ export function evaluateMathExpr(
   return val
 }
 
-/** True when a percentage constraint has no definite size to resolve against. */
+/** True when a percentage or percentage-containing math constraint is indefinite. */
 export function pctIndefinite(value: Value, available: number): boolean {
-  return value.unit === C.UNIT_PERCENT && Number.isNaN(available)
+  return Number.isNaN(available) && containsPercent(value)
+}
+
+function containsPercent(expr: MathExpr): boolean {
+  if ("unit" in expr) return expr.unit === C.UNIT_PERCENT || (expr.expr !== undefined && containsPercent(expr.expr))
+  if ("op" in expr) return containsPercent(expr.left) || containsPercent(expr.right)
+  for (const arg of expr.args) if (containsPercent(arg)) return true
+  return false
 }
 
 /**
@@ -415,7 +436,7 @@ export function pctIndefinite(value: Value, available: number): boolean {
  * since resolveValue returns 0 for percent-against-NaN, which would incorrectly
  * clamp sizes to 0.
  */
-export function applyMinMax(size: number, min: Value, max: Value, available: number): number {
+export function applyMinMax(size: number, min: Value, max: Value, available: number, queryInlineSize = NaN): number {
   let result = size
 
   // Apply max first, then min. CSS spec: when min > max, min wins.
@@ -426,7 +447,7 @@ export function applyMinMax(size: number, min: Value, max: Value, available: num
     if (pctIndefinite(max, available)) {
       // Skip: percent against NaN resolves to 0, which would be wrong
     } else {
-      const maxValue = resolveValue(max, available)
+      const maxValue = resolveValue(max, available, queryInlineSize)
       if (!Number.isNaN(maxValue)) {
         // Apply max as ceiling even when size is NaN (auto-sized).
         // This constrains children's layout to the max bound.
@@ -451,7 +472,7 @@ export function applyMinMax(size: number, min: Value, max: Value, available: num
     if (pctIndefinite(min, available)) {
       // Skip: percent against NaN resolves to 0, which would be wrong
     } else {
-      const minValue = resolveValue(min, available)
+      const minValue = resolveValue(min, available, queryInlineSize)
       if (!Number.isNaN(minValue)) {
         // Only apply min to definite sizes. When size is NaN (auto-sized),
         // skip — the post-shrink-wrap applyMinMax call will floor it.
