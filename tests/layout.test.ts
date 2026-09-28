@@ -37,6 +37,7 @@ import {
   MEASURE_MODE_UNDEFINED,
   Node,
   OVERFLOW_HIDDEN,
+  parseLength,
   POSITION_TYPE_ABSOLUTE,
   POSITION_TYPE_RELATIVE,
   POSITION_TYPE_STATIC,
@@ -1728,28 +1729,32 @@ describe("Flexily Layout Engine", () => {
   // Bug fixes: min/max sizing edge cases
   // ==========================================================================
   describe("min/max sizing edge cases", () => {
-    it("keeps intrinsic width when a percentage max has no definite size to constrain", () => {
-      // @failure #26246: resolving an indefinite maxWidth=100% as zero erases content.
-      // @level l0 @consumer Silvery CSS-preset layout @testonly none
-      const root = Node.create({ defaults: "css" })
-      root.setWidth(100)
-      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
-      root.setAlignItems(ALIGN_FLEX_START)
+    it.each(["100%", "min(100%, 60ch)", "max(10ch, 100%)"])(
+      "keeps intrinsic width with maxWidth=%s in the CSS column fixture",
+      (maxWidth) => {
+        // @failure #26246: plain and math percentage maxima must preserve intrinsic content.
+        // @level l0 @consumer flexily/Node CSS-preset layout @testonly none
+        const root = Node.create({ defaults: "css" })
+        root.setWidth(100)
+        root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        root.setAlignItems(ALIGN_FLEX_START)
 
-      const child = Node.create({ defaults: "css" })
-      child.setMaxWidthPercent(100)
-      child.setFlexDirection(FLEX_DIRECTION_ROW)
-      const content = Node.create({ defaults: "css" })
-      content.setWidth(30)
-      content.setHeight(1)
-      child.insertChild(content, 0)
-      root.insertChild(child, 0)
+        const child = Node.create({ defaults: "css" })
+        if (maxWidth === "100%") child.setMaxWidthPercent(100)
+        else child.setMaxWidth(parseLength(maxWidth, { ch: 1, lh: 1 }))
+        child.setFlexDirection(FLEX_DIRECTION_ROW)
+        const content = Node.create({ defaults: "css" })
+        content.setWidth(30)
+        content.setHeight(1)
+        child.insertChild(content, 0)
+        root.insertChild(child, 0)
 
-      root.calculateLayout(100, NaN, DIRECTION_LTR)
+        root.calculateLayout(100, NaN, DIRECTION_LTR)
 
-      expect(child.getComputedWidth()).toBe(30)
-      root.free()
-    })
+        expect(child.getComputedWidth()).toBe(30)
+        root.free()
+      },
+    )
 
     it("keeps the same intrinsic width through the classic engine", () => {
       // @failure #26246: the exported classic engine has its own Phase 6 max reader.
