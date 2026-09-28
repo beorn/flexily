@@ -124,6 +124,9 @@ export {
   UNIT_SNUG_CONTENT,
   UNIT_CQI,
   UNIT_CQMIN,
+  UNIT_CALC,
+  UNIT_CH,
+  UNIT_LH,
   // Container queries (A0.1)
   CONTAINER_TYPE_NORMAL,
   CONTAINER_TYPE_INLINE_SIZE,
@@ -134,6 +137,8 @@ export type { BaselineFunc, Layout, MeasureFunc, Style, Value } from "./types.js
 
 // Utility functions
 export { createDefaultStyle, createValue } from "./types.js"
+export { parseLength, LengthError } from "./length.js"
+export type { LengthScale } from "./length.js"
 
 // Layout stats (for debugging/benchmarking)
 export {

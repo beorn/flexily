@@ -5,6 +5,7 @@
  */
 
 import * as C from "./constants.js"
+import { assertLengthAxis } from "./length.js"
 import { computeLayout, countNodes, markSubtreeLayoutSeen } from "./layout-zero.js"
 import {
   type BaselineFunc,
@@ -28,6 +29,9 @@ import {
   edgeValueMatches,
   edgeBorderMatches,
   styleValueMatches,
+  isLength,
+  pctIndefinite,
+  findContainerQuerySize,
 } from "./utils.js"
 import { isRowDirection, resolveEdgeValue, resolveEdgeBorderValue } from "./layout-helpers.js"
 import { log } from "./logger.js"
@@ -306,7 +310,17 @@ export class Node {
     this._style = createDefaultStyle(preset)
   }
 
-  private setStyleValue(key: StyleValueKey, value: number, unit: number): void {
+  private setStyleValue(key: StyleValueKey, value: number | Value, unit: number): void {
+    if (typeof value === "object") {
+      if (key !== "flexBasis") {
+        const axis = key === "width" || key === "minWidth" || key === "maxWidth" ? "inline" : "block"
+        assertLengthAxis(value, axis, key)
+      }
+      if (styleValuesEqual(this._style[key], value)) return
+      this._style[key] = value
+      this.markDirty()
+      return
+    }
     if (styleValueMatches(this._style[key], value, unit)) {
       return
     }
@@ -687,8 +701,9 @@ export class Node {
    *      padding + border + max(child.getMinContent(direction))
    *  - Empty leaf without measureFunc: padding + border only.
    *
-   * Cached per-axis (`_minContentRow`, `_minContentCol`); cache is invalidated
-   * by `markDirty()` (alongside the measure + layout caches). The `-1`
+   * Cached per-axis within a layout pass (`_minContentRow`, `_minContentCol`);
+   * resetLayoutCache() refreshes query-dependent results at the next pass,
+   * and markDirty() clears them after style/content changes. The `-1`
    * sentinel marks the cache as empty.
    *
    * `direction` accepts the FLEX_DIRECTION_* constants. Non-row values are
@@ -826,13 +841,12 @@ export class Node {
       result = pad + bord + inner
     }
 
-    // Honor explicit minWidth/minHeight in points/percent — a definite
+    // Honor explicit minWidth/minHeight lengths — a definite
     // explicit min is a hard floor on the intrinsic min-content as well.
     const minVal = isRow ? style.minWidth : style.minHeight
-    if (minVal.unit === C.UNIT_POINT) {
-      result = Math.max(result, minVal.value)
-    } else if (minVal.unit === C.UNIT_PERCENT && !Number.isNaN(containingBlockSize)) {
-      result = Math.max(result, containingBlockSize * (minVal.value / 100))
+    if (isLength(minVal.unit) && !pctIndefinite(minVal, containingBlockSize)) {
+      const queryInlineSize = minVal.unit === C.UNIT_POINT ? NaN : findContainerQuerySize(this)
+      result = Math.max(result, resolveValue(minVal, containingBlockSize, queryInlineSize))
     }
 
     if (cacheable) {
@@ -867,20 +881,30 @@ export class Node {
       return 0
     }
 
-    // Explicit minWidth/minHeight = 0 in points means "I can shrink to
+    // Explicit minWidth/minHeight = 0 means "I can shrink to
     // nothing" — canonical CSS escape hatch from the auto-min rule.
     const minVal = isRow ? style.minWidth : style.minHeight
-    if (minVal.unit === C.UNIT_POINT && minVal.value === 0) {
+    const sizeVal = isRow ? style.width : style.height
+    // Numeric nodes keep the fast path without an ancestor walk.
+    const queryInlineSize =
+      (isLength(minVal.unit) && minVal.unit !== C.UNIT_POINT) ||
+      (isLength(sizeVal.unit) && sizeVal.unit !== C.UNIT_POINT)
+        ? findContainerQuerySize(this)
+        : NaN
+    if (
+      isLength(minVal.unit) &&
+      !pctIndefinite(minVal, containingBlockSize) &&
+      resolveValue(minVal, containingBlockSize, queryInlineSize) === 0
+    ) {
       return 0
     }
 
-    // Explicit definite size (width/height in points) caps the min-content:
+    // Explicit definite size (width/height length) caps the min-content:
     // a Box that says width=10 can't have a smaller intrinsic min than 10.
-    // Don't override when explicit size is auto/percent/fit/snug — fall
+    // Don't override an indefinite percentage or auto/fit/snug — fall
     // through to the recursive computation.
-    const sizeVal = isRow ? style.width : style.height
-    if (sizeVal.unit === C.UNIT_POINT) {
-      return sizeVal.value
+    if (isLength(sizeVal.unit) && !pctIndefinite(sizeVal, containingBlockSize)) {
+      return resolveValue(sizeVal, containingBlockSize, queryInlineSize)
     }
 
     return this.getMinContent(parentDirection, containingBlockSize)
@@ -948,7 +972,7 @@ export class Node {
   }
 
   /**
-   * Clear layout cache for this node and all descendants.
+   * Clear layout and intrinsic caches for this node and all descendants.
    * Called at the start of each calculateLayout pass.
    * Zero-allocation: invalidates entries (availW = NaN) rather than deallocating.
    * Uses iterative traversal to avoid stack overflow on deep trees.
@@ -962,6 +986,10 @@ export class Node {
       // value and Object.is(NaN, NaN) === true would cause false cache hits)
       if (node._lc0) node._lc0.availW = -1
       if (node._lc1) node._lc1.availW = -1
+      // Intrinsic lengths can depend on a query container that resized while
+      // this node's own style stayed unchanged. Reuse them only in this pass.
+      node._minContentRow = -1
+      node._minContentCol = -1
       for (const child of node._children) {
         traversalStack.push(child)
       }
@@ -1301,13 +1329,13 @@ export class Node {
   // ============================================================================
 
   /**
-   * Set the width to a fixed value in points.
+   * Set the width to a number in points or a parsed inline-axis length.
    *
    * @param value - Width in points
    */
-  setWidth(value: number): void {
+  setWidth(value: number | Value): void {
     // NaN means "auto" in Yoga API
-    if (Number.isNaN(value)) {
+    if (typeof value === "number" && Number.isNaN(value)) {
       this.setStyleValue("width", 0, C.UNIT_AUTO)
     } else {
       this.setStyleValue("width", value, C.UNIT_POINT)
@@ -1378,13 +1406,13 @@ export class Node {
   // ============================================================================
 
   /**
-   * Set the height to a fixed value in points.
+   * Set the height to a number in points or a parsed block-axis length.
    *
    * @param value - Height in points
    */
-  setHeight(value: number): void {
+  setHeight(value: number | Value): void {
     // NaN means "auto" in Yoga API
-    if (Number.isNaN(value)) {
+    if (typeof value === "number" && Number.isNaN(value)) {
       this.setStyleValue("height", 0, C.UNIT_AUTO)
     } else {
       this.setStyleValue("height", value, C.UNIT_POINT)
@@ -1430,7 +1458,7 @@ export class Node {
    *
    * @param value - Minimum width in points
    */
-  setMinWidth(value: number): void {
+  setMinWidth(value: number | Value): void {
     this.setStyleValue("minWidth", value, C.UNIT_POINT)
   }
 
@@ -1448,7 +1476,7 @@ export class Node {
    *
    * @param value - Minimum height in points
    */
-  setMinHeight(value: number): void {
+  setMinHeight(value: number | Value): void {
     this.setStyleValue("minHeight", value, C.UNIT_POINT)
   }
 
@@ -1466,7 +1494,7 @@ export class Node {
    *
    * @param value - Maximum width in points
    */
-  setMaxWidth(value: number): void {
+  setMaxWidth(value: number | Value): void {
     this.setStyleValue("maxWidth", value, C.UNIT_POINT)
   }
 
@@ -1484,7 +1512,7 @@ export class Node {
    *
    * @param value - Maximum height in points
    */
-  setMaxHeight(value: number): void {
+  setMaxHeight(value: number | Value): void {
     this.setStyleValue("maxHeight", value, C.UNIT_POINT)
   }
 
@@ -1561,12 +1589,12 @@ export class Node {
   }
 
   /**
-   * Set the flex basis to a fixed value in points.
+   * Set the flex basis to a number in points or a parsed length.
    * The initial size of the node before flex grow/shrink is applied.
    *
    * @param value - Flex basis in points
    */
-  setFlexBasis(value: number): void {
+  setFlexBasis(value: number | Value): void {
     this.setStyleValue("flexBasis", value, C.UNIT_POINT)
   }
 
@@ -1965,7 +1993,15 @@ export class Node {
    * @internal
    */
   _setFrozenQuerySize(size: number): void {
+    if (Object.is(this._frozenQuerySize, size)) return
     this._frozenQuerySize = size
+    // Intrinsic sizing can run before this container freezes in the same
+    // pass. Refresh descendants and any ancestor result derived from them.
+    this.resetLayoutCache()
+    for (let ancestor = this._parent; ancestor !== null; ancestor = ancestor._parent) {
+      ancestor._minContentRow = -1
+      ancestor._minContentCol = -1
+    }
   }
 
   // ============================================================================

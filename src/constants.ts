@@ -103,6 +103,12 @@ export const UNIT_CQMIN = 7
 // queryInlineSize as the leaf units. Late-bound per the contract in
 // docs/two-phase-layout.md.
 export const UNIT_CALC = 8
+// The adapter has already scaled these leaves into layout coordinates.
+// Retaining the unit identifies axis mismatches without baking in a cell size.
+export const UNIT_CH = 9
+export const UNIT_LH = 10
+// Unitless constants are internal operands of multiplication and division.
+export const UNIT_NUMBER = 11
 
 // Container type (A0.1) — declares a node as a container-query container.
 // Maps to CSS `container-type`. Phase 1 supports `inline-size` only.
