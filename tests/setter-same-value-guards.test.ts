@@ -171,14 +171,20 @@ describe("Node setter same-value guards", () => {
       node.setContainerQueryStyle({
         width: { value: 24, unit: UNIT_POINT },
         containSize: true,
-        gap: [1, 2],
+        gap: [
+          { value: 1, unit: UNIT_POINT },
+          { value: 2, unit: UNIT_POINT },
+        ],
       })
     })
 
     child.setContainerQueryStyle({
       width: { value: 24, unit: UNIT_POINT },
       containSize: true,
-      gap: [1, 2],
+      gap: [
+        { value: 1, unit: UNIT_POINT },
+        { value: 2, unit: UNIT_POINT },
+      ],
     })
 
     expect(child.isDirty()).toBe(false)

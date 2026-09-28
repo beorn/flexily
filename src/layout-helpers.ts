@@ -7,7 +7,26 @@
 
 import * as C from "./constants.js"
 import type { Value } from "./types.js"
+import { LengthError } from "./length.js"
 import { resolveValue } from "./utils.js"
+
+/** A missing query argument identifies classic's existing numeric contract. */
+export function resolveSpacingValue(
+  value: Value,
+  availableSize: number,
+  queryInlineSize?: number,
+  prop = "spacing",
+): number {
+  if (
+    queryInlineSize === undefined &&
+    value.unit !== C.UNIT_POINT &&
+    value.unit !== C.UNIT_PERCENT &&
+    value.unit !== C.UNIT_AUTO &&
+    value.unit !== C.UNIT_UNDEFINED
+  )
+    throw new LengthError(value.source ?? "<Value>", "production engine only", prop)
+  return resolveValue(value, availableSize, queryInlineSize)
+}
 
 // Re-export edge constants (canonical definitions in constants.ts)
 export { EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, EDGE_BOTTOM } from "./constants.js"
@@ -71,16 +90,14 @@ export function resolveEdgeValue(
   flexDirection: number,
   availableSize: number,
   direction: number = C.DIRECTION_LTR,
+  queryInlineSize?: number,
+  prop = "spacing",
 ): number {
   const logicalValue = getLogicalEdgeValue(arr, physicalIndex, flexDirection, direction)
 
-  // Logical takes precedence if defined
-  if (logicalValue && logicalValue.unit !== C.UNIT_UNDEFINED) {
-    return resolveValue(logicalValue, availableSize)
-  }
-
-  // Fall back to physical
-  return resolveValue(arr[physicalIndex]!, availableSize)
+  // Logical takes precedence if defined; point spacing needs no context.
+  const value = logicalValue && logicalValue.unit !== C.UNIT_UNDEFINED ? logicalValue : arr[physicalIndex]!
+  return value.unit === C.UNIT_POINT ? value.value : resolveSpacingValue(value, availableSize, queryInlineSize, prop)
 }
 
 /**
@@ -103,17 +120,6 @@ export function isEdgeAuto(
   return arr[physicalIndex]!.unit === C.UNIT_AUTO
 }
 
-/**
- * Resolve logical (START/END) border widths to physical values.
- * Border values are plain numbers (always points), so resolution is simpler
- * than for margin/padding. Uses NaN as the "not set" sentinel for logical slots.
- * When both physical and logical are set, logical takes precedence.
- *
- * EDGE_START/EDGE_END always resolve along the inline (horizontal) axis,
- * regardless of flex direction. Direction (LTR/RTL) determines the mapping:
- * - LTR: START->left, END->right
- * - RTL: START->right, END->left
- */
 /**
  * Resolve logical (START/END) position edges to physical values.
  * Returns the resolved Value for a physical position index, considering
@@ -140,21 +146,11 @@ export function resolvePositionEdge(
 }
 
 export function resolveEdgeBorderValue(
-  arr: [number, number, number, number, number, number],
-  physicalIndex: number, // 0=left, 1=top, 2=right, 3=bottom
-  _flexDirection: number,
+  arr: [Value, Value, Value, Value, Value, Value],
+  physicalIndex: number,
+  flexDirection: number,
   direction: number = C.DIRECTION_LTR,
+  queryInlineSize?: number,
 ): number {
-  const isRTL = direction === C.DIRECTION_RTL
-
-  // START/END always map to left/right (inline direction)
-  let logicalSlot: number | undefined
-  if (physicalIndex === 0) logicalSlot = isRTL ? 5 : 4
-  else if (physicalIndex === 2) logicalSlot = isRTL ? 4 : 5
-
-  // Logical takes precedence if set (NaN = not set)
-  if (logicalSlot !== undefined && !Number.isNaN(arr[logicalSlot])) {
-    return arr[logicalSlot]!
-  }
-  return arr[physicalIndex]!
+  return resolveEdgeValue(arr, physicalIndex, flexDirection, 0, direction, queryInlineSize, "border")
 }

@@ -1175,8 +1175,18 @@ describe("Flexily Layout Engine", () => {
         expect(style.padding).toHaveLength(6)
         expect(style.margin).toHaveLength(6)
         expect(style.position).toHaveLength(6)
-        expect(style.border).toEqual([0, 0, 0, 0, NaN, NaN])
-        expect(style.gap).toEqual([0, 0])
+        expect(style.border).toEqual([
+          { value: 0, unit: UNIT_POINT },
+          { value: 0, unit: UNIT_POINT },
+          { value: 0, unit: UNIT_POINT },
+          { value: 0, unit: UNIT_POINT },
+          { value: 0, unit: UNIT_UNDEFINED },
+          { value: 0, unit: UNIT_UNDEFINED },
+        ])
+        expect(style.gap).toEqual([
+          { value: 0, unit: UNIT_POINT },
+          { value: 0, unit: UNIT_POINT },
+        ])
       })
 
       it("should create a style object with correct css-preset defaults", () => {

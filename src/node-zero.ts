@@ -5,7 +5,7 @@
  */
 
 import * as C from "./constants.js"
-import { assertLengthAxis } from "./length.js"
+import { assertLengthAxis, LengthError } from "./length.js"
 import { computeLayout, countNodes, markSubtreeLayoutSeen } from "./layout-zero.js"
 import {
   type BaselineFunc,
@@ -24,16 +24,21 @@ import {
   setEdgeValue,
   setEdgeBorder,
   getEdgeValue,
+  getEdgeIndex,
   getEdgeBorderValue,
   traversalStack,
   edgeValueMatches,
   edgeBorderMatches,
   styleValueMatches,
+  styleValuesEqual,
+  assertEdgeLength,
+  pointSpacing,
+  containsPercent,
   isLength,
   pctIndefinite,
   findContainerQuerySize,
 } from "./utils.js"
-import { isRowDirection, resolveEdgeValue, resolveEdgeBorderValue } from "./layout-helpers.js"
+import { isRowDirection, isEdgeAuto, resolveEdgeValue, resolveEdgeBorderValue } from "./layout-helpers.js"
 import { log } from "./logger.js"
 import { getTrace } from "./trace.js"
 
@@ -75,10 +80,6 @@ function isStyleValue(value: unknown): value is Value {
     typeof (value as Value).value === "number" &&
     typeof (value as Value).unit === "number"
   )
-}
-
-function styleValuesEqual(current: Value, next: Value): boolean {
-  return styleValueMatches(current, next.value, next.unit) && current.expr === next.expr
 }
 
 function styleArraysEqual(current: readonly unknown[], next: readonly unknown[]): boolean {
@@ -734,6 +735,12 @@ export class Node {
 
     let result: number
     const style = this._style
+    const ownQueryInlineSize =
+      this.getParent() === null
+        ? Number.isNaN(this._lastCalcW)
+          ? containingBlockSize
+          : this._lastCalcW
+        : findContainerQuerySize(this)
 
     if (this._measureFunc !== null) {
       // Leaf with measureFunc: ask the measurer for true min-content along the
@@ -757,15 +764,15 @@ export class Node {
       // we pass it through faithfully.
       const cb = containingBlockSize
       const pad = isRow
-        ? resolveEdgeValue(style.padding, 0, style.flexDirection, cb) +
-          resolveEdgeValue(style.padding, 2, style.flexDirection, cb)
-        : resolveEdgeValue(style.padding, 1, style.flexDirection, cb) +
-          resolveEdgeValue(style.padding, 3, style.flexDirection, cb)
+        ? resolveEdgeValue(style.padding, 0, style.flexDirection, cb, C.DIRECTION_LTR, ownQueryInlineSize, "padding") +
+          resolveEdgeValue(style.padding, 2, style.flexDirection, cb, C.DIRECTION_LTR, ownQueryInlineSize, "padding")
+        : resolveEdgeValue(style.padding, 1, style.flexDirection, cb, C.DIRECTION_LTR, ownQueryInlineSize, "padding") +
+          resolveEdgeValue(style.padding, 3, style.flexDirection, cb, C.DIRECTION_LTR, ownQueryInlineSize, "padding")
       const bord = isRow
-        ? resolveEdgeBorderValue(style.border, 0, style.flexDirection) +
-          resolveEdgeBorderValue(style.border, 2, style.flexDirection)
-        : resolveEdgeBorderValue(style.border, 1, style.flexDirection) +
-          resolveEdgeBorderValue(style.border, 3, style.flexDirection)
+        ? resolveEdgeBorderValue(style.border, 0, style.flexDirection, C.DIRECTION_LTR, ownQueryInlineSize) +
+          resolveEdgeBorderValue(style.border, 2, style.flexDirection, C.DIRECTION_LTR, ownQueryInlineSize)
+        : resolveEdgeBorderValue(style.border, 1, style.flexDirection, C.DIRECTION_LTR, ownQueryInlineSize) +
+          resolveEdgeBorderValue(style.border, 3, style.flexDirection, C.DIRECTION_LTR, ownQueryInlineSize)
       result = pad + bord
     } else {
       // Container with children: recurse into each in-flow child.
@@ -788,15 +795,15 @@ export class Node {
       // Padding + border on the requested axis use containing-block sizing
       const cb = containingBlockSize
       const pad = isRow
-        ? resolveEdgeValue(style.padding, 0, style.flexDirection, cb) +
-          resolveEdgeValue(style.padding, 2, style.flexDirection, cb)
-        : resolveEdgeValue(style.padding, 1, style.flexDirection, cb) +
-          resolveEdgeValue(style.padding, 3, style.flexDirection, cb)
+        ? resolveEdgeValue(style.padding, 0, style.flexDirection, cb, C.DIRECTION_LTR, ownQueryInlineSize, "padding") +
+          resolveEdgeValue(style.padding, 2, style.flexDirection, cb, C.DIRECTION_LTR, ownQueryInlineSize, "padding")
+        : resolveEdgeValue(style.padding, 1, style.flexDirection, cb, C.DIRECTION_LTR, ownQueryInlineSize, "padding") +
+          resolveEdgeValue(style.padding, 3, style.flexDirection, cb, C.DIRECTION_LTR, ownQueryInlineSize, "padding")
       const bord = isRow
-        ? resolveEdgeBorderValue(style.border, 0, style.flexDirection) +
-          resolveEdgeBorderValue(style.border, 2, style.flexDirection)
-        : resolveEdgeBorderValue(style.border, 1, style.flexDirection) +
-          resolveEdgeBorderValue(style.border, 3, style.flexDirection)
+        ? resolveEdgeBorderValue(style.border, 0, style.flexDirection, C.DIRECTION_LTR, ownQueryInlineSize) +
+          resolveEdgeBorderValue(style.border, 2, style.flexDirection, C.DIRECTION_LTR, ownQueryInlineSize)
+        : resolveEdgeBorderValue(style.border, 1, style.flexDirection, C.DIRECTION_LTR, ownQueryInlineSize) +
+          resolveEdgeBorderValue(style.border, 3, style.flexDirection, C.DIRECTION_LTR, ownQueryInlineSize)
 
       // Inner content size from children. Filter out display:none and absolute.
       const childCb = NaN // we don't have own content-box yet — see comment above
@@ -821,9 +828,44 @@ export class Node {
         let childMin = child._getMinContentForParent(direction, childCb)
 
         // Cross-axis margins on children are part of the child's outer min
+        const childQueryInlineSize = findContainerQuerySize(child)
         const cm = isRow
-          ? resolveValue(child._style.margin[0]!, cb) + resolveValue(child._style.margin[2]!, cb)
-          : resolveValue(child._style.margin[1]!, cb) + resolveValue(child._style.margin[3]!, cb)
+          ? resolveEdgeValue(
+              child._style.margin,
+              0,
+              child._style.flexDirection,
+              cb,
+              C.DIRECTION_LTR,
+              childQueryInlineSize,
+              "margin",
+            ) +
+            resolveEdgeValue(
+              child._style.margin,
+              2,
+              child._style.flexDirection,
+              cb,
+              C.DIRECTION_LTR,
+              childQueryInlineSize,
+              "margin",
+            )
+          : resolveEdgeValue(
+              child._style.margin,
+              1,
+              child._style.flexDirection,
+              cb,
+              C.DIRECTION_LTR,
+              childQueryInlineSize,
+              "margin",
+            ) +
+            resolveEdgeValue(
+              child._style.margin,
+              3,
+              child._style.flexDirection,
+              cb,
+              C.DIRECTION_LTR,
+              childQueryInlineSize,
+              "margin",
+            )
         // Replace NaN (auto margins) with 0 — auto margins don't add to min-content
         const childMargin = Number.isNaN(cm) ? 0 : cm
         childMin += childMargin
@@ -839,7 +881,7 @@ export class Node {
       let inner = queryIsMain ? childSum : childMax
       if (queryIsMain && inFlowCount > 1) {
         // Add total gap between children along the main axis
-        const gap = ownIsRow ? style.gap[0]! : style.gap[1]!
+        const gap = resolveValue(style.gap[ownIsRow ? 0 : 1], cb, ownQueryInlineSize)
         inner += gap * (inFlowCount - 1)
       }
       result = pad + bord + inner
@@ -1276,7 +1318,16 @@ export class Node {
    * @returns Padding value in points
    */
   getComputedPadding(edge: number): number {
-    return getEdgeValue(this._style.padding, edge).value
+    edge = getEdgeIndex(edge)
+    return resolveEdgeValue(
+      this._style.padding,
+      edge,
+      this._style.flexDirection,
+      this.flex.lastAvailW,
+      this.flex.lastDir,
+      this.getParent() === null ? this.flex.lastAvailW : findContainerQuerySize(this),
+      "padding",
+    )
   }
 
   /**
@@ -1287,7 +1338,17 @@ export class Node {
    * @returns Margin value in points
    */
   getComputedMargin(edge: number): number {
-    return getEdgeValue(this._style.margin, edge).value
+    edge = getEdgeIndex(edge)
+    if (isEdgeAuto(this._style.margin, edge, this._style.flexDirection, this.flex.lastDir)) return 0
+    return resolveEdgeValue(
+      this._style.margin,
+      edge,
+      this._style.flexDirection,
+      this.flex.lastAvailW,
+      this.flex.lastDir,
+      this.getParent() === null ? this.flex.lastAvailW : findContainerQuerySize(this),
+      "margin",
+    )
   }
 
   /**
@@ -1297,7 +1358,16 @@ export class Node {
    * @returns Border width in points
    */
   getComputedBorder(edge: number): number {
-    return getEdgeBorderValue(this._style.border, edge)
+    edge = getEdgeIndex(edge)
+    if ((edge === C.EDGE_START || edge === C.EDGE_END) && this._style.border[edge]!.unit === C.UNIT_UNDEFINED)
+      return NaN
+    return resolveEdgeBorderValue(
+      this._style.border,
+      edge,
+      this._style.flexDirection,
+      this.flex.lastDir,
+      this.getParent() === null ? this.flex.lastAvailW : findContainerQuerySize(this),
+    )
   }
 
   // ============================================================================
@@ -1702,14 +1772,17 @@ export class Node {
    * Set padding for one or more edges.
    *
    * @param edge - EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, EDGE_BOTTOM, EDGE_HORIZONTAL, EDGE_VERTICAL, or EDGE_ALL
-   * @param value - Padding in points
+   * @param value - Padding as points or a parsed Value
    * @example
    * ```typescript
    * node.setPadding(EDGE_ALL, 10); // Set 10pt padding on all edges
    * node.setPadding(EDGE_HORIZONTAL, 5); // Set 5pt padding on left and right
    * ```
    */
-  setPadding(edge: number, value: number): void {
+  setPadding(edge: number, value: number | Value): void {
+    if (typeof value !== "number") {
+      assertEdgeLength(value, edge, "padding")
+    }
     if (edgeValueMatches(this._style.padding, edge, value, C.UNIT_POINT)) {
       return
     }
@@ -1736,14 +1809,17 @@ export class Node {
    * Set margin for one or more edges.
    *
    * @param edge - EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, EDGE_BOTTOM, EDGE_HORIZONTAL, EDGE_VERTICAL, or EDGE_ALL
-   * @param value - Margin in points
+   * @param value - Margin as points or a parsed Value
    * @example
    * ```typescript
    * node.setMargin(EDGE_ALL, 5); // Set 5pt margin on all edges
    * node.setMargin(EDGE_TOP, 10); // Set 10pt margin on top only
    * ```
    */
-  setMargin(edge: number, value: number): void {
+  setMargin(edge: number, value: number | Value): void {
+    if (typeof value !== "number") {
+      assertEdgeLength(value, edge, "margin")
+    }
     if (edgeValueMatches(this._style.margin, edge, value, C.UNIT_POINT)) {
       return
     }
@@ -1782,9 +1858,14 @@ export class Node {
    * Set border width for one or more edges.
    *
    * @param edge - EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, EDGE_BOTTOM, EDGE_HORIZONTAL, EDGE_VERTICAL, or EDGE_ALL
-   * @param value - Border width in points
+   * @param value - Border width as points or a parsed Value
    */
-  setBorder(edge: number, value: number): void {
+  setBorder(edge: number, value: number | Value): void {
+    if (typeof value !== "number") {
+      assertEdgeLength(value, edge, "border")
+      if (containsPercent(value))
+        throw new LengthError(value.source ?? "<Value>", "border widths do not accept percentages", "border")
+    }
     if (edgeBorderMatches(this._style.border, edge, value)) {
       return
     }
@@ -1796,33 +1877,27 @@ export class Node {
    * Set gap between flex items.
    *
    * @param gutter - GUTTER_COLUMN (horizontal gap), GUTTER_ROW (vertical gap), or GUTTER_ALL (both)
-   * @param value - Gap size in points
+   * @param value - Gap size as points or a parsed Value
    * @example
    * ```typescript
    * container.setGap(GUTTER_ALL, 8); // Set 8pt gap between all items
    * container.setGap(GUTTER_COLUMN, 10); // Set 10pt horizontal gap only
    * ```
    */
-  setGap(gutter: number, value: number): void {
-    if (gutter === C.GUTTER_COLUMN) {
-      if (Object.is(this._style.gap[0], value)) {
-        return
-      }
-      this._style.gap[0] = value
-    } else if (gutter === C.GUTTER_ROW) {
-      if (Object.is(this._style.gap[1], value)) {
-        return
-      }
-      this._style.gap[1] = value
-    } else if (gutter === C.GUTTER_ALL) {
-      if (Object.is(this._style.gap[0], value) && Object.is(this._style.gap[1], value)) {
-        return
-      }
-      this._style.gap[0] = value
-      this._style.gap[1] = value
-    } else {
-      return
+  setGap(gutter: number, value: number | Value): void {
+    if (typeof value !== "number") {
+      if (gutter === C.GUTTER_COLUMN || gutter === C.GUTTER_ALL) assertLengthAxis(value, "inline", "gap")
+      if (gutter === C.GUTTER_ROW || gutter === C.GUTTER_ALL) assertLengthAxis(value, "block", "gap")
     }
+    if (gutter !== C.GUTTER_COLUMN && gutter !== C.GUTTER_ROW && gutter !== C.GUTTER_ALL) return
+    if (
+      (gutter === C.GUTTER_ROW || styleValuesEqual(this._style.gap[0], value)) &&
+      (gutter === C.GUTTER_COLUMN || styleValuesEqual(this._style.gap[1], value))
+    )
+      return
+    const next = typeof value === "number" ? { value, unit: C.UNIT_POINT } : value
+    if (gutter !== C.GUTTER_ROW) this._style.gap[0] = next
+    if (gutter !== C.GUTTER_COLUMN) this._style.gap[1] = next
     this.markDirty()
   }
 
@@ -2231,10 +2306,10 @@ export class Node {
    */
   getGap(gutter: number): number {
     if (gutter === C.GUTTER_COLUMN) {
-      return this._style.gap[0]
+      return pointSpacing(this._style.gap[0], "getGap", "node.style.gap")
     } else if (gutter === C.GUTTER_ROW) {
-      return this._style.gap[1]
+      return pointSpacing(this._style.gap[1], "getGap", "node.style.gap")
     }
-    return this._style.gap[0] // Default to column gap
+    return pointSpacing(this._style.gap[0], "getGap", "node.style.gap") // Default to column gap
   }
 }

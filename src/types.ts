@@ -4,6 +4,7 @@
  * TypeScript interfaces for the flexbox layout engine.
  */
 
+import * as C from "./constants.js"
 import { type DefaultsPreset, DEFAULT_PRESET } from "./defaults.js"
 
 /**
@@ -232,10 +233,10 @@ export interface Style {
   // Logical edges: [4]=start, [5]=end (resolved based on flex direction)
   margin: [Value, Value, Value, Value, Value, Value]
   padding: [Value, Value, Value, Value, Value, Value]
-  border: [number, number, number, number, number, number] // Border widths (always points, [4,5] = logical start/end)
+  border: [Value, Value, Value, Value, Value, Value] // [left, top, right, bottom, start, end]
 
   // Gap
-  gap: [number, number] // [column, row]
+  gap: [Value, Value] // [column, row]
 
   // Overflow
   overflow: number
@@ -269,6 +270,9 @@ export interface Style {
 export function createValue(value = 0, unit = 0): Value {
   return { value, unit }
 }
+
+const POINT_ZERO: Value = Object.freeze({ value: 0, unit: C.UNIT_POINT })
+const UNSET_EDGE: Value = Object.freeze({ value: 0, unit: C.UNIT_UNDEFINED })
 
 /**
  * Create default style.
@@ -314,8 +318,8 @@ export function createDefaultStyle(preset: DefaultsPreset = DEFAULT_PRESET): Sty
     aspectRatio: NaN, // undefined by default (same in CSS and Yoga)
     margin: [createValue(), createValue(), createValue(), createValue(), createValue(), createValue()],
     padding: [createValue(), createValue(), createValue(), createValue(), createValue(), createValue()],
-    border: [0, 0, 0, 0, NaN, NaN],
-    gap: [0, 0],
+    border: [POINT_ZERO, POINT_ZERO, POINT_ZERO, POINT_ZERO, UNSET_EDGE, UNSET_EDGE],
+    gap: [POINT_ZERO, POINT_ZERO],
     overflow: 0, // OVERFLOW_VISIBLE (same in CSS and Yoga)
     containerType: 0, // CONTAINER_TYPE_NORMAL — not a CQ container by default (A0.1)
     containSize: false, // CSS contain: size — off by default (A0.1)
