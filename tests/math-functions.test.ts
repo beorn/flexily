@@ -288,6 +288,134 @@ describe("[A0.3] engine integration — Box.width with min/max", () => {
   })
 })
 
+describe("[A0.3a] recursive CSS intrinsic length equivalence", () => {
+  // AC4: the default-Yoga table below has no recursive CSS auto-min pressure.
+  // Numeric controls prove explicit sizes, min floors and the zero-min escape.
+  test.each([
+    { property: "width", row: true, value: 20 },
+    { property: "height", row: false, value: 20 },
+    { property: "minWidth", row: true, value: 20 },
+    { property: "minHeight", row: false, value: 20 },
+    { property: "minWidth", row: true, value: 0 },
+    { property: "minHeight", row: false, value: 0 },
+  ] as const)("$property=$value preserves recursive intrinsic sizing", ({ property, row, value }) => {
+    const direction = row ? C.FLEX_DIRECTION_ROW : C.FLEX_DIRECTION_COLUMN
+    const unit = row ? "ch" : "lh"
+    const layout = (input: number | string) => {
+      const flex = createFlexily({ defaults: "css" })
+      const root = flex.createNode()
+      root.setWidth(row ? 12 : 4)
+      root.setHeight(row ? 4 : 12)
+      root.setFlexDirection(direction)
+      root.setAlignItems(C.ALIGN_FLEX_START)
+      const wrapper = flex.createNode()
+      wrapper.setFlexDirection(direction)
+      wrapper.setAlignItems(C.ALIGN_FLEX_START)
+      const leaf = flex.createNode()
+      leaf.setWidth(row ? (value === 0 ? 20 : 0) : 1)
+      leaf.setHeight(row ? 1 : value === 0 ? 20 : 0)
+      if (property.startsWith("min") && value !== 0) {
+        if (row) leaf.setWidthAuto()
+        else leaf.setHeightAuto()
+      }
+      const parsed = typeof input === "string" ? Flexily.parseLength(input, { ch: 1, lh: 1 }) : input
+      const setters = {
+        width: leaf.setWidth,
+        height: leaf.setHeight,
+        minWidth: leaf.setMinWidth,
+        minHeight: leaf.setMinHeight,
+      }
+      setters[property].call(leaf, parsed)
+      wrapper.insertChild(leaf, 0)
+      root.insertChild(wrapper, 0)
+      const sibling = flex.createNode()
+      sibling.setWidth(row ? 10 : 1)
+      sibling.setHeight(row ? 1 : 10)
+      root.insertChild(sibling, 1)
+      flex.calculateLayout(root, row ? 12 : 4, row ? 4 : 12)
+      return {
+        intrinsic: wrapper.getMinContent(direction),
+        mainSizes: [wrapper, leaf, sibling].map((node) => (row ? node.getComputedWidth() : node.getComputedHeight())),
+      }
+    }
+    const numeric = layout(value)
+    expect(numeric.intrinsic).toBe(value)
+    expect(numeric.mainSizes).toEqual(value === 0 ? [8, 8, 4] : property.startsWith("min") ? [20, 20, 10] : [20, 20, 0])
+    for (const input of [`${value}${unit}`, `calc(${value}${unit} * 1)`, `max(0${unit}, ${value}${unit})`]) {
+      expect(layout(input), input).toEqual(numeric)
+    }
+  })
+})
+
+describe("[A0.3a] CQ intrinsic resize", () => {
+  // AC4/26247: numeric mutation dirties the leaf, whereas an unchanged CQ
+  // expression must refresh its cached intrinsic size when the root resizes.
+  test.each(["25cqi", "max(1ch, 25cqi)"].flatMap((input) => [false, true].map((nested) => ({ input, nested }))))(
+    "$input refreshes recursive min-content (nested=$nested)",
+    ({ input, nested }) => {
+      const create = (input: number | string) => {
+        const flex = createFlexily({ defaults: "css" })
+        const root = flex.createNode()
+        root.setWidth(nested ? 100 : 80)
+        root.setHeight(4)
+        root.setFlexDirection(C.FLEX_DIRECTION_ROW)
+        root.setAlignItems(C.ALIGN_FLEX_START)
+        root.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+        root.setContainSize(true)
+        const queryRoot = nested ? flex.createNode() : root
+        if (nested) {
+          queryRoot.setWidth(80)
+          queryRoot.setHeight(4)
+          queryRoot.setFlexDirection(C.FLEX_DIRECTION_ROW)
+          queryRoot.setAlignItems(C.ALIGN_FLEX_START)
+          queryRoot.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+          queryRoot.setContainSize(true)
+          root.insertChild(queryRoot, 0)
+        }
+        const wrapper = flex.createNode()
+        wrapper.setFlexDirection(C.FLEX_DIRECTION_ROW)
+        const leaf = flex.createNode()
+        leaf.setMinWidth(typeof input === "number" ? input : Flexily.parseLength(input, { ch: 1, lh: 1 }))
+        leaf.setHeight(1)
+        const content = flex.createNode()
+        content.setWidth(3)
+        content.setHeight(1)
+        leaf.insertChild(content, 0)
+        wrapper.insertChild(leaf, 0)
+        queryRoot.insertChild(wrapper, 0)
+        const sibling = flex.createNode()
+        sibling.setWidth(30)
+        sibling.setHeight(1)
+        queryRoot.insertChild(sibling, 1)
+        const snapshot = (width: number) => {
+          queryRoot.setWidth(width)
+          flex.calculateLayout(root, nested ? 100 : width, 4)
+          return {
+            intrinsic: [wrapper, leaf].map((node) => node.getMinContent(C.FLEX_DIRECTION_ROW)),
+            geometry: [queryRoot, wrapper, leaf, sibling].map((node) => [
+              node.getComputedLeft(),
+              node.getComputedWidth(),
+              node.getComputedHeight(),
+            ]),
+          }
+        }
+        return { leaf, snapshot }
+      }
+      const numeric = create(20)
+      const parsed = create(input)
+      const first = numeric.snapshot(80)
+      expect(first.intrinsic).toEqual([20, 20])
+      expect(parsed.snapshot(80)).toEqual(first)
+      numeric.leaf.setMinWidth(10)
+      const resized = numeric.snapshot(40)
+      expect(resized.intrinsic).toEqual([10, 10])
+      expect(resized.geometry.map((box) => box[1])).toEqual([40, 10, 10, 30])
+      expect(parsed.snapshot(40)).toEqual(resized)
+      expect(create(input).snapshot(40)).toEqual(resized)
+    },
+  )
+})
+
 describe("[A0.3a] seven-property layout equivalence", () => {
   const properties = ["width", "height", "minWidth", "minHeight", "maxWidth", "maxHeight", "flexBasis"] as const
   const contexts = ["row main", "column main", "cross axis", "CQ container", "auto parent"] as const

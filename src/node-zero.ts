@@ -29,6 +29,9 @@ import {
   edgeValueMatches,
   edgeBorderMatches,
   styleValueMatches,
+  isLength,
+  pctIndefinite,
+  findContainerQuerySize,
 } from "./utils.js"
 import { isRowDirection, resolveEdgeValue, resolveEdgeBorderValue } from "./layout-helpers.js"
 import { log } from "./logger.js"
@@ -698,8 +701,9 @@ export class Node {
    *      padding + border + max(child.getMinContent(direction))
    *  - Empty leaf without measureFunc: padding + border only.
    *
-   * Cached per-axis (`_minContentRow`, `_minContentCol`); cache is invalidated
-   * by `markDirty()` (alongside the measure + layout caches). The `-1`
+   * Cached per-axis within a layout pass (`_minContentRow`, `_minContentCol`);
+   * resetLayoutCache() refreshes query-dependent results at the next pass,
+   * and markDirty() clears them after style/content changes. The `-1`
    * sentinel marks the cache as empty.
    *
    * `direction` accepts the FLEX_DIRECTION_* constants. Non-row values are
@@ -837,13 +841,12 @@ export class Node {
       result = pad + bord + inner
     }
 
-    // Honor explicit minWidth/minHeight in points/percent — a definite
+    // Honor explicit minWidth/minHeight lengths — a definite
     // explicit min is a hard floor on the intrinsic min-content as well.
     const minVal = isRow ? style.minWidth : style.minHeight
-    if (minVal.unit === C.UNIT_POINT) {
-      result = Math.max(result, minVal.value)
-    } else if (minVal.unit === C.UNIT_PERCENT && !Number.isNaN(containingBlockSize)) {
-      result = Math.max(result, containingBlockSize * (minVal.value / 100))
+    if (isLength(minVal.unit) && !pctIndefinite(minVal, containingBlockSize)) {
+      const queryInlineSize = minVal.unit === C.UNIT_POINT ? NaN : findContainerQuerySize(this)
+      result = Math.max(result, resolveValue(minVal, containingBlockSize, queryInlineSize))
     }
 
     if (cacheable) {
@@ -878,20 +881,30 @@ export class Node {
       return 0
     }
 
-    // Explicit minWidth/minHeight = 0 in points means "I can shrink to
+    // Explicit minWidth/minHeight = 0 means "I can shrink to
     // nothing" — canonical CSS escape hatch from the auto-min rule.
     const minVal = isRow ? style.minWidth : style.minHeight
-    if (minVal.unit === C.UNIT_POINT && minVal.value === 0) {
+    const sizeVal = isRow ? style.width : style.height
+    // Numeric nodes keep the fast path without an ancestor walk.
+    const queryInlineSize =
+      (isLength(minVal.unit) && minVal.unit !== C.UNIT_POINT) ||
+      (isLength(sizeVal.unit) && sizeVal.unit !== C.UNIT_POINT)
+        ? findContainerQuerySize(this)
+        : NaN
+    if (
+      isLength(minVal.unit) &&
+      !pctIndefinite(minVal, containingBlockSize) &&
+      resolveValue(minVal, containingBlockSize, queryInlineSize) === 0
+    ) {
       return 0
     }
 
-    // Explicit definite size (width/height in points) caps the min-content:
+    // Explicit definite size (width/height length) caps the min-content:
     // a Box that says width=10 can't have a smaller intrinsic min than 10.
-    // Don't override when explicit size is auto/percent/fit/snug — fall
+    // Don't override an indefinite percentage or auto/fit/snug — fall
     // through to the recursive computation.
-    const sizeVal = isRow ? style.width : style.height
-    if (sizeVal.unit === C.UNIT_POINT) {
-      return sizeVal.value
+    if (isLength(sizeVal.unit) && !pctIndefinite(sizeVal, containingBlockSize)) {
+      return resolveValue(sizeVal, containingBlockSize, queryInlineSize)
     }
 
     return this.getMinContent(parentDirection, containingBlockSize)
@@ -959,7 +972,7 @@ export class Node {
   }
 
   /**
-   * Clear layout cache for this node and all descendants.
+   * Clear layout and intrinsic caches for this node and all descendants.
    * Called at the start of each calculateLayout pass.
    * Zero-allocation: invalidates entries (availW = NaN) rather than deallocating.
    * Uses iterative traversal to avoid stack overflow on deep trees.
@@ -973,6 +986,10 @@ export class Node {
       // value and Object.is(NaN, NaN) === true would cause false cache hits)
       if (node._lc0) node._lc0.availW = -1
       if (node._lc1) node._lc1.availW = -1
+      // Intrinsic lengths can depend on a query container that resized while
+      // this node's own style stayed unchanged. Reuse them only in this pass.
+      node._minContentRow = -1
+      node._minContentCol = -1
       for (const child of node._children) {
         traversalStack.push(child)
       }
@@ -1976,7 +1993,15 @@ export class Node {
    * @internal
    */
   _setFrozenQuerySize(size: number): void {
+    if (Object.is(this._frozenQuerySize, size)) return
     this._frozenQuerySize = size
+    // Intrinsic sizing can run before this container freezes in the same
+    // pass. Refresh descendants and any ancestor result derived from them.
+    this.resetLayoutCache()
+    for (let ancestor = this._parent; ancestor !== null; ancestor = ancestor._parent) {
+      ancestor._minContentRow = -1
+      ancestor._minContentCol = -1
+    }
   }
 
   // ============================================================================
