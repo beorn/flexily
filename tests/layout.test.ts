@@ -7,6 +7,7 @@ import {
   ALIGN_SPACE_AROUND,
   ALIGN_SPACE_BETWEEN,
   ALIGN_STRETCH,
+  CONTAINER_TYPE_INLINE_SIZE,
   createDefaultStyle,
   createValue,
   DIRECTION_LTR,
@@ -51,6 +52,126 @@ import {
 } from "../src/index.js"
 import { createChild, expectLayout, expectWidth } from "./test-utils.js"
 import { Node as ClassicNode } from "../src/index-classic.js"
+
+/**
+ * @failure A flex item lays descendants out at its preferred size before its parent commits a smaller size.
+ * @level l0
+ * @consumer Chat prose lanes and allocated container-query items (#19845)
+ * The existing chat fixture catches clipped text; these rows isolate the engine's
+ * distinct allocation/percentage-basis contract without React or a local scope.
+ */
+describe("committed flex allocations", () => {
+  it.each(
+    [FLEX_DIRECTION_ROW, FLEX_DIRECTION_COLUMN].flatMap((axis) =>
+      [
+        { gutter: 1, cap: 100, min: 0, margin: 0, border: 0, allocated: 70, content: 70 },
+        { gutter: 20, cap: 50, min: 0, margin: 0, border: 0, allocated: 32, content: 32 },
+        { gutter: 25, cap: 33.3, min: 0, margin: 0, border: 0, allocated: 22, content: 22 },
+        { gutter: 0, cap: 33.3, min: 0, margin: 0, border: 0, allocated: 24, content: 24 },
+        { gutter: 20, cap: 25, min: 40, margin: 0, border: 0, allocated: 40, content: 40 },
+        { gutter: 20, cap: 25, min: 40.1, margin: 0, border: 0, allocated: 40, content: 40 },
+        { gutter: 1, cap: 100, min: 0, margin: 2, border: 1, allocated: 66, content: 64 },
+      ].map((row) => ({ axis, ...row })),
+    ),
+  )(
+    "uses the committed box before percent descendants (axis $axis, cap $cap, min $min, margin $margin)",
+    ({ axis, gutter, cap, min, margin, border, allocated, content }) => {
+      const horizontal = axis === FLEX_DIRECTION_ROW
+      const root = Node.create()
+      root.setWidth(72)
+      root.setHeight(72)
+      root.setFlexDirection(axis)
+      const lane = Node.create()
+      lane.setFlexDirection(horizontal ? FLEX_DIRECTION_COLUMN : FLEX_DIRECTION_ROW)
+      lane.setFlexShrink(1)
+      lane.setMargin(EDGE_ALL, margin)
+      lane.setBorder(EDGE_ALL, border)
+      if (horizontal) {
+        lane.setWidth(96)
+        lane.setMaxWidthPercent(cap)
+        lane.setMinWidth(min)
+      } else {
+        lane.setHeight(96)
+        lane.setMaxHeightPercent(cap)
+        lane.setMinHeight(min)
+      }
+      let parent = lane
+      for (let depth = 0; depth < 2; depth++) {
+        const inner = Node.create()
+        inner.setFlexShrink(0)
+        if (horizontal) inner.setWidthPercent(100)
+        else inner.setHeightPercent(100)
+        parent.insertChild(inner, 0)
+        parent = inner
+      }
+      for (let index = 0; index < 3; index++) {
+        const child = index === 1 ? lane : Node.create()
+        if (index !== 1) {
+          child.setFlexShrink(0)
+          if (horizontal) child.setWidth(gutter)
+          else child.setHeight(gutter)
+        }
+        root.insertChild(child, index)
+      }
+      root.calculateLayout(72, 72)
+      expect(horizontal ? lane.getComputedWidth() : lane.getComputedHeight()).toBe(allocated)
+      expect(horizontal ? parent.getComputedWidth() : parent.getComputedHeight()).toBe(content)
+      root.freeRecursive()
+    },
+  )
+
+  it("updates percent descendants when allocation changes under an unchanged containing box", () => {
+    const root = Node.create()
+    root.setWidth(72)
+    root.setHeight(20)
+    root.setFlexDirection(FLEX_DIRECTION_ROW)
+    const lane = Node.create()
+    lane.setWidthPercent(100)
+    lane.setMinWidth(0)
+    lane.setFlexShrink(1)
+    const inner = Node.create()
+    inner.setWidthPercent(100)
+    lane.insertChild(inner, 0)
+    const sibling = Node.create()
+    sibling.setWidth(2)
+    sibling.setFlexShrink(0)
+    root.insertChild(lane, 0)
+    root.insertChild(sibling, 1)
+    root.calculateLayout(72, 20)
+    expect(inner.getComputedWidth()).toBe(70)
+    sibling.setWidth(3)
+    root.calculateLayout(72, 20)
+    expect(lane.getComputedWidth()).toBe(69)
+    expect(inner.getComputedWidth()).toBe(69)
+    root.freeRecursive()
+  })
+
+  it("freezes an allocated query container at its used inline size", () => {
+    const root = Node.create()
+    root.setWidth(72)
+    root.setHeight(20)
+    const lane = Node.create()
+    lane.setWidth(96)
+    lane.setMaxWidthPercent(100)
+    lane.setMinWidth(0)
+    lane.setFlexShrink(1)
+    lane.setContainerType(CONTAINER_TYPE_INLINE_SIZE)
+    lane.setContainSize(true)
+    const inner = Node.create()
+    inner.setWidth(parseLength("50cqi", { ch: 1, lh: 1 }))
+    lane.insertChild(inner, 0)
+    const sibling = Node.create()
+    sibling.setWidth(2)
+    sibling.setFlexShrink(0)
+    root.insertChild(lane, 0)
+    root.insertChild(sibling, 1)
+    root.calculateLayout(72, 20)
+    expect(lane.getComputedWidth()).toBe(70)
+    expect(lane.getFrozenQuerySize()).toBe(70)
+    expect(inner.getComputedWidth()).toBe(35)
+    root.freeRecursive()
+  })
+})
 
 describe("Flexily Layout Engine", () => {
   describe("Basic Layout", () => {

@@ -148,6 +148,8 @@ function layoutNode(
   direction: number = C.DIRECTION_LTR,
   containingWidth: number = availableWidth,
   containingHeight: number = availableHeight,
+  allocatedWidth: number = NaN,
+  allocatedHeight: number = NaN,
 ): void {
   incLayoutNodeCalls()
   // Track sizing vs positioning calls
@@ -194,6 +196,10 @@ function layoutNode(
     !node.isDirty() &&
     Object.is(flex.lastAvailW, availableWidth) &&
     Object.is(flex.lastAvailH, availableHeight) &&
+    Object.is(flex.lastContainingW, containingWidth) &&
+    Object.is(flex.lastContainingH, containingHeight) &&
+    Object.is(flex.lastAllocatedW, allocatedWidth) &&
+    Object.is(flex.lastAllocatedH, allocatedHeight) &&
     flex.lastDir === direction &&
     flex.lastAbsX === absX &&
     flex.lastAbsY === absY
@@ -253,6 +259,8 @@ function layoutNode(
   // Used for cqi/cqmin resolution of width/height/etc. on this node — the node's
   // OWN inline-size resolves against its parent's containment context, never its own.
   const ownQueryInlineSize = node.getParent() === null ? availableWidth : findContainerQuerySize(node)
+  const hasAllocatedWidth = Number.isFinite(allocatedWidth)
+  const hasAllocatedHeight = Number.isFinite(allocatedHeight)
 
   let nodeWidth: number
   const isFitContentWidth = style.width.unit === C.UNIT_FIT_CONTENT || style.width.unit === C.UNIT_SNUG_CONTENT
@@ -312,38 +320,6 @@ function layoutNode(
   // PHASE 3a: Freeze container-query inline-size (A0.1 — Pass 1 of two-phase layout)
   // ============================================================================
   //
-  // If this node is a CQ container or the implicit viewport layout root,
-  // freeze its inline-size NOW — before child layout recursion. Descendants will
-  // resolve `cqi`/`cqmin` against this frozen value during their own layoutNode
-  // pass (via `findContainerQuerySize`, lands with Pass 2).
-  //
-  // Why here: nodeWidth has been derived from parent's constraint + min/max,
-  // BEFORE any shrink-wrap from children's intrinsic sizes (Phase 9). This is
-  // the invariant the two-phase algorithm depends on — without it, CQ branch
-  // resolution could oscillate as child sizes feed back into container size.
-  //
-  // NaN nodeWidth (auto-sized, unconstrained) is propagated as-is. Descendant
-  // cqi values then resolve to 0, so this dead-end is explicit instead of
-  // accidentally feeding child intrinsic size back into the query size.
-  if (style.containerType !== C.CONTAINER_TYPE_NORMAL || node.getParent() === null) {
-    if (!Object.is(node.getFrozenQuerySize(), nodeWidth)) {
-      // Descendants may have identical box constraints but depend on this CQ
-      // size through cqi or a math expression. Their fingerprints are stale.
-      invalidateFingerprintsAround(node)
-    }
-    node._setFrozenQuerySize(nodeWidth)
-  } else {
-    // Not a query container — clear any stale freeze from prior layout passes when
-    // the user toggled containerType off. Cheap; no-op if already NaN.
-    if (!Number.isNaN(node.getFrozenQuerySize())) invalidateFingerprintsAround(node)
-    node._setFrozenQuerySize(NaN)
-  }
-
-  // All direct children share this query context. A container's own styles
-  // queried its ancestor above; its descendants query the newly frozen size.
-  const frozenQueryInlineSize = node.getFrozenQuerySize()
-  const childQueryInlineSize = Number.isNaN(frozenQueryInlineSize) ? ownQueryInlineSize : frozenQueryInlineSize
-
   let nodeHeight: number
   if (isLength(style.height.unit)) {
     nodeHeight = resolveValue(style.height, availableHeight, ownQueryInlineSize)
@@ -380,6 +356,12 @@ function layoutNode(
   const earlyHeightBasis = Number.isNaN(nodeHeight) ? availableHeight : containingHeight
   nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, earlyHeightBasis, ownQueryInlineSize)
 
+  // Flex resolution has already constrained these border boxes. Descendants
+  // must use the exact sizes the parent commits, while own percentages retain
+  // their separate containing-block basis (#19845).
+  if (hasAllocatedWidth) nodeWidth = allocatedWidth
+  if (hasAllocatedHeight) nodeHeight = allocatedHeight
+
   // Content area (inside border and padding)
   // When node dimensions are NaN (unconstrained), content dimensions are also NaN
   const innerLeft = borderLeft + paddingLeft
@@ -399,6 +381,18 @@ function layoutNode(
 
   const contentWidth = Number.isNaN(nodeWidth) ? NaN : Math.max(0, nodeWidth - innerLeft - innerRight)
   const contentHeight = Number.isNaN(nodeHeight) ? NaN : Math.max(0, nodeHeight - innerTop - innerBottom)
+
+  // Freeze the used inline size after aspect ratio and parent allocation, but
+  // before intrinsic child contributions. NaN keeps indefinite queries explicit.
+  if (style.containerType !== C.CONTAINER_TYPE_NORMAL || node.getParent() === null) {
+    if (!Object.is(node.getFrozenQuerySize(), nodeWidth)) invalidateFingerprintsAround(node)
+    node._setFrozenQuerySize(nodeWidth)
+  } else {
+    if (!Number.isNaN(node.getFrozenQuerySize())) invalidateFingerprintsAround(node)
+    node._setFrozenQuerySize(NaN)
+  }
+  const frozenQueryInlineSize = node.getFrozenQuerySize()
+  const childQueryInlineSize = Number.isNaN(frozenQueryInlineSize) ? ownQueryInlineSize : frozenQueryInlineSize
 
   // Compute position offsets early (needed for children's absolute position calculation)
   // This ensures children's absolute positions include parent's position offset
@@ -2099,6 +2093,22 @@ function layoutNode(
       // absChildLeft/Top include the child's margins, so subtract them to get margin box start
       const childAbsX = absChildLeft - childMarginLeft
       const childAbsY = absChildTop - childMarginTop
+      // Select the existing parent commits before descending, so the child uses
+      // the same rounded box for its contents and container queries.
+      const shouldOverrideMain =
+        (!mainIsAuto && !mainIsAutoChild) || flexGrowHasDefiniteMainBudget || hasMeasureLeaf || flexDistChanged
+      const crossDimIsFitContent = crossIsFitContent
+      const crossIsAuto = crossIsAutoForLayoutCall
+      const hasCrossMinMax = crossMinVal.unit !== C.UNIT_UNDEFINED || crossMaxVal.unit !== C.UNIT_UNDEFINED
+      const shouldOverrideCross =
+        !crossIsAuto ||
+        (!crossDimIsFitContent && parentHasDefiniteCross && alignment === C.ALIGN_STRETCH) ||
+        (hasCrossMinMax && !Number.isNaN(childCrossSize))
+      const allocatedMain = !hasMeasureLeaf && shouldOverrideMain ? edgeBasedMainSize : NaN
+      const allocatedCross =
+        !hasMeasureLeaf && shouldOverrideCross
+          ? Math.round(isRow ? Math.max(childHeight, childMinH) : Math.max(childWidth, childMinW))
+          : NaN
       // Allocation and percentage-constraint context differ for a flex child.
       // In particular, an allocated row does not make its auto parent definite.
       layoutNode(
@@ -2112,6 +2122,8 @@ function layoutNode(
         direction,
         contentWidth,
         contentHeight,
+        isRow ? allocatedMain : allocatedCross,
+        isRow ? allocatedCross : allocatedMain,
       )
 
       // Enforce box model constraint: child can't be smaller than its padding + border
@@ -2144,14 +2156,7 @@ function layoutNode(
       // the real algorithm when this container is about to distribute from it,
       // so the number arrives already wrapped wherever it can be seen.
       // Regression: tests/parent-flex-base-nested-row-wrap.test.ts.
-      const hasMeasure = child.hasMeasureFunc() && child.children.length === 0
-      const flexDistributionChangedSize = child.flex.mainSize !== child.flex.baseSize
-      if (
-        (!mainIsAuto && !mainIsAutoChild) ||
-        flexGrowHasDefiniteMainBudget ||
-        hasMeasure ||
-        flexDistributionChangedSize
-      ) {
+      if (shouldOverrideMain) {
         // Use edge-based rounding: size = round(end_edge) - round(start_edge)
         if (isRow) {
           _t?.parentOverride(_tn, "main", child.layout.width, edgeBasedMainSize)
@@ -2163,23 +2168,12 @@ function layoutNode(
       }
       // Cross axis: only override for explicit sizing or when we have a real constraint
       // For auto-sized children, let layoutNode determine the size
-      const crossDimForCheck = isRow ? childStyle.height : childStyle.width
-      const crossDimIsFitContent =
-        crossDimForCheck.unit === C.UNIT_FIT_CONTENT || crossDimForCheck.unit === C.UNIT_SNUG_CONTENT
-      const crossIsAuto =
-        crossDimForCheck.unit === C.UNIT_AUTO || crossDimForCheck.unit === C.UNIT_UNDEFINED || crossDimIsFitContent
       // Only override if child has explicit sizing OR parent has explicit cross size
       // When parent has auto cross size, let children shrink-wrap first
       // Note: parentCrossDim and parentHasDefiniteCross already computed above
-      const parentCrossIsAuto = !parentHasDefiniteCross
       // Also check if childCrossSize was constrained by min/max - if so, we should override
-      const hasCrossMinMax = crossMinVal.unit !== C.UNIT_UNDEFINED || crossMaxVal.unit !== C.UNIT_UNDEFINED
       // Fit-content children determine their own cross-axis size via layoutNode
       // (shrink-wrap to content). Don't override with the parent's stretch.
-      const shouldOverrideCross =
-        !crossIsAuto ||
-        (!crossDimIsFitContent && !parentCrossIsAuto && alignment === C.ALIGN_STRETCH) ||
-        (hasCrossMinMax && !Number.isNaN(childCrossSize))
       if (shouldOverrideCross) {
         if (isRow) {
           child.layout.height = Math.round(childHeight)
@@ -2269,9 +2263,7 @@ function layoutNode(
       // - Phase 8 did NOT override (auto-sized container, no grow, no measure):
       //   Use child.layout (from layoutNode), which reflects actual content size.
       //   constrainedMainSize is a stale pre-layout estimate from unconstrained measurement.
-      const phaseEightOverrode =
-        (!mainIsAuto && !mainIsAutoChild) || flexGrowHasDefiniteMainBudget || hasMeasure || flexDistributionChangedSize
-      const fractionalMainSize = phaseEightOverrode
+      const fractionalMainSize = shouldOverrideMain
         ? constrainedMainSize
         : isRow
           ? child.layout.width
@@ -2329,11 +2321,11 @@ function layoutNode(
     const containsInlineSize = style.containSize && style.containerType !== C.CONTAINER_TYPE_NORMAL
     // A0.2: fit-width pre-selected the inline-size — don't shrink-wrap over it.
     const hasFitWidth = style.fitWidth !== undefined && style.fitWidth.length > 0
-    if (isRow && !isLength(style.width.unit) && !hasAR && !containsInlineSize && !hasFitWidth) {
+    if (isRow && !hasAllocatedWidth && !isLength(style.width.unit) && !hasAR && !containsInlineSize && !hasFitWidth) {
       // Auto-width row: shrink-wrap to content
       nodeWidth = actualUsedMain + innerLeft + innerRight
     }
-    if (!isRow && !isLength(style.height.unit) && !hasAR) {
+    if (!isRow && !hasAllocatedHeight && !isLength(style.height.unit) && !hasAR) {
       // Auto-height column: shrink-wrap to content (block-axis — uncontained in Phase 1)
       nodeHeight = actualUsedMain + innerTop + innerBottom
     }
@@ -2367,12 +2359,13 @@ function layoutNode(
     // Only shrink-wrap when the available dimension is NaN (unconstrained)
     // When availableHeight/Width is defined, Yoga uses it for AUTO-sized root nodes
     // Skip if aspect ratio already determined this dimension (aspect ratio > shrink-wrap)
-    if (isRow && !isLength(style.height.unit) && Number.isNaN(availableHeight) && !hasAR) {
+    if (isRow && !hasAllocatedHeight && !isLength(style.height.unit) && Number.isNaN(availableHeight) && !hasAR) {
       // Auto-height row: shrink-wrap to total cross size (accounts for multi-line)
       nodeHeight = totalCrossSize + innerTop + innerBottom
     }
     if (
       !isRow &&
+      !hasAllocatedWidth &&
       !isLength(style.width.unit) &&
       Number.isNaN(availableWidth) &&
       !hasAR &&
@@ -2469,7 +2462,21 @@ function layoutNode(
         const cAbsY = absY + innerTop + savedTop - cMarginT
         const passW = isRow ? child.layout.width : stretchedCross
         const passH = isRow ? stretchedCross : child.layout.height
-        layoutNode(child, passW, passH, savedLeft, savedTop, cAbsX, cAbsY, direction)
+        const hasMeasureLeaf = child.hasMeasureFunc() && child.children.length === 0
+        layoutNode(
+          child,
+          passW,
+          passH,
+          savedLeft,
+          savedTop,
+          cAbsX,
+          cAbsY,
+          direction,
+          contentWidth,
+          contentHeight,
+          hasMeasureLeaf ? NaN : isRow ? child.layout.width : Math.round(stretchedCross),
+          hasMeasureLeaf ? NaN : isRow ? Math.round(stretchedCross) : child.layout.height,
+        )
         // Restore position and override cross dimension to stretched size
         child.layout.left = savedLeft
         child.layout.top = savedTop
@@ -2894,6 +2901,10 @@ function layoutNode(
   // Update constraint fingerprint - layout is now valid for these constraints
   flex.lastAvailW = availableWidth
   flex.lastAvailH = availableHeight
+  flex.lastContainingW = containingWidth
+  flex.lastContainingH = containingHeight
+  flex.lastAllocatedW = allocatedWidth
+  flex.lastAllocatedH = allocatedHeight
   flex.lastOffsetX = offsetX
   flex.lastOffsetY = offsetY
   flex.lastAbsX = absX
