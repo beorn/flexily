@@ -164,6 +164,12 @@ export interface FlexInfo {
   lastAvailW: number
   /** Last availableHeight passed to layoutNode */
   lastAvailH: number
+  /** @internal Percentage-containing context for the cached layout. */
+  lastContainingW: number
+  lastContainingH: number
+  /** @internal Parent-committed border-box allocation, or NaN when intrinsic. */
+  lastAllocatedW: number
+  lastAllocatedH: number
   /** Last offsetX passed to layoutNode */
   lastOffsetX: number
   /** Last offsetY passed to layoutNode */
