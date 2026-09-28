@@ -18,12 +18,87 @@
  */
 import { describe, expect, test } from "vitest"
 import * as C from "../src/constants.js"
+import * as Flexily from "../src/index.js"
 import { createFlexily } from "../src/index.js"
 import type { MathExpr, Value } from "../src/types.js"
 import { evaluateMathExpr, resolveValue } from "../src/utils.js"
 
 const pt = (n: number): Value => ({ value: n, unit: C.UNIT_POINT })
 const cqi = (n: number): Value => ({ value: n, unit: C.UNIT_CQI })
+
+describe("[A0.3a] public length grammar and style setters", () => {
+  const scale = { ch: 3, lh: 5 }
+
+  test.each([
+    ["2ch", 6],
+    ["2lh", 10],
+    ["50%", 40],
+    ["10cqi", 20],
+    ["calc((10ch + 2ch)*2/3)", 24],
+    ["MIN(10CH, 50%)", 30],
+    ["max(1ch, 10cqi)", 20],
+    ["clamp(20ch, 50%, 10ch)", 60],
+  ])("parses %s with explicit adapter scale and late-bound context", (input, expected) => {
+    const value = Flexily.parseLength(input, scale)
+    expect(resolveValue(value, 80, 200)).toBe(expected)
+    expect(Object.isFrozen(value)).toBe(true)
+  })
+
+  test.each([
+    ["calc(100%-2ch)", /spaces.*-/],
+    ["calc(100%+2ch)", /spaces.*\+/],
+    ["100% - 2ch", /wrap it: calc\(100% - 2ch\)/],
+    ["max(50%, 2)", /unitless/],
+    ["calc(2)", /unitless/],
+    ["calc(2ch*3ch)", /constant/],
+    ["calc(2ch/0)", /zero/],
+    ["calc(2ch/1ch)", /constant/],
+    ["min(1ch,)", /length/],
+    ["1px", /ch.*lh/],
+    ["max(1ch, 5cqmin)", /26239/],
+    ["1cqb", /26239/],
+    ["1cqmax", /26239/],
+    ["-1ch", /negative/],
+    ["-1%", /negative/],
+    ["10%junk", /unexpected/],
+  ])("refuses %s with a typed teaching error", (input, reason) => {
+    expect(() => Flexily.parseLength(input, scale)).toThrow(expect.objectContaining({ name: "LengthError", input }))
+    expect(() => Flexily.parseLength(input, scale)).toThrow(reason)
+  })
+
+  test.each([
+    { ch: 0, lh: 1 },
+    { ch: -1, lh: 1 },
+    { ch: Infinity, lh: 1 },
+    { ch: 1, lh: NaN },
+  ])("refuses an invalid adapter scale", (invalid) => {
+    expect(() => Flexily.parseLength("1ch", invalid)).toThrow(
+      expect.objectContaining({ name: "LengthError", input: "1ch" }),
+    )
+  })
+
+  test("a changed expression dirties the node; the identical frozen value does not", () => {
+    const flex = createFlexily()
+    const root = flex.createNode()
+    const first = Flexily.parseLength("max(10ch, 50%)", { ch: 1, lh: 1 })
+    root.setWidth(first)
+    flex.calculateLayout(root, 80, 10)
+    expect(root.getComputedWidth()).toBe(40)
+    root.setWidth(first)
+    expect(root.isDirty()).toBe(false)
+    root.setWidth(Flexily.parseLength("max(10ch, 25%)", { ch: 1, lh: 1 }))
+    expect(root.isDirty()).toBe(true)
+    flex.calculateLayout(root, 80, 10)
+    expect(root.getComputedWidth()).toBe(20)
+  })
+
+  test("fixed-axis setters refuse mismatched units and name the property and input", () => {
+    const node = createFlexily().createNode()
+    expect(() => node.setWidth(Flexily.parseLength("2lh", scale))).toThrow(/width.*2lh/)
+    expect(() => node.setHeight(Flexily.parseLength("2ch", scale))).toThrow(/height.*2ch/)
+    expect(() => node.setMaxHeight(Flexily.parseLength("10cqi", scale))).toThrow(/maxHeight.*10cqi/)
+  })
+})
 
 describe("[A0.3] evaluateMathExpr — min / max / clamp", () => {
   test("min returns smallest", () => {

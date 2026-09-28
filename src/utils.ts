@@ -5,6 +5,7 @@
  */
 
 import * as C from "./constants.js"
+import { LengthError } from "./length.js"
 import type { Node } from "./node-zero.js"
 import type { MathExpr, Value } from "./types.js"
 
@@ -300,6 +301,9 @@ export function findContainerQuerySize(node: Node): number {
 export function resolveValue(value: Value, availableSize: number, queryInlineSize = NaN): number {
   switch (value.unit) {
     case C.UNIT_POINT:
+    case C.UNIT_CH:
+    case C.UNIT_LH:
+    case C.UNIT_NUMBER:
       return value.value
     case C.UNIT_PERCENT:
       // Percentage against NaN (auto-sized parent) resolves to 0
@@ -323,7 +327,7 @@ export function resolveValue(value: Value, availableSize: number, queryInlineSiz
       // as its leaf units (cqi → Pass 2). A defensively-malformed CALC value
       // without an `expr` payload resolves to 0 (same surface as UNDEFINED).
       if (!value.expr) return 0
-      return evaluateMathExpr(value.expr, availableSize, queryInlineSize)
+      return evaluateMathExpr(value.expr, availableSize, queryInlineSize, value.source)
     default:
       // UNIT_UNDEFINED, UNIT_AUTO, UNIT_FIT_CONTENT, UNIT_SNUG_CONTENT all
       // resolve to 0 here. Callers that need auto-rule semantics (CSS §4.5
@@ -342,15 +346,29 @@ export function resolveValue(value: Value, availableSize: number, queryInlineSiz
  *   - `clamp(min, val, max)` enforces `min ≤ result ≤ max`, with `min` winning
  *     ties when `min > max` (CSS clamp definition)
  */
-export function evaluateMathExpr(expr: MathExpr, availableSize: number, queryInlineSize: number): number {
+export function evaluateMathExpr(
+  expr: MathExpr,
+  availableSize: number,
+  queryInlineSize: number,
+  source = "<MathExpr>",
+): number {
   if ("unit" in expr) {
     return resolveValue(expr, availableSize, queryInlineSize)
+  }
+  if ("op" in expr) {
+    const left = evaluateMathExpr(expr.left, availableSize, queryInlineSize, source)
+    const right = evaluateMathExpr(expr.right, availableSize, queryInlineSize, source)
+    if (expr.op === "/" && right === 0) throw new LengthError(source, "division by zero")
+    const result =
+      expr.op === "+" ? left + right : expr.op === "-" ? left - right : expr.op === "*" ? left * right : left / right
+    if (!Number.isFinite(result)) throw new LengthError(source, "arithmetic must produce a finite length")
+    return result
   }
   if (expr.fn === "min") {
     if (expr.args.length === 0) return 0
     let acc = Infinity
     for (const arg of expr.args) {
-      const v = evaluateMathExpr(arg, availableSize, queryInlineSize)
+      const v = evaluateMathExpr(arg, availableSize, queryInlineSize, source)
       if (v < acc) acc = v
     }
     return acc
@@ -359,15 +377,15 @@ export function evaluateMathExpr(expr: MathExpr, availableSize: number, queryInl
     if (expr.args.length === 0) return 0
     let acc = -Infinity
     for (const arg of expr.args) {
-      const v = evaluateMathExpr(arg, availableSize, queryInlineSize)
+      const v = evaluateMathExpr(arg, availableSize, queryInlineSize, source)
       if (v > acc) acc = v
     }
     return acc
   }
   // clamp(min, val, max)
-  const minV = evaluateMathExpr(expr.args[0], availableSize, queryInlineSize)
-  const val = evaluateMathExpr(expr.args[1], availableSize, queryInlineSize)
-  const maxV = evaluateMathExpr(expr.args[2], availableSize, queryInlineSize)
+  const minV = evaluateMathExpr(expr.args[0], availableSize, queryInlineSize, source)
+  const val = evaluateMathExpr(expr.args[1], availableSize, queryInlineSize, source)
+  const maxV = evaluateMathExpr(expr.args[2], availableSize, queryInlineSize, source)
   // CSS spec: when min > max, min wins (clamp degenerates to min). Apply this
   // BEFORE the val < minV check — otherwise a val > maxV in the unordered-bounds
   // case would erroneously return maxV (< minV), violating result >= minV.

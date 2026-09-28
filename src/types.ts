@@ -16,6 +16,8 @@ export interface Value {
   value: number
   unit: number // UNIT_UNDEFINED | UNIT_POINT | UNIT_PERCENT | UNIT_AUTO | UNIT_CQI | UNIT_CQMIN | UNIT_CALC
   expr?: MathExpr
+  /** Original parsed input, retained for deferred style/layout diagnostics. */
+  source?: string
 }
 
 /**
@@ -36,6 +38,7 @@ export type MathExpr =
   | { readonly fn: "min"; readonly args: readonly MathExpr[] }
   | { readonly fn: "max"; readonly args: readonly MathExpr[] }
   | { readonly fn: "clamp"; readonly args: readonly [MathExpr, MathExpr, MathExpr] }
+  | { readonly op: "+" | "-" | "*" | "/"; readonly left: MathExpr; readonly right: MathExpr }
 
 /**
  * Measure function signature for intrinsic sizing.
