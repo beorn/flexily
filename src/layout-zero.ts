@@ -102,6 +102,19 @@ export function computeLayout(
   }
 }
 
+// Whether Phase 8 commits the item's main box, also used by re-stretch.
+function commitsMainAxis(child: Node, isRow: boolean, parentMainIsAuto: boolean, mainAxisSize: number): boolean {
+  const mainDim = isRow ? child.style.width : child.style.height
+  const childMainIsAuto =
+    (mainDim.unit === C.UNIT_AUTO || mainDim.unit === C.UNIT_UNDEFINED) && !isLength(child.style.flexBasis.unit)
+  return (
+    (!parentMainIsAuto && !childMainIsAuto) ||
+    (child.flex.flexGrow > 0 && !Number.isNaN(mainAxisSize)) ||
+    (child.hasMeasureFunc() && child.children.length === 0) ||
+    child.flex.mainSize !== child.flex.baseSize
+  )
+}
+
 /**
  * Re-derive a child's flex base size with the REAL algorithm, for the one case
  * `measureNode`'s shrink-wrap shortcut cannot answer: a row whose children
@@ -1982,10 +1995,9 @@ function layoutNode(
       // This matches Yoga's roundLayoutResultsToPixelGrid, which stores each
       // node's position as the difference of rounded absolute edges.
       //
-      // CROSS axis keeps a local round of the fractional offset: its size is a
-      // plain round of the float extent (not edge-based), so the two stay
-      // internally consistent as-is. Yoga's 3.x measureFunc-leaf `Math.floor`
-      // quirk is preserved there (`posRound`).
+      // CROSS positions keep their existing local rounding, including Yoga's
+      // measureFunc-leaf floor quirk (`posRound`). Both committed sizes use
+      // absolute edges, matching Phase 10 even at fractional offsets.
       //
       // The main axis takes the telescoping form for EVERY child, measureFunc
       // leaves included. A shared edge must be rounded by exactly ONE function
@@ -2095,8 +2107,7 @@ function layoutNode(
       const childAbsY = absChildTop - childMarginTop
       // Select the existing parent commits before descending, so the child uses
       // the same rounded box for its contents and container queries.
-      const shouldOverrideMain =
-        (!mainIsAuto && !mainIsAutoChild) || flexGrowHasDefiniteMainBudget || hasMeasureLeaf || flexDistChanged
+      const shouldOverrideMain = commitsMainAxis(child, isRow, mainIsAuto, mainAxisSize)
       const crossDimIsFitContent = crossIsFitContent
       const crossIsAuto = crossIsAutoForLayoutCall
       const hasCrossMinMax = crossMinVal.unit !== C.UNIT_UNDEFINED || crossMaxVal.unit !== C.UNIT_UNDEFINED
@@ -2105,10 +2116,10 @@ function layoutNode(
         (!crossDimIsFitContent && parentHasDefiniteCross && alignment === C.ALIGN_STRETCH) ||
         (hasCrossMinMax && !Number.isNaN(childCrossSize))
       const allocatedMain = !hasMeasureLeaf && shouldOverrideMain ? edgeBasedMainSize : NaN
-      const allocatedCross =
-        !hasMeasureLeaf && shouldOverrideCross
-          ? Math.round(isRow ? Math.max(childHeight, childMinH) : Math.max(childWidth, childMinW))
-          : NaN
+      const crossAbsStart = isRow ? absChildTop : absChildLeft
+      const crossExtent = isRow ? Math.max(childHeight, childMinH) : Math.max(childWidth, childMinW)
+      const edgeBasedCrossSize = Math.round(crossAbsStart + crossExtent) - Math.round(crossAbsStart)
+      const allocatedCross = !hasMeasureLeaf && shouldOverrideCross ? edgeBasedCrossSize : NaN
       // Allocation and percentage-constraint context differ for a flex child.
       // In particular, an allocated row does not make its auto parent definite.
       layoutNode(
@@ -2176,9 +2187,9 @@ function layoutNode(
       // (shrink-wrap to content). Don't override with the parent's stretch.
       if (shouldOverrideCross) {
         if (isRow) {
-          child.layout.height = Math.round(childHeight)
+          child.layout.height = edgeBasedCrossSize
         } else {
-          child.layout.width = Math.round(childWidth)
+          child.layout.width = edgeBasedCrossSize
         }
       }
       // Store RELATIVE position (within parent's content area), not absolute
@@ -2446,11 +2457,20 @@ function layoutNode(
             resolveEdgeValue(cstyle.margin, 3, style.flexDirection, contentWidth, direction)
           : resolveEdgeValue(cstyle.margin, 0, style.flexDirection, contentWidth, direction) +
             resolveEdgeValue(cstyle.margin, 2, style.flexDirection, contentWidth, direction)
-        const stretchedCross = finalCross - cCrossMargin
-
-        // Only re-layout if the cross size actually changed
-        const currentCross = isRow ? child.layout.height : child.layout.width
-        if (Math.round(stretchedCross) <= currentCross) continue
+        const crossContaining = isRow ? contentHeight : contentWidth
+        const crossMin = isRow ? cstyle.minHeight : cstyle.minWidth
+        const crossMax = isRow ? cstyle.maxHeight : cstyle.maxWidth
+        const crossStartEdge = isRow ? 1 : 0
+        const crossEndEdge = isRow ? 3 : 2
+        const boxMinimum =
+          resolveEdgeValue(cstyle.padding, crossStartEdge, cstyle.flexDirection, contentWidth, direction) +
+          resolveEdgeValue(cstyle.padding, crossEndEdge, cstyle.flexDirection, contentWidth, direction) +
+          resolveEdgeBorderValue(cstyle.border, crossStartEdge, cstyle.flexDirection, direction) +
+          resolveEdgeBorderValue(cstyle.border, crossEndEdge, cstyle.flexDirection, direction)
+        const stretchedCross = Math.max(
+          boxMinimum,
+          applyMinMax(finalCross - cCrossMargin, crossMin, crossMax, crossContaining, childQueryInlineSize),
+        )
 
         // Re-layout child with the definite cross size
         // Save position — layoutNode overwrites layout.left/top
@@ -2460,9 +2480,22 @@ function layoutNode(
         const cMarginT = resolveEdgeValue(cstyle.margin, 1, style.flexDirection, contentWidth, direction)
         const cAbsX = absX + innerLeft + savedLeft - cMarginL
         const cAbsY = absY + innerTop + savedTop - cMarginT
+        const crossAbsStart = isRow ? cAbsY + cMarginT : cAbsX + cMarginL
+        const edgeBasedCrossSize = Math.round(crossAbsStart + stretchedCross) - Math.round(crossAbsStart)
+        const currentCross = isRow ? child.layout.height : child.layout.width
+        if (edgeBasedCrossSize <= currentCross) continue
         const passW = isRow ? child.layout.width : stretchedCross
         const passH = isRow ? stretchedCross : child.layout.height
         const hasMeasureLeaf = child.hasMeasureFunc() && child.children.length === 0
+        const mainCommitted = commitsMainAxis(
+          child,
+          isRow,
+          isRow ? !isLength(style.width.unit) : !isLength(style.height.unit),
+          mainAxisSize,
+        )
+        const allocatedMain =
+          !hasMeasureLeaf && mainCommitted ? (isRow ? child.layout.width : child.layout.height) : NaN
+        const allocatedCross = hasMeasureLeaf ? NaN : edgeBasedCrossSize
         layoutNode(
           child,
           passW,
@@ -2474,16 +2507,16 @@ function layoutNode(
           direction,
           contentWidth,
           contentHeight,
-          hasMeasureLeaf ? NaN : isRow ? child.layout.width : Math.round(stretchedCross),
-          hasMeasureLeaf ? NaN : isRow ? Math.round(stretchedCross) : child.layout.height,
+          isRow ? allocatedMain : allocatedCross,
+          isRow ? allocatedCross : allocatedMain,
         )
         // Restore position and override cross dimension to stretched size
         child.layout.left = savedLeft
         child.layout.top = savedTop
         if (isRow) {
-          child.layout.height = Math.round(stretchedCross)
+          child.layout.height = edgeBasedCrossSize
         } else {
-          child.layout.width = Math.round(stretchedCross)
+          child.layout.width = edgeBasedCrossSize
         }
       }
 

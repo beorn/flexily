@@ -61,6 +61,132 @@ import { Node as ClassicNode } from "../src/index-classic.js"
  * distinct allocation/percentage-basis contract without React or a local scope.
  */
 describe("committed flex allocations", () => {
+  it.each([FLEX_DIRECTION_ROW, FLEX_DIRECTION_COLUMN])(
+    "uses absolute cross edges after fractional min/max (axis %s)",
+    (axis) => {
+      const horizontal = axis === FLEX_DIRECTION_ROW
+      const root = Node.create()
+      root.setFlexDirection(axis)
+      root.setAlignItems(ALIGN_STRETCH)
+      root.setPadding(horizontal ? EDGE_TOP : EDGE_LEFT, 0.4)
+      if (horizontal) root.setWidth(72)
+      else root.setHeight(72)
+      const child = Node.create()
+      const inner = Node.create()
+      inner.setWidthPercent(100)
+      inner.setHeightPercent(100)
+      if (horizontal) {
+        child.setWidth(30)
+        child.setMinHeight(20.1)
+        child.setMaxHeight(20.1)
+      } else {
+        child.setHeight(30)
+        child.setMinWidth(20.1)
+        child.setMaxWidth(20.1)
+      }
+      child.insertChild(inner, 0)
+      const sibling = Node.create()
+      sibling.setWidth(horizontal ? 20 : 100)
+      sibling.setHeight(horizontal ? 100 : 20)
+      root.insertChild(child, 0)
+      root.insertChild(sibling, 1)
+      root.calculateLayout(horizontal ? 72 : NaN, horizontal ? NaN : 72)
+      expect(horizontal ? child.getComputedHeight() : child.getComputedWidth()).toBe(21)
+      expect(horizontal ? inner.getComputedHeight() : inner.getComputedWidth()).toBe(21)
+      root.freeRecursive()
+    },
+  )
+
+  it("keeps adjacent siblings gapless at a fractional absolute offset", () => {
+    const root = Node.create()
+    root.setWidth(72)
+    root.setHeight(20)
+    root.setPadding(EDGE_LEFT, 0.4)
+    root.setFlexDirection(FLEX_DIRECTION_ROW)
+    const first = Node.create()
+    first.setWidth(20.1)
+    const second = Node.create()
+    second.setWidth(20.1)
+    root.insertChild(first, 0)
+    root.insertChild(second, 1)
+    root.calculateLayout(72, 20)
+    expect(first.getComputedWidth()).toBe(21)
+    expect(first.getComputedLeft() + first.getComputedWidth()).toBe(second.getComputedLeft())
+    root.freeRecursive()
+  })
+
+  // Fixed-cross roots above cannot enter the second stretch pass. These public
+  // owners prove that re-stretch honors the item's constraints on both axes.
+  it.each(
+    [FLEX_DIRECTION_ROW, FLEX_DIRECTION_COLUMN].flatMap((axis) =>
+      [
+        { min: 0, expected: 20 },
+        { min: 120, expected: 120 },
+      ].map((row) => ({ axis, ...row })),
+    ),
+  )("clamps auto-cross re-stretch before committing (axis $axis, min $min)", ({ axis, min, expected }) => {
+    const horizontal = axis === FLEX_DIRECTION_ROW
+    const root = Node.create()
+    root.setFlexDirection(axis)
+    root.setAlignItems(ALIGN_STRETCH)
+    if (horizontal) root.setWidth(72)
+    else root.setHeight(72)
+    const child = Node.create()
+    const descendant = Node.create()
+    descendant.setWidthPercent(100)
+    descendant.setHeightPercent(100)
+    if (horizontal) {
+      child.setWidth(30)
+      child.setMaxHeight(20)
+      child.setMinHeight(min)
+    } else {
+      child.setHeight(30)
+      child.setMaxWidth(20)
+      child.setMinWidth(min)
+    }
+    child.insertChild(descendant, 0)
+    const sibling = Node.create()
+    sibling.setWidth(horizontal ? 20 : 100)
+    sibling.setHeight(horizontal ? 100 : 20)
+    root.insertChild(child, 0)
+    root.insertChild(sibling, 1)
+    root.calculateLayout(horizontal ? 72 : NaN, horizontal ? NaN : 72)
+    const cross = (n: Node) => (horizontal ? n.getComputedHeight() : n.getComputedWidth())
+    expect(cross(child)).toBe(expected)
+    expect(cross(descendant)).toBe(expected)
+    root.freeRecursive()
+  })
+
+  it("preserves the used main size without promoting intrinsic allocation on re-stretch", () => {
+    const root = Node.create()
+    root.setWidth(72)
+    root.setFlexDirection(FLEX_DIRECTION_ROW)
+    root.setAlignItems(ALIGN_STRETCH)
+    const child = Node.create()
+    child.setFlexDirection(FLEX_DIRECTION_COLUMN)
+    child.setAlignItems(ALIGN_FLEX_START)
+    const text = Node.create()
+    text.setHeightPercent(100)
+    text.setMeasureFunc((_width, _widthMode, height, heightMode) => ({
+      width: heightMode !== MEASURE_MODE_UNDEFINED && height >= 100 ? 10 : 50,
+      height: 20,
+    }))
+    child.insertChild(text, 0)
+    const sibling = Node.create()
+    sibling.setWidth(20)
+    sibling.setHeight(100)
+    root.insertChild(child, 0)
+    root.insertChild(sibling, 1)
+    root.calculateLayout(72, NaN)
+    expect(text.getComputedWidth()).toBe(10)
+    // Stretch re-lays out contents at the used main size; it does not rerun
+    // flex distribution. The narrower leaf must not resize its flex item.
+    expect(child.getComputedWidth()).toBe(50)
+    expect(child.getComputedHeight()).toBe(100)
+    expect(child.flex.lastAllocatedW).toBeNaN()
+    root.freeRecursive()
+  })
+
   it.each(
     [FLEX_DIRECTION_ROW, FLEX_DIRECTION_COLUMN].flatMap((axis) =>
       [
