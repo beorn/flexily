@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-09-28
+
+### Fixed
+
+- Browser imports no longer include Node-only code from optional logging
+  backends. `debug` and `loggily` remain optional peer dependencies, and the
+  package build rejects imports other than those two backends.
+
 ## [0.8.0] - 2026-09-28
 
 ### Added

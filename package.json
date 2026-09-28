@@ -1,6 +1,6 @@
 {
   "name": "flexily",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Pure JavaScript flexbox layout engine — composable plugins, text measurement, Yoga-compatible API, no WASM",
   "keywords": [
     "canvas-ui",
@@ -54,8 +54,8 @@
     }
   },
   "scripts": {
-    "build": "vp pack",
-    "prepack": "vp pack",
+    "build": "tsdown",
+    "prepack": "tsdown",
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:vp": "vp test",
@@ -69,8 +69,9 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.5",
-    "loggily": "^0.4.2",
+    "loggily": "^0.10.2",
     "oxfmt": "0.38.0",
+    "tsdown": "^0.22.13",
     "typescript": "^5.9.3",
     "vite-plus": "^0.2.4",
     "vitepress": "^1.6.3",
@@ -78,6 +79,18 @@
     "vitepress-plugin-llms": "1.14.0",
     "vitest": "^4.1.10",
     "yoga-wasm-web": "^0.3.3"
+  },
+  "peerDependencies": {
+    "debug": "^4.4.3",
+    "loggily": "^0.10.0 || ^0.11.0"
+  },
+  "peerDependenciesMeta": {
+    "debug": {
+      "optional": true
+    },
+    "loggily": {
+      "optional": true
+    }
   },
   "engines": {
     "bun": ">=1.0",
