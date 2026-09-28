@@ -69,9 +69,9 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.5",
-    "loggily": "^0.10.2",
+    "loggily": "0.10.2",
     "oxfmt": "0.38.0",
-    "tsdown": "^0.22.13",
+    "tsdown": "0.22.13",
     "typescript": "^5.9.3",
     "vite-plus": "^0.2.4",
     "vitepress": "^1.6.3",
