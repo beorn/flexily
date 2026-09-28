@@ -115,6 +115,23 @@ function commitsMainAxis(child: Node, isRow: boolean, parentMainIsAuto: boolean,
   )
 }
 
+// Relative insets use the containing box, including when available is an
+// allocated size or NaN. Keep precedence identical at parent and child.
+function relativeInset(node: Node, horizontal: boolean, containing: number, direction: number): number {
+  if (node.style.positionType !== C.POSITION_TYPE_RELATIVE) return 0
+  const leading = horizontal ? resolvePositionEdge(node.style.position, 0, direction) : node.style.position[1]
+  const trailing = horizontal ? resolvePositionEdge(node.style.position, 2, direction) : node.style.position[3]
+  if (leading.unit !== C.UNIT_UNDEFINED) return resolveValue(leading, containing)
+  if (trailing.unit !== C.UNIT_UNDEFINED) return -resolveValue(trailing, containing)
+  return 0
+}
+
+// The recursive input is a flow margin-box origin, excluding the node's own
+// margin and relative inset. All committed edges use this same border origin.
+function borderBoxStart(marginBoxStart: number, margin: number, inset: number): number {
+  return marginBoxStart + margin + inset
+}
+
 /**
  * Re-derive a child's flex base size with the REAL algorithm, for the one case
  * `measureNode`'s shrink-wrap shortcut cannot answer: a row whose children
@@ -409,29 +426,8 @@ function layoutNode(
 
   // Compute position offsets early (needed for children's absolute position calculation)
   // This ensures children's absolute positions include parent's position offset
-  let parentPosOffsetX = 0
-  let parentPosOffsetY = 0
-  // CSS spec: position:static ignores insets (top/left/right/bottom).
-  // Only position:relative applies insets as offsets from normal flow position.
-  if (style.positionType === C.POSITION_TYPE_RELATIVE) {
-    // Resolve logical EDGE_START/EDGE_END to physical left/right based on direction
-    const leftPos = resolvePositionEdge(style.position, 0, direction)
-    const topPos = style.position[1]
-    const rightPos = resolvePositionEdge(style.position, 2, direction)
-    const bottomPos = style.position[3]
-
-    if (leftPos.unit !== C.UNIT_UNDEFINED) {
-      parentPosOffsetX = resolveValue(leftPos, availableWidth)
-    } else if (rightPos.unit !== C.UNIT_UNDEFINED) {
-      parentPosOffsetX = -resolveValue(rightPos, availableWidth)
-    }
-
-    if (topPos.unit !== C.UNIT_UNDEFINED) {
-      parentPosOffsetY = resolveValue(topPos, availableHeight)
-    } else if (bottomPos.unit !== C.UNIT_UNDEFINED) {
-      parentPosOffsetY = -resolveValue(bottomPos, availableHeight)
-    }
-  }
+  const parentPosOffsetX = relativeInset(node, true, containingWidth, direction)
+  const parentPosOffsetY = relativeInset(node, false, containingHeight, direction)
 
   // =========================================================================
   // PHASE 4: Handle Leaf Nodes (nodes without children)
@@ -1910,35 +1906,16 @@ function layoutNode(
       // Compute position offsets for RELATIVE positioned children
       // CSS spec: position:static ignores insets; only position:relative applies them.
       // These must be included in the absolute position BEFORE rounding (Yoga-compatible)
-      let posOffsetX = 0
-      let posOffsetY = 0
-      if (childStyle.positionType === C.POSITION_TYPE_RELATIVE) {
-        // Resolve logical EDGE_START/EDGE_END to physical left/right based on direction
-        const relLeftPos = resolvePositionEdge(childStyle.position, 0, direction)
-        const relTopPos = childStyle.position[1]
-        const relRightPos = resolvePositionEdge(childStyle.position, 2, direction)
-        const relBottomPos = childStyle.position[3]
-
-        // Left offset (takes precedence over right)
-        if (relLeftPos.unit !== C.UNIT_UNDEFINED) {
-          posOffsetX = resolveValue(relLeftPos, contentWidth)
-        } else if (relRightPos.unit !== C.UNIT_UNDEFINED) {
-          posOffsetX = -resolveValue(relRightPos, contentWidth)
-        }
-
-        // Top offset (takes precedence over bottom)
-        if (relTopPos.unit !== C.UNIT_UNDEFINED) {
-          posOffsetY = resolveValue(relTopPos, contentHeight)
-        } else if (relBottomPos.unit !== C.UNIT_UNDEFINED) {
-          posOffsetY = -resolveValue(relBottomPos, contentHeight)
-        }
-      }
+      const posOffsetX = relativeInset(child, true, contentWidth, direction)
+      const posOffsetY = relativeInset(child, false, contentHeight, direction)
 
       // Compute ABSOLUTE float positions for edge rounding (including position offsets)
       // absX/absY are the parent's absolute position from document root
       // Include BOTH parent's position offset and child's position offset
-      const absChildLeft = absX + marginLeft + parentPosOffsetX + fractionalLeft + posOffsetX
-      const absChildTop = absY + marginTop + parentPosOffsetY + fractionalTop + posOffsetY
+      const childAbsX = borderBoxStart(absX, marginLeft, parentPosOffsetX) + fractionalLeft - childMarginLeft
+      const childAbsY = borderBoxStart(absY, marginTop, parentPosOffsetY) + fractionalTop - childMarginTop
+      const absChildLeft = borderBoxStart(childAbsX, childMarginLeft, posOffsetX)
+      const absChildTop = borderBoxStart(childAbsY, childMarginTop, posOffsetY)
 
       // For main axis: round ABSOLUTE edges and derive size
       // Only use edge-based rounding when childMainSize is valid (positive)
@@ -2102,9 +2079,8 @@ function layoutNode(
 
       // Recurse to layout any grandchildren
       // Pass the child's FLOAT absolute position (margin box start, before child's own margin)
-      // absChildLeft/Top include the child's margins, so subtract them to get margin box start
-      const childAbsX = absChildLeft - childMarginLeft
-      const childAbsY = absChildTop - childMarginTop
+      // childAbsX/Y exclude the child's own margin and relative inset; the
+      // child adds each once when deriving its border-box absolute edges.
       // Select the existing parent commits before descending, so the child uses
       // the same rounded box for its contents and container queries.
       const shouldOverrideMain = commitsMainAxis(child, isRow, mainIsAuto, mainAxisSize)
@@ -2478,24 +2454,29 @@ function layoutNode(
         const savedTop = child.layout.top
         const cMarginL = resolveEdgeValue(cstyle.margin, 0, style.flexDirection, contentWidth, direction)
         const cMarginT = resolveEdgeValue(cstyle.margin, 1, style.flexDirection, contentWidth, direction)
-        const cAbsX = absX + innerLeft + savedLeft - cMarginL
-        const cAbsY = absY + innerTop + savedTop - cMarginT
-        const crossAbsStart = isRow ? cAbsY + cMarginT : cAbsX + cMarginL
+        const isContainer = child.children.length > 0
+        // Phase 8 and 9b skip the same relativeIndex<0 children. Every
+        // container has completed Phase 8 here: its full exit stores the
+        // passed abs, and a fingerprint hit requires equal abs. Leaf exits
+        // precede that write; their absolute input is unused and stays old.
+        const cAbsX = isContainer ? child.flex.lastAbsX : absX + innerLeft + savedLeft - cMarginL
+        const cAbsY = isContainer ? child.flex.lastAbsY : absY + innerTop + savedTop - cMarginT
+        const crossAbsStart = isRow
+          ? borderBoxStart(cAbsY, cMarginT, relativeInset(child, false, contentHeight, direction))
+          : borderBoxStart(cAbsX, cMarginL, relativeInset(child, true, contentWidth, direction))
         const edgeBasedCrossSize = Math.round(crossAbsStart + stretchedCross) - Math.round(crossAbsStart)
         const currentCross = isRow ? child.layout.height : child.layout.width
         if (edgeBasedCrossSize <= currentCross) continue
         const passW = isRow ? child.layout.width : stretchedCross
         const passH = isRow ? stretchedCross : child.layout.height
-        const hasMeasureLeaf = child.hasMeasureFunc() && child.children.length === 0
         const mainCommitted = commitsMainAxis(
           child,
           isRow,
           isRow ? !isLength(style.width.unit) : !isLength(style.height.unit),
           mainAxisSize,
         )
-        const allocatedMain =
-          !hasMeasureLeaf && mainCommitted ? (isRow ? child.layout.width : child.layout.height) : NaN
-        const allocatedCross = hasMeasureLeaf ? NaN : edgeBasedCrossSize
+        const allocatedMain = isContainer && mainCommitted ? (isRow ? child.layout.width : child.layout.height) : NaN
+        const allocatedCross = isContainer ? edgeBasedCrossSize : NaN
         layoutNode(
           child,
           passW,
@@ -2613,8 +2594,8 @@ function layoutNode(
   // Set this node's layout using edge-based rounding (Yoga-compatible)
   // Use parentPosOffsetX/Y computed earlier (includes position offsets)
   // Compute absolute positions for edge-based rounding
-  const absNodeLeft = absX + marginLeft + parentPosOffsetX
-  const absNodeTop = absY + marginTop + parentPosOffsetY
+  const absNodeLeft = borderBoxStart(absX, marginLeft, parentPosOffsetX)
+  const absNodeTop = borderBoxStart(absY, marginTop, parentPosOffsetY)
   const absNodeRight = absNodeLeft + nodeWidth
   const absNodeBottom = absNodeTop + nodeHeight
 

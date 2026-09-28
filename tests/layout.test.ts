@@ -52,6 +52,7 @@ import {
 } from "../src/index.js"
 import { createChild, expectLayout, expectWidth } from "./test-utils.js"
 import { Node as ClassicNode } from "../src/index-classic.js"
+import { enableTrace, disableTrace } from "../src/trace.js"
 
 /**
  * @failure A flex item lays descendants out at its preferred size before its parent commits a smaller size.
@@ -61,6 +62,171 @@ import { Node as ClassicNode } from "../src/index-classic.js"
  * distinct allocation/percentage-basis contract without React or a local scope.
  */
 describe("committed flex allocations", () => {
+  // The capped relative-inset row catches the return/override disagreement;
+  // these owners also exercise re-stretch provenance and differing inset bases.
+  it.each([false, true])("keeps re-stretch at the original float start (percent inset %s)", (percent) => {
+    const layout = (definite: boolean) => {
+      const parent = Node.create()
+      parent.setWidth(72)
+      parent.setFlexDirection(FLEX_DIRECTION_ROW)
+      parent.setAlignItems(ALIGN_STRETCH)
+      parent.setMargin(EDGE_TOP, 2)
+      parent.setPositionType(POSITION_TYPE_RELATIVE)
+      parent.setPosition(EDGE_TOP, 0.4)
+      parent.setPadding(EDGE_TOP, 0.4)
+      if (definite) parent.setHeight(100.4)
+      const child = Node.create()
+      child.setWidth(30)
+      child.setPositionType(POSITION_TYPE_RELATIVE)
+      child.setPosition(EDGE_TOP, 0.4)
+      if (percent) child.setPositionPercent(EDGE_LEFT, 1)
+      else child.setPosition(EDGE_LEFT, 0.4)
+      const inner = Node.create()
+      inner.setWidthPercent(100)
+      inner.setHeightPercent(100)
+      const content = Node.create()
+      content.setHeight(20.1)
+      inner.insertChild(content, 0)
+      child.insertChild(inner, 0)
+      const sibling = Node.create()
+      sibling.setWidth(20)
+      sibling.setHeight(100)
+      parent.insertChild(child, 0)
+      parent.insertChild(sibling, 1)
+      parent.calculateLayout(72, NaN)
+      const boxes = [parent, child, inner, content].map((node) => ({
+        left: node.getComputedLeft(),
+        top: node.getComputedTop(),
+        width: node.getComputedWidth(),
+        height: node.getComputedHeight(),
+      }))
+      parent.freeRecursive()
+      return boxes
+    }
+    // Numeric parent margin/inset must survive 9b once; rounding savedLeft/Top
+    // cannot recover the original float. The fixed cross tree skips 9b.
+    expect(layout(false)).toEqual(layout(true))
+  })
+
+  it.each([false, true])("resolves a child's percent inset against its containing box (auto %s)", (auto) => {
+    const root = Node.create()
+    root.setWidth(100)
+    root.setHeight(40)
+    root.setFlexDirection(FLEX_DIRECTION_ROW)
+    const child = Node.create()
+    if (!auto) {
+      child.setWidth(30)
+      child.setMargin(EDGE_LEFT, 2)
+    }
+    child.setPositionType(POSITION_TYPE_RELATIVE)
+    child.setPositionPercent(EDGE_LEFT, 1.4)
+    const inner = Node.create()
+    inner.setWidth(20.1)
+    child.insertChild(inner, 0)
+    root.insertChild(child, 0)
+    root.calculateLayout(100, 40)
+    // Definite child's available width is 30; auto child's is NaN. Both
+    // insets use containing width 100. This intentionally changes the former
+    // available-basis inset and the duplicate numeric offset at depth.
+    expect(child.getComputedLeft()).toBe(auto ? 1 : 3)
+    expect(inner.getComputedLeft()).toBe(0)
+    // With auto main sizing, Phase 8 leaves the intrinsic main size uncommitted
+    // (20 after measurement); a definite main budget commits the float edge (21).
+    expect(inner.getComputedWidth()).toBe(auto ? 20 : 21)
+    root.freeRecursive()
+  })
+
+  it.each([false, true])("preserves root relative-inset output (percent %s)", (percent) => {
+    const root = Node.create()
+    root.setWidth(20.1)
+    root.setHeight(20.1)
+    root.setPositionType(POSITION_TYPE_RELATIVE)
+    if (percent) {
+      root.setPositionPercent(EDGE_LEFT, 5)
+      root.setPositionPercent(EDGE_TOP, 5)
+    } else {
+      root.setPosition(EDGE_LEFT, 0.4)
+      root.setPosition(EDGE_TOP, 0.4)
+    }
+    const inner = Node.create()
+    inner.setWidthPercent(100)
+    inner.setHeightPercent(100)
+    root.insertChild(inner, 0)
+    root.calculateLayout(72, 40)
+    expect([root.getComputedLeft(), root.getComputedTop(), root.getComputedWidth(), root.getComputedHeight()]).toEqual(
+      percent ? [4, 2, 20, 20] : [0, 0, 21, 21],
+    )
+    root.freeRecursive()
+  })
+
+  it.each([FLEX_DIRECTION_ROW, FLEX_DIRECTION_COLUMN])(
+    "counts a fractional relative inset once at the cross commit (axis %s)",
+    (axis) => {
+      const horizontal = axis === FLEX_DIRECTION_ROW
+      const root = Node.create()
+      root.setFlexDirection(axis)
+      root.setAlignItems(ALIGN_STRETCH)
+      if (horizontal) root.setWidth(72)
+      else root.setHeight(72)
+      const child = Node.create()
+      child.setPositionType(POSITION_TYPE_RELATIVE)
+      child.setPosition(horizontal ? EDGE_TOP : EDGE_LEFT, 0.4)
+      const inner = Node.create()
+      inner.setWidthPercent(100)
+      inner.setHeightPercent(100)
+      if (horizontal) {
+        child.setWidth(30)
+        child.setMinHeight(20.1)
+        child.setMaxHeight(20.1)
+      } else {
+        child.setHeight(30)
+        child.setMinWidth(20.1)
+        child.setMaxWidth(20.1)
+      }
+      child.insertChild(inner, 0)
+      const sibling = Node.create()
+      sibling.setWidth(horizontal ? 20 : 100)
+      sibling.setHeight(horizontal ? 100 : 20)
+      root.insertChild(child, 0)
+      root.insertChild(sibling, 1)
+      const trace = enableTrace()
+      try {
+        root.calculateLayout(horizontal ? 72 : NaN, horizontal ? NaN : 72)
+        const returned = trace.events.filter((event) => event.type === "layout_exit" && event.nodeIndex === 1)
+        expect(returned.length).toBeGreaterThan(0)
+        for (const event of returned) expect(event.detail?.[horizontal ? "height" : "width"]).toBe(21)
+        expect(horizontal ? child.getComputedHeight() : child.getComputedWidth()).toBe(21)
+        expect(horizontal ? inner.getComputedHeight() : inner.getComputedWidth()).toBe(21)
+      } finally {
+        disableTrace()
+        root.freeRecursive()
+      }
+    },
+  )
+
+  it("keeps relatively inset sibling contents at their once-counted flow positions", () => {
+    const root = Node.create()
+    root.setWidth(72)
+    root.setHeight(20)
+    root.setFlexDirection(FLEX_DIRECTION_ROW)
+    const children = [Node.create(), Node.create()]
+    const contents = [Node.create(), Node.create()]
+    children.forEach((child, index) => {
+      child.setWidth(20.1)
+      child.setPositionType(POSITION_TYPE_RELATIVE)
+      child.setPosition(EDGE_LEFT, 0.4)
+      contents[index]!.setWidthPercent(100)
+      child.insertChild(contents[index]!, 0)
+      root.insertChild(child, index)
+    })
+    root.calculateLayout(72, 20)
+    expect(children[0]!.getComputedLeft()).toBe(0)
+    expect(children[0]!.getComputedLeft() + children[0]!.getComputedWidth()).toBe(children[1]!.getComputedLeft())
+    expect(contents[0]!.getComputedLeft()).toBe(0)
+    expect(contents[1]!.getComputedLeft()).toBe(0)
+    root.freeRecursive()
+  })
+
   it.each([FLEX_DIRECTION_ROW, FLEX_DIRECTION_COLUMN])(
     "uses absolute cross edges after fractional min/max (axis %s)",
     (axis) => {
