@@ -257,6 +257,43 @@ node.setGap(GUTTER_ROW, 5)
 node.setGap(GUTTER_COLUMN, 5)
 ```
 
+The production engine accepts `number | Value` in all four spacing setters.
+Numbers remain point lengths. Use `parseLength` with your adapter's `ch` and `lh`
+scale to construct a `Value`; the existing resolver evaluates math expressions.
+
+```typescript
+import { parseLength } from "flexily"
+
+const scale = { ch: 1, lh: 1 } // Terminal cells; choose your adapter's scale.
+node.setPadding(EDGE_LEFT, parseLength("2ch", scale))
+node.setMargin(EDGE_START, parseLength("10cqi", scale))
+node.setBorder(EDGE_LEFT, parseLength("calc(1ch + 2cqi)", scale))
+node.setGap(GUTTER_ROW, parseLength("1lh", scale))
+```
+
+`cqi` uses the nearest ancestor query container, skipping the node itself. A
+query container's own padding, margin, border and gap therefore use its ancestor
+context; its children use its frozen inline size. The layout root uses the width
+passed to `calculateLayout` for its own CQ spacing. Resize resolves these values
+again during layout and intrinsic measurement.
+
+Inline edges (left, right, start and end) and column gaps refuse `lh`. Block edges
+(top and bottom) and row gaps refuse `ch` and `cqi`. `EDGE_ALL` and `GUTTER_ALL`
+check both axes before changing any value. Percentage padding and margins retain
+their existing containing-block width basis; border widths refuse percentages,
+including percentages inside math expressions.
+
+`getPadding` and `getMargin` return stored `Value` objects. `getBorder` and
+`getGap` retain numeric point results and throw `LengthError` for a stored
+non-point length; read `node.style.border` or `node.style.gap` to inspect that
+`Value`. After layout, `getComputedPadding`, `getComputedMargin` and
+`getComputedBorder` resolve edge lengths in the layout context. There is no
+computed gap getter. Unset logical borders still return `NaN` from `getBorder`.
+
+The classic engine retains its numeric setters and percentage/auto behavior.
+It refuses CQ, adapter units and math expressions in shared spacing storage with
+a typed property error saying `production engine only`.
+
 ### Positioning
 
 ```typescript

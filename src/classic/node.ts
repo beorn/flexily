@@ -23,6 +23,7 @@ import {
   edgeValueMatches,
   edgeBorderMatches,
   styleValueMatches,
+  pointSpacing,
 } from "../utils.js"
 import { log } from "../logger.js"
 
@@ -921,21 +922,24 @@ export class Node {
    */
   setGap(gutter: number, value: number): void {
     if (gutter === C.GUTTER_COLUMN) {
-      if (Object.is(this._style.gap[0], value)) {
+      if (styleValueMatches(this._style.gap[0], value, C.UNIT_POINT)) {
         return
       }
-      this._style.gap[0] = value
+      this._style.gap[0] = { value, unit: C.UNIT_POINT }
     } else if (gutter === C.GUTTER_ROW) {
-      if (Object.is(this._style.gap[1], value)) {
+      if (styleValueMatches(this._style.gap[1], value, C.UNIT_POINT)) {
         return
       }
-      this._style.gap[1] = value
+      this._style.gap[1] = { value, unit: C.UNIT_POINT }
     } else if (gutter === C.GUTTER_ALL) {
-      if (Object.is(this._style.gap[0], value) && Object.is(this._style.gap[1], value)) {
+      if (
+        styleValueMatches(this._style.gap[0], value, C.UNIT_POINT) &&
+        styleValueMatches(this._style.gap[1], value, C.UNIT_POINT)
+      ) {
         return
       }
-      this._style.gap[0] = value
-      this._style.gap[1] = value
+      this._style.gap[0] = { value, unit: C.UNIT_POINT }
+      this._style.gap[1] = { value, unit: C.UNIT_POINT }
     } else {
       return
     }
@@ -1243,10 +1247,10 @@ export class Node {
    */
   getGap(gutter: number): number {
     if (gutter === C.GUTTER_COLUMN) {
-      return this._style.gap[0]
+      return pointSpacing(this._style.gap[0], "getGap", "node.style.gap")
     } else if (gutter === C.GUTTER_ROW) {
-      return this._style.gap[1]
+      return pointSpacing(this._style.gap[1], "getGap", "node.style.gap")
     }
-    return this._style.gap[0] // Default to column gap
+    return pointSpacing(this._style.gap[0], "getGap", "node.style.gap") // Default to column gap
   }
 }

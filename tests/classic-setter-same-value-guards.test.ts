@@ -20,6 +20,9 @@ import {
   WRAP_WRAP,
 } from "../src/index-classic.js"
 
+import * as C from "../src/constants.js"
+import { LengthError, parseLength } from "../src/length.js"
+
 type SameValueCase = {
   name: string
   apply: (node: Node) => void
@@ -122,5 +125,61 @@ describe("Classic Node setter same-value guards", () => {
     node.unsetBaselineFunc()
 
     expect(node.isDirty()).toBe(false)
+  })
+})
+
+/**
+ * @failure Shared Value spacing changes classic percent/auto behavior or silently consumes production-only units (26237).
+ * @level l0
+ * @consumer Callers of Flexily's classic engine.
+ */
+describe("[26237] classic spacing compatibility", () => {
+  it("keeps percent padding, auto margins and numeric border/gap defaults", () => {
+    const root = Node.create()
+    const child = Node.create()
+    root.setWidth(100)
+    root.setHeight(40)
+    root.setPaddingPercent(EDGE_LEFT, 10)
+    child.setWidth(20)
+    child.setHeight(10)
+    child.setMarginAuto(EDGE_HORIZONTAL)
+    root.insertChild(child, 0)
+    try {
+      root.calculateLayout(100, 40, DIRECTION_LTR)
+      expect(child.getComputedLeft()).toBe(45)
+      expect(root.getBorder(C.EDGE_START)).toBeNaN()
+      expect(root.getGap(GUTTER_COLUMN)).toBe(0)
+    } finally {
+      root.freeRecursive()
+    }
+  })
+
+  it.each([
+    ["margin", C.UNIT_CQI],
+    ["padding", C.UNIT_CQI],
+    ["border", C.UNIT_CQI],
+    ["gap", C.UNIT_CQI],
+    ["padding", C.UNIT_CQMIN],
+    ["padding", C.UNIT_CH],
+    ["padding", C.UNIT_LH],
+    ["padding", C.UNIT_CALC],
+  ] as const)("refuses production-only %s unit %s with a typed property diagnostic", (prop, unit) => {
+    const node = Node.create()
+    try {
+      const value = unit === C.UNIT_CALC ? parseLength("calc(1ch + 2ch)", { ch: 1, lh: 1 }) : { value: 5, unit }
+      node.style[prop][0] = value
+      if (prop === "gap") {
+        for (let i = 0; i < 2; i++) {
+          const child = Node.create()
+          child.setWidth(10)
+          child.setHeight(10)
+          node.insertChild(child, i)
+        }
+      }
+      expect(() => node.calculateLayout(100, 40)).toThrow(LengthError)
+      expect(() => node.calculateLayout(100, 40)).toThrow(new RegExp(`${prop}:.*production engine only`))
+    } finally {
+      node.freeRecursive()
+    }
   })
 })
