@@ -16,8 +16,9 @@
  */
 
 import * as C from "./constants.js"
+import { assertLengthAxis } from "./length.js"
 import type { Node } from "./node-zero.js"
-import { applyMinMax, findContainerQuerySize, pctIndefinite, resolveValue } from "./utils.js"
+import { applyMinMax, findContainerQuerySize, isLength, pctIndefinite, resolveValue } from "./utils.js"
 import { log } from "./logger.js"
 import { getTrace } from "./trace.js"
 
@@ -145,6 +146,8 @@ function layoutNode(
   absX: number,
   absY: number,
   direction: number = C.DIRECTION_LTR,
+  containingWidth: number = availableWidth,
+  containingHeight: number = availableHeight,
 ): void {
   incLayoutNodeCalls()
   // Track sizing vs positioning calls
@@ -246,10 +249,10 @@ function layoutNode(
   // ============================================================================
 
   // Container-query inline-size for THIS node's own style values (A0.1 Pass 2).
-  // Walks up to the nearest CQ ancestor's frozen size; NaN if no CQ ancestor.
+  // The layout root supplies the viewport fallback; children use its frozen size.
   // Used for cqi/cqmin resolution of width/height/etc. on this node — the node's
   // OWN inline-size resolves against its parent's containment context, never its own.
-  const ownQueryInlineSize = findContainerQuerySize(node)
+  const ownQueryInlineSize = node.getParent() === null ? availableWidth : findContainerQuerySize(node)
 
   let nodeWidth: number
   const isFitContentWidth = style.width.unit === C.UNIT_FIT_CONTENT || style.width.unit === C.UNIT_SNUG_CONTENT
@@ -291,18 +294,7 @@ function layoutNode(
       smallestFitValue = resolveValue(lastLane, availableWidth, ownQueryInlineSize)
     }
     nodeWidth = smallestFitValue
-  } else if (style.width.unit === C.UNIT_POINT) {
-    nodeWidth = style.width.value
-  } else if (style.width.unit === C.UNIT_PERCENT) {
-    // Percentage against NaN (auto-sized parent) resolves to 0 via resolveValue
-    nodeWidth = resolveValue(style.width, availableWidth)
-  } else if (style.width.unit === C.UNIT_CQI || style.width.unit === C.UNIT_CQMIN) {
-    // cqi/cqmin against the nearest CQ ancestor's frozen inline-size (A0.1 Pass 2).
-    // No CQ ancestor → resolves to 0 (same defensive shape as percent vs NaN).
-    nodeWidth = resolveValue(style.width, availableWidth, ownQueryInlineSize)
-  } else if (style.width.unit === C.UNIT_CALC) {
-    // A0.3 math function — evaluates late-bound against the same epoch as its
-    // leaf units (cqi → Pass 2 via ownQueryInlineSize).
+  } else if (isLength(style.width.unit)) {
     nodeWidth = resolveValue(style.width, availableWidth, ownQueryInlineSize)
   } else if (Number.isNaN(availableWidth)) {
     // Unconstrained: use NaN to signal shrink-wrap (will be computed from children)
@@ -314,13 +306,13 @@ function layoutNode(
     nodeWidth = availableWidth - marginLeft - marginRight
   }
   // Apply min/max constraints (works even with NaN available for point-based constraints)
-  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
+  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, containingWidth, ownQueryInlineSize)
 
   // ============================================================================
   // PHASE 3a: Freeze container-query inline-size (A0.1 — Pass 1 of two-phase layout)
   // ============================================================================
   //
-  // If this node is declared as a CQ container (`container-type: inline-size`),
+  // If this node is a CQ container or the implicit viewport layout root,
   // freeze its inline-size NOW — before child layout recursion. Descendants will
   // resolve `cqi`/`cqmin` against this frozen value during their own layoutNode
   // pass (via `findContainerQuerySize`, lands with Pass 2).
@@ -333,7 +325,7 @@ function layoutNode(
   // NaN nodeWidth (auto-sized, unconstrained) is propagated as-is. Descendant
   // cqi values then resolve to 0, so this dead-end is explicit instead of
   // accidentally feeding child intrinsic size back into the query size.
-  if (style.containerType !== C.CONTAINER_TYPE_NORMAL) {
+  if (style.containerType !== C.CONTAINER_TYPE_NORMAL || node.getParent() === null) {
     if (!Object.is(node.getFrozenQuerySize(), nodeWidth)) {
       // Descendants may have identical box constraints but depend on this CQ
       // size through cqi or a math expression. Their fingerprints are stale.
@@ -341,21 +333,19 @@ function layoutNode(
     }
     node._setFrozenQuerySize(nodeWidth)
   } else {
-    // Not a CQ container — clear any stale freeze from prior layout passes when
+    // Not a query container — clear any stale freeze from prior layout passes when
     // the user toggled containerType off. Cheap; no-op if already NaN.
     if (!Number.isNaN(node.getFrozenQuerySize())) invalidateFingerprintsAround(node)
     node._setFrozenQuerySize(NaN)
   }
 
+  // All direct children share this query context. A container's own styles
+  // queried its ancestor above; its descendants query the newly frozen size.
+  const frozenQueryInlineSize = node.getFrozenQuerySize()
+  const childQueryInlineSize = Number.isNaN(frozenQueryInlineSize) ? ownQueryInlineSize : frozenQueryInlineSize
+
   let nodeHeight: number
-  if (style.height.unit === C.UNIT_POINT) {
-    nodeHeight = style.height.value
-  } else if (style.height.unit === C.UNIT_PERCENT) {
-    // Percentage against NaN (auto-sized parent) resolves to 0 via resolveValue
-    nodeHeight = resolveValue(style.height, availableHeight)
-  } else if (style.height.unit === C.UNIT_CQI || style.height.unit === C.UNIT_CQMIN) {
-    // CSS: `height: 50cqi` means 50% of CQ container's *inline* size, expressed as height.
-    // Phase 1 supports cqi/cqmin (inline-size only); cqb arrives later.
+  if (isLength(style.height.unit)) {
     nodeHeight = resolveValue(style.height, availableHeight, ownQueryInlineSize)
   } else if (Number.isNaN(availableHeight)) {
     // Unconstrained: use NaN to signal shrink-wrap (will be computed from children)
@@ -376,7 +366,7 @@ function layoutNode(
       // Height is defined, width is auto: width = height * aspectRatio
       nodeWidth = nodeHeight * aspectRatio
       // Re-apply min/max for derived width
-      nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
+      nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, containingWidth, ownQueryInlineSize)
     } else if (heightIsAuto && !widthIsAuto && !Number.isNaN(nodeWidth)) {
       // Width is defined, height is auto: height = width / aspectRatio
       nodeHeight = nodeWidth / aspectRatio
@@ -385,7 +375,7 @@ function layoutNode(
   }
 
   // Apply min/max constraints (works even with NaN available for point-based constraints)
-  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight)
+  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, containingHeight, ownQueryInlineSize)
 
   // Content area (inside border and padding)
   // When node dimensions are NaN (unconstrained), content dimensions are also NaN
@@ -531,6 +521,12 @@ function layoutNode(
     const childStyle = child.style
     const cflex = child.flex
 
+    // Parsed basis units follow the parent's axis, which is unknown at set time.
+    // Numeric/CQI setters retain their published A0.2 contract.
+    if (childStyle.flexBasis.source !== undefined) {
+      assertLengthAxis(childStyle.flexBasis, isRow ? "inline" : "block", "flexBasis")
+    }
+
     // Check for auto margins on main axis
     // Physical indices depend on axis and effective reverse (including RTL):
     // - Row LTR: main-start=left(0), main-end=right(2)
@@ -598,30 +594,12 @@ function layoutNode(
     // under-estimate. Only the auto-sized-container branch can produce one.
     let baseApprox = false
     let contentMinSize = 0
-    if (childStyle.flexBasis.unit === C.UNIT_POINT) {
-      baseSize = childStyle.flexBasis.value
-    } else if (childStyle.flexBasis.unit === C.UNIT_PERCENT) {
-      baseSize = Number.isNaN(mainAxisSize) ? 0 : mainAxisSize * (childStyle.flexBasis.value / 100)
-    } else if (childStyle.flexBasis.unit === C.UNIT_CQI || childStyle.flexBasis.unit === C.UNIT_CQMIN) {
-      // A0.1 Pass 2: flex-basis in cqi resolves against child's nearest CQ ancestor.
-      const qsize = findContainerQuerySize(child)
-      baseSize = Number.isNaN(qsize) ? 0 : qsize * (childStyle.flexBasis.value / 100)
-    } else if (childStyle.flexBasis.unit === C.UNIT_CALC) {
-      // A0.3: flex-basis in calc() — evaluate against child's CQ context.
-      baseSize = resolveValue(childStyle.flexBasis, mainAxisSize, findContainerQuerySize(child))
+    if (isLength(childStyle.flexBasis.unit)) {
+      baseSize = resolveValue(childStyle.flexBasis, mainAxisSize, childQueryInlineSize)
     } else {
       const sizeVal = isRow ? childStyle.width : childStyle.height
-      if (sizeVal.unit === C.UNIT_POINT) {
-        baseSize = sizeVal.value
-      } else if (sizeVal.unit === C.UNIT_PERCENT) {
-        baseSize = Number.isNaN(mainAxisSize) ? 0 : mainAxisSize * (sizeVal.value / 100)
-      } else if (sizeVal.unit === C.UNIT_CQI || sizeVal.unit === C.UNIT_CQMIN) {
-        // A0.1 Pass 2: child's width/height-as-flex-basis in cqi.
-        const qsize = findContainerQuerySize(child)
-        baseSize = Number.isNaN(qsize) ? 0 : qsize * (sizeVal.value / 100)
-      } else if (sizeVal.unit === C.UNIT_CALC) {
-        // A0.3: child's width-as-flex-basis is a calc expression.
-        baseSize = resolveValue(sizeVal, mainAxisSize, findContainerQuerySize(child))
+      if (isLength(sizeVal.unit)) {
+        baseSize = resolveValue(sizeVal, mainAxisSize, childQueryInlineSize)
       } else if (child.hasMeasureFunc()) {
         // For auto-sized children with measureFunc,
         // pre-measure to get intrinsic content size as flex base size.
@@ -802,35 +780,13 @@ function layoutNode(
         // main-axis size, it's that size. For auto flex-basis + auto size,
         // the specified-size suggestion is "infinity" (no cap).
         let specifiedSize = Infinity
-        if (childStyle.flexBasis.unit === C.UNIT_POINT) {
-          specifiedSize = childStyle.flexBasis.value
-        } else if (childStyle.flexBasis.unit === C.UNIT_PERCENT && !Number.isNaN(mainAxisSize)) {
-          specifiedSize = mainAxisSize * (childStyle.flexBasis.value / 100)
-        } else if (childStyle.flexBasis.unit === C.UNIT_CQI || childStyle.flexBasis.unit === C.UNIT_CQMIN) {
-          // A0.1 Pass 2: cqi flex-basis specified-size suggestion.
-          const qsize = findContainerQuerySize(child)
-          if (!Number.isNaN(qsize)) {
-            specifiedSize = qsize * (childStyle.flexBasis.value / 100)
-          }
-        } else if (childStyle.flexBasis.unit === C.UNIT_CALC) {
-          // A0.3: math-function flex-basis specified-size.
-          specifiedSize = resolveValue(childStyle.flexBasis, mainAxisSize, findContainerQuerySize(child))
+        if (isLength(childStyle.flexBasis.unit) && !pctIndefinite(childStyle.flexBasis, mainAxisSize)) {
+          specifiedSize = resolveValue(childStyle.flexBasis, mainAxisSize, childQueryInlineSize)
         } else if (childStyle.flexBasis.unit === C.UNIT_AUTO || childStyle.flexBasis.unit === C.UNIT_UNDEFINED) {
           // flex-basis: auto → use main-axis size
           const sizeVal = isRow ? childStyle.width : childStyle.height
-          if (sizeVal.unit === C.UNIT_POINT) {
-            specifiedSize = sizeVal.value
-          } else if (sizeVal.unit === C.UNIT_PERCENT && !Number.isNaN(mainAxisSize)) {
-            specifiedSize = mainAxisSize * (sizeVal.value / 100)
-          } else if (sizeVal.unit === C.UNIT_CQI || sizeVal.unit === C.UNIT_CQMIN) {
-            // A0.1 Pass 2: cqi main-axis size as auto-flex-basis specified-size.
-            const qsize = findContainerQuerySize(child)
-            if (!Number.isNaN(qsize)) {
-              specifiedSize = qsize * (sizeVal.value / 100)
-            }
-          } else if (sizeVal.unit === C.UNIT_CALC) {
-            // A0.3: math-function main-axis size.
-            specifiedSize = resolveValue(sizeVal, mainAxisSize, findContainerQuerySize(child))
+          if (isLength(sizeVal.unit) && !pctIndefinite(sizeVal, mainAxisSize)) {
+            specifiedSize = resolveValue(sizeVal, mainAxisSize, childQueryInlineSize)
           }
           // else: auto/undef size + auto flex-basis → no cap (infinity)
         }
@@ -849,11 +805,8 @@ function layoutNode(
       if (!Number.isNaN(childStyle.aspectRatio) && childStyle.aspectRatio > 0) {
         const crossDim = isRow ? childStyle.height : childStyle.width
         let crossDefinite = NaN
-        if (crossDim.unit === C.UNIT_POINT) {
-          crossDefinite = crossDim.value
-        } else if (crossDim.unit === C.UNIT_PERCENT) {
-          const crossParent = isRow ? crossAxisSize : mainAxisSize
-          if (!Number.isNaN(crossParent)) crossDefinite = crossParent * (crossDim.value / 100)
+        if (isLength(crossDim.unit) && !pctIndefinite(crossDim, crossAxisSize)) {
+          crossDefinite = resolveValue(crossDim, crossAxisSize, childQueryInlineSize)
         }
         if (!Number.isNaN(crossDefinite)) {
           const transferred = isRow ? crossDefinite * childStyle.aspectRatio : crossDefinite / childStyle.aspectRatio
@@ -921,22 +874,22 @@ function layoutNode(
         let autoMin = childStyle.overflow === C.OVERFLOW_VISIBLE ? contentMinSize : 0
         // Clamp by definite max-* (CSS spec: auto min-size includes a "specified
         // size suggestion" that's bounded by max-* if specified).
-        if (maxVal.unit === C.UNIT_POINT || maxVal.unit === C.UNIT_PERCENT) {
-          const maxResolved = resolveValue(maxVal, mainAxisSize)
+        if (isLength(maxVal.unit) && !pctIndefinite(maxVal, mainAxisSize)) {
+          const maxResolved = resolveValue(maxVal, mainAxisSize, childQueryInlineSize)
           if (!Number.isNaN(maxResolved) && maxResolved !== Infinity) {
             autoMin = Math.min(autoMin, maxResolved)
           }
         }
         cflex.minMain = autoMin
       }
-    } else if (minVal.unit !== C.UNIT_UNDEFINED) {
-      cflex.minMain = resolveValue(minVal, mainAxisSize)
+    } else if (minVal.unit !== C.UNIT_UNDEFINED && !pctIndefinite(minVal, mainAxisSize)) {
+      cflex.minMain = resolveValue(minVal, mainAxisSize, childQueryInlineSize)
     } else {
       cflex.minMain = 0
     }
     cflex.maxMain =
       maxVal.unit !== C.UNIT_UNDEFINED && !pctIndefinite(maxVal, mainAxisSize)
-        ? resolveValue(maxVal, mainAxisSize)
+        ? resolveValue(maxVal, mainAxisSize, childQueryInlineSize)
         : Infinity
 
     // Store flex factors from style
@@ -1072,9 +1025,9 @@ function layoutNode(
     if (
       !mainDefinite &&
       style.maxHeight.unit !== C.UNIT_UNDEFINED &&
-      !pctIndefinite(style.maxHeight, availableHeight)
+      !pctIndefinite(style.maxHeight, containingHeight)
     ) {
-      maxMainCanShrink = !Number.isNaN(resolveValue(style.maxHeight, availableHeight))
+      maxMainCanShrink = !Number.isNaN(resolveValue(style.maxHeight, containingHeight, ownQueryInlineSize))
     }
     const baseSizesReachOutput =
       (mainDefinite &&
@@ -1128,8 +1081,8 @@ function layoutNode(
         if (autoMinApplies) {
           let exactMin = exactMain
           const maxVal = isRow ? childStyle.maxWidth : childStyle.maxHeight
-          if (maxVal.unit === C.UNIT_POINT || maxVal.unit === C.UNIT_PERCENT) {
-            const maxResolved = resolveValue(maxVal, mainAxisSize)
+          if (isLength(maxVal.unit) && !pctIndefinite(maxVal, mainAxisSize)) {
+            const maxResolved = resolveValue(maxVal, mainAxisSize, childQueryInlineSize)
             if (!Number.isNaN(maxResolved) && maxResolved !== Infinity) {
               exactMin = Math.min(exactMin, maxResolved)
             }
@@ -1173,9 +1126,9 @@ function layoutNode(
       if (Number.isNaN(mainAxisSize)) {
         // Shrink-wrap mode - check if max constraint applies
         const maxMainVal = isRow ? style.maxWidth : style.maxHeight
-        const availableMain = isRow ? availableWidth : availableHeight
+        const availableMain = isRow ? containingWidth : containingHeight
         if (maxMainVal.unit !== C.UNIT_UNDEFINED && !pctIndefinite(maxMainVal, availableMain)) {
-          const maxMain = resolveValue(maxMainVal, availableMain)
+          const maxMain = resolveValue(maxMainVal, availableMain, ownQueryInlineSize)
           if (!Number.isNaN(maxMain) && lineTotalBaseMain + lineTotalGaps > maxMain) {
             const innerMain = isRow ? innerLeft + innerRight : innerTop + innerBottom
             effectiveMainSize = maxMain - innerMain
@@ -1337,19 +1290,15 @@ function layoutNode(
         const heightDim = childStyle.height
 
         // Get width for baseline function
-        if (widthDim.unit === C.UNIT_POINT) {
-          childWidth = widthDim.value
-        } else if (widthDim.unit === C.UNIT_PERCENT && !Number.isNaN(mainAxisSize)) {
-          childWidth = mainAxisSize * (widthDim.value / 100)
+        if (isLength(widthDim.unit) && !pctIndefinite(widthDim, mainAxisSize)) {
+          childWidth = resolveValue(widthDim, mainAxisSize, childQueryInlineSize)
         } else {
           childWidth = child.flex.mainSize
         }
 
         // Get height for baseline
-        if (heightDim.unit === C.UNIT_POINT) {
-          childHeight = heightDim.value
-        } else if (heightDim.unit === C.UNIT_PERCENT && !Number.isNaN(crossAxisSize)) {
-          childHeight = crossAxisSize * (heightDim.value / 100)
+        if (isLength(heightDim.unit) && !pctIndefinite(heightDim, crossAxisSize)) {
+          childHeight = resolveValue(heightDim, crossAxisSize, childQueryInlineSize)
         } else {
           // Auto height - need to layout to get intrinsic size
           // Check cache first to avoid redundant recursive calls
@@ -1442,10 +1391,8 @@ function layoutNode(
         const crossMarginEnd = isRow ? child.flex.marginB : child.flex.marginR
 
         let childCross = 0
-        if (crossDim.unit === C.UNIT_POINT) {
-          childCross = crossDim.value
-        } else if (crossDim.unit === C.UNIT_PERCENT && !Number.isNaN(crossAxisSize)) {
-          childCross = crossAxisSize * (crossDim.value / 100)
+        if (isLength(crossDim.unit) && !pctIndefinite(crossDim, crossAxisSize)) {
+          childCross = resolveValue(crossDim, crossAxisSize, childQueryInlineSize)
         } else if (child.hasMeasureFunc()) {
           // Auto-sized with measureFunc: get tentative cross size from cached measure.
           // Phase 5 already called cachedMeasure, so this is typically a cache hit (no alloc).
@@ -1668,9 +1615,7 @@ function layoutNode(
     // RTL + reverse cancels out (XOR behavior)
     // For shrink-wrap containers, compute effective main size first
     let effectiveMainAxisSize = mainAxisSize
-    const mainIsAuto = isRow
-      ? style.width.unit !== C.UNIT_POINT && style.width.unit !== C.UNIT_PERCENT
-      : style.height.unit !== C.UNIT_POINT && style.height.unit !== C.UNIT_PERCENT
+    const mainIsAuto = isRow ? !isLength(style.width.unit) : !isLength(style.height.unit)
 
     // Calculate total gaps for all children (used for shrink-wrap sizing)
     const totalGaps = relativeCount > 1 ? mainGap * (relativeCount - 1) : 0
@@ -1817,25 +1762,12 @@ function layoutNode(
       // 1. Explicit style (width/height in points or percent)
       // 2. Definite available space (crossAxisSize is not NaN)
       const parentCrossDim = isRow ? style.height : style.width
-      const parentHasDefiniteCrossStyle = parentCrossDim.unit === C.UNIT_POINT || parentCrossDim.unit === C.UNIT_PERCENT
+      const parentHasDefiniteCrossStyle = isLength(parentCrossDim.unit)
       // crossAxisSize comes from available space - if it's a real number, we have a constraint
       const parentHasDefiniteCross = parentHasDefiniteCrossStyle || !Number.isNaN(crossAxisSize)
 
-      if (crossDim.unit === C.UNIT_POINT) {
-        // Explicit cross size
-        childCrossSize = crossDim.value
-      } else if (crossDim.unit === C.UNIT_PERCENT) {
-        // Percent of PARENT's cross axis (resolveValue handles NaN -> 0)
-        childCrossSize = resolveValue(crossDim, crossAxisSize)
-      } else if (crossDim.unit === C.UNIT_CQI || crossDim.unit === C.UNIT_CQMIN) {
-        // A0.1 Pass 2: cqi/cqmin on cross axis resolves against the nearest CQ
-        // ancestor's frozen inline-size — Phase 1 supports inline-size only, so
-        // cross-axis cqi is "X% of the CQ container's INLINE width, expressed as
-        // a height" (matches CSS). 0 if no CQ ancestor.
-        childCrossSize = resolveValue(crossDim, crossAxisSize, findContainerQuerySize(child))
-      } else if (crossDim.unit === C.UNIT_CALC) {
-        // A0.3: cross-axis math function — same epoch, same queryInlineSize.
-        childCrossSize = resolveValue(crossDim, crossAxisSize, findContainerQuerySize(child))
+      if (isLength(crossDim.unit)) {
+        childCrossSize = resolveValue(crossDim, crossAxisSize, childQueryInlineSize)
       } else if (crossDim.unit === C.UNIT_FIT_CONTENT || crossDim.unit === C.UNIT_SNUG_CONTENT) {
         // Fit-content on cross axis: shrink-wrap to content, don't stretch
         childCrossSize = NaN
@@ -1858,8 +1790,14 @@ function layoutNode(
       // Apply cross-axis min/max constraints
       const crossMinVal = isRow ? childStyle.minHeight : childStyle.minWidth
       const crossMaxVal = isRow ? childStyle.maxHeight : childStyle.maxWidth
-      const crossMin = crossMinVal.unit !== C.UNIT_UNDEFINED ? resolveValue(crossMinVal, crossAxisSize) : 0
-      const crossMax = crossMaxVal.unit !== C.UNIT_UNDEFINED ? resolveValue(crossMaxVal, crossAxisSize) : Infinity
+      const crossMin =
+        crossMinVal.unit !== C.UNIT_UNDEFINED && !pctIndefinite(crossMinVal, crossAxisSize)
+          ? resolveValue(crossMinVal, crossAxisSize, childQueryInlineSize)
+          : 0
+      const crossMax =
+        crossMaxVal.unit !== C.UNIT_UNDEFINED && !pctIndefinite(crossMaxVal, crossAxisSize)
+          ? resolveValue(crossMaxVal, crossAxisSize, childQueryInlineSize)
+          : Infinity
 
       // Apply constraints - for NaN (shrink-wrap), use min as floor
       if (Number.isNaN(childCrossSize)) {
@@ -1876,8 +1814,7 @@ function layoutNode(
       // otherwise pass remaining available space for shrink-wrap behavior
       const mainDim = isRow ? childStyle.width : childStyle.height
       // A child has definite main size if it has explicit width/height OR non-auto flexBasis
-      const hasDefiniteFlexBasis =
-        childStyle.flexBasis.unit === C.UNIT_POINT || childStyle.flexBasis.unit === C.UNIT_PERCENT
+      const hasDefiniteFlexBasis = isLength(childStyle.flexBasis.unit)
       const mainIsAutoChild =
         (mainDim.unit === C.UNIT_AUTO || mainDim.unit === C.UNIT_UNDEFINED) && !hasDefiniteFlexBasis
       const hasFlexGrow = cflex.flexGrow > 0
@@ -2081,8 +2018,10 @@ function layoutNode(
       const mainDimForLayoutCall = isRow ? childStyle.width : childStyle.height
       const mainIsAutoForLayoutCall =
         mainDimForLayoutCall.unit === C.UNIT_AUTO || mainDimForLayoutCall.unit === C.UNIT_UNDEFINED
-      const mainIsPercentForLayoutCall = mainDimForLayoutCall.unit === C.UNIT_PERCENT
-      const crossIsPercentForLayoutCall = crossDimForLayoutCall.unit === C.UNIT_PERCENT
+      // Percentage-containing math needs the same containing block as a bare
+      // percent. NaN asks the shared predicate whether that dependency exists.
+      const mainIsPercentForLayoutCall = pctIndefinite(mainDimForLayoutCall, NaN)
+      const crossIsPercentForLayoutCall = pctIndefinite(crossDimForLayoutCall, NaN)
 
       // For auto-sized children (no flexGrow, no measureFunc), pass NaN to let them compute intrinsic size
       // Otherwise layoutNode would subtract margins from the available size
@@ -2157,7 +2096,20 @@ function layoutNode(
       // absChildLeft/Top include the child's margins, so subtract them to get margin box start
       const childAbsX = absChildLeft - childMarginLeft
       const childAbsY = absChildTop - childMarginTop
-      layoutNode(child, passWidthToChild, passHeightToChild, childLeft, childTop, childAbsX, childAbsY, direction)
+      // Allocation and percentage-constraint context differ for a flex child.
+      // In particular, an allocated row does not make its auto parent definite.
+      layoutNode(
+        child,
+        passWidthToChild,
+        passHeightToChild,
+        childLeft,
+        childTop,
+        childAbsX,
+        childAbsY,
+        direction,
+        contentWidth,
+        contentHeight,
+      )
 
       // Enforce box model constraint: child can't be smaller than its padding + border
       // (using childMinW/childMinH computed earlier for edge-based rounding)
@@ -2374,18 +2326,11 @@ function layoutNode(
     const containsInlineSize = style.containSize && style.containerType !== C.CONTAINER_TYPE_NORMAL
     // A0.2: fit-width pre-selected the inline-size — don't shrink-wrap over it.
     const hasFitWidth = style.fitWidth !== undefined && style.fitWidth.length > 0
-    if (
-      isRow &&
-      style.width.unit !== C.UNIT_POINT &&
-      style.width.unit !== C.UNIT_PERCENT &&
-      !hasAR &&
-      !containsInlineSize &&
-      !hasFitWidth
-    ) {
+    if (isRow && !isLength(style.width.unit) && !hasAR && !containsInlineSize && !hasFitWidth) {
       // Auto-width row: shrink-wrap to content
       nodeWidth = actualUsedMain + innerLeft + innerRight
     }
-    if (!isRow && style.height.unit !== C.UNIT_POINT && style.height.unit !== C.UNIT_PERCENT && !hasAR) {
+    if (!isRow && !isLength(style.height.unit) && !hasAR) {
       // Auto-height column: shrink-wrap to content (block-axis — uncontained in Phase 1)
       nodeHeight = actualUsedMain + innerTop + innerBottom
     }
@@ -2419,20 +2364,13 @@ function layoutNode(
     // Only shrink-wrap when the available dimension is NaN (unconstrained)
     // When availableHeight/Width is defined, Yoga uses it for AUTO-sized root nodes
     // Skip if aspect ratio already determined this dimension (aspect ratio > shrink-wrap)
-    if (
-      isRow &&
-      style.height.unit !== C.UNIT_POINT &&
-      style.height.unit !== C.UNIT_PERCENT &&
-      Number.isNaN(availableHeight) &&
-      !hasAR
-    ) {
+    if (isRow && !isLength(style.height.unit) && Number.isNaN(availableHeight) && !hasAR) {
       // Auto-height row: shrink-wrap to total cross size (accounts for multi-line)
       nodeHeight = totalCrossSize + innerTop + innerBottom
     }
     if (
       !isRow &&
-      style.width.unit !== C.UNIT_POINT &&
-      style.width.unit !== C.UNIT_PERCENT &&
+      !isLength(style.width.unit) &&
       Number.isNaN(availableWidth) &&
       !hasAR &&
       !containsInlineSize &&
@@ -2461,8 +2399,8 @@ function layoutNode(
 
   // Re-apply min/max constraints after any shrink-wrap adjustments
   // This ensures containers don't violate their constraints after auto-sizing
-  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
-  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, availableHeight)
+  nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, containingWidth, ownQueryInlineSize)
+  nodeHeight = applyMinMax(nodeHeight, style.minHeight, style.maxHeight, containingHeight, ownQueryInlineSize)
 
   // Re-enforce box model constraint: minimum size = padding + border
   // This must be applied AFTER applyMinMax since min/max can't reduce below padding+border
@@ -2754,7 +2692,7 @@ function layoutNode(
     let childAvailWidth: number
     const widthIsAuto = childStyle.width.unit === C.UNIT_AUTO || childStyle.width.unit === C.UNIT_UNDEFINED
     const widthIsFit = childStyle.width.unit === C.UNIT_FIT_CONTENT || childStyle.width.unit === C.UNIT_SNUG_CONTENT
-    const widthIsPercent = childStyle.width.unit === C.UNIT_PERCENT
+    const widthIsPercent = pctIndefinite(childStyle.width, NaN)
     if (widthIsAuto && hasLeft && hasRight) {
       childAvailWidth = contentW - leftOffset - rightOffset - childMarginLeft - childMarginRight
     } else if (widthIsAuto) {
@@ -2779,7 +2717,7 @@ function layoutNode(
     // - Otherwise (explicit height): use available height as constraint
     let childAvailHeight: number
     const heightIsAuto = childStyle.height.unit === C.UNIT_AUTO || childStyle.height.unit === C.UNIT_UNDEFINED
-    const heightIsPercent = childStyle.height.unit === C.UNIT_PERCENT
+    const heightIsPercent = pctIndefinite(childStyle.height, NaN)
     if (heightIsAuto && hasTop && hasBottom) {
       childAvailHeight = contentH - topOffset - bottomOffset - childMarginTop - childMarginBottom
     } else if (heightIsAuto) {
@@ -2813,6 +2751,8 @@ function layoutNode(
       childAbsX,
       childAbsY,
       direction,
+      absContentBoxW,
+      absContentBoxH,
     )
 
     // Now compute final position based on right/bottom if left/top not set
