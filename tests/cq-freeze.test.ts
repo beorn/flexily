@@ -1,6 +1,6 @@
 /**
  * CQ containers freeze their inline-size before laying out descendants.
- * The root provides an implicit viewport query container; normal non-root
+ * The root is an implicit inline-size query container; normal non-root
  * nodes have no freeze. Explicit nested containers freeze independently.
  */
 import { describe, expect, test } from "vitest"
@@ -8,14 +8,25 @@ import * as C from "../src/constants.js"
 import { createFlexily } from "../src/index.js"
 
 describe("[A0.1 Pass 1] CQ container freeze", () => {
-  test("normal root freezes the implicit viewport inline-size", () => {
+  test("implicit root freezes its computed inline-size like an explicit container", () => {
     const flex = createFlexily()
     const node = flex.createNode()
+    node.setWidth(150)
     flex.calculateLayout(node, 200, 100)
-    expect(node.getFrozenQuerySize()).toBe(200)
+    expect(node.getFrozenQuerySize()).toBe(150)
 
+    // Declaring the same root as a query container must preserve its basis.
+    node.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+    flex.calculateLayout(node, 200, 100)
+    expect(node.getFrozenQuerySize()).toBe(150)
+
+    node.setContainerType(C.CONTAINER_TYPE_NORMAL)
     flex.calculateLayout(node, 320, 100)
-    expect(node.getFrozenQuerySize()).toBe(320)
+    expect(node.getFrozenQuerySize()).toBe(150)
+
+    node.setWidth(180)
+    flex.calculateLayout(node, 320, 100)
+    expect(node.getFrozenQuerySize()).toBe(180)
   })
 
   test("CONTAINER_TYPE_INLINE_SIZE freezes node's inline-size after layout", () => {

@@ -18,9 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The root supplies an implicit query container for `cqi` when no explicit
-  container ancestor exists. Legacy CQ setters follow the root's inline-size
-  as it changes; explicit nested containers still take precedence.
+- The layout root is the implicit inline-size query container for `cqi` when
+  no explicit container ancestor exists. Descendants query its computed
+  inline-size; a root's own CQ units resolve against the available size.
+  Explicit nested containers still take precedence.
 - The Tests workflow now fails when tests fail.
 
 ### Fixed

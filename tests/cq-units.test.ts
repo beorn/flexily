@@ -9,7 +9,7 @@
  *   - `setWidthCqi` / `setHeightCqi` node setters preserve unit + mark dirty
  *   - Defensive: cqi against NaN queryInlineSize → 0 (same shape as percent against NaN)
  *
- * Layout uses the nearest explicit CQ container, or the implicit root viewport.
+ * Layout uses the nearest explicit CQ container, or the implicit layout root.
  */
 import { describe, expect, test } from "vitest"
 import * as C from "../src/constants.js"
@@ -87,36 +87,36 @@ describe("[A0.1] resolveValue — container-query units", () => {
 })
 
 describe("[A0.1] node setters — setWidthCqi / setHeightCqi", () => {
-  // Legacy setters resolve against the root viewport when no explicit CQ
-  // ancestor exists. Changing viewport width must resize both width and height
-  // cqi values, while point-valued dimensions remain fixed.
-  test("setWidthCqi follows viewport inline-size while numeric width stays fixed", () => {
+  // A root's own CQ dimensions have no query container above them, so they
+  // resolve against the available inline-size. Its descendants query the
+  // root's computed inline-size instead. Point-valued dimensions stay fixed.
+  test("setWidthCqi follows available inline-size while numeric width stays fixed", () => {
     const flex = createFlexily()
     const explicit = flex.createNode()
     explicit.setWidth(50)
     const queried = flex.createNode()
     queried.setWidthCqi(50)
 
-    for (const viewportWidth of [100, 200]) {
-      flex.calculateLayout(explicit, viewportWidth, 100)
-      flex.calculateLayout(queried, viewportWidth, 100)
+    for (const availableWidth of [100, 200]) {
+      flex.calculateLayout(explicit, availableWidth, 100)
+      flex.calculateLayout(queried, availableWidth, 100)
       expect(explicit.getComputedWidth()).toBe(50)
-      expect(queried.getComputedWidth()).toBe(viewportWidth / 2)
+      expect(queried.getComputedWidth()).toBe(availableWidth / 2)
     }
   })
 
-  test("setHeightCqi follows viewport inline-size while numeric height stays fixed", () => {
+  test("setHeightCqi follows available inline-size while numeric height stays fixed", () => {
     const flex = createFlexily()
     const explicit = flex.createNode()
     explicit.setHeight(50)
     const queried = flex.createNode()
     queried.setHeightCqi(50)
 
-    for (const viewportWidth of [100, 200]) {
-      flex.calculateLayout(explicit, viewportWidth, 160)
-      flex.calculateLayout(queried, viewportWidth, 160)
+    for (const availableWidth of [100, 200]) {
+      flex.calculateLayout(explicit, availableWidth, 160)
+      flex.calculateLayout(queried, availableWidth, 160)
       expect(explicit.getComputedHeight()).toBe(50)
-      expect(queried.getComputedHeight()).toBe(viewportWidth / 2)
+      expect(queried.getComputedHeight()).toBe(availableWidth / 2)
     }
   })
 
