@@ -181,4 +181,4 @@ import { Node } from "flexily" // Zero-allocation (default, fast)
 import { Node } from "flexily/classic" // Allocating (easier to debug)
 ```
 
-Both produce identical output. Use `flexily/classic` when stepping through layout computation in a debugger.
+Both support the shared numeric Yoga-style API, including percentage and auto setters. The production engine also accepts Value spacing and CQ/math lengths; classic refuses these new spacing units. Use `flexily/classic` when stepping through its supported layout computation in a debugger.

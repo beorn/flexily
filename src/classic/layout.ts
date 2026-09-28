@@ -11,122 +11,21 @@ import type { Value } from "../types.js"
 import { resolveValue, applyMinMax, pctIndefinite } from "../utils.js"
 import { log } from "../logger.js"
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Check if flex direction is row-oriented (horizontal main axis).
- */
-export function isRowDirection(flexDirection: number): boolean {
-  return flexDirection === C.FLEX_DIRECTION_ROW || flexDirection === C.FLEX_DIRECTION_ROW_REVERSE
-}
-
-/**
- * Check if flex direction is reversed.
- */
-export function isReverseDirection(flexDirection: number): boolean {
-  return flexDirection === C.FLEX_DIRECTION_ROW_REVERSE || flexDirection === C.FLEX_DIRECTION_COLUMN_REVERSE
-}
-
-/**
- * Get the logical edge value (START/END) for a given physical index.
- * Returns undefined if no logical value applies to this physical edge.
- *
- * The mapping depends on flex direction and text direction:
- * - Row LTR: START→left, END→right (swapped if reverse)
- * - Row RTL: START→right, END→left (swapped if reverse)
- * - Column: START→top, END→bottom (swapped if reverse)
- */
-function getLogicalEdgeValue(
-  arr: [Value, Value, Value, Value, Value, Value],
-  physicalIndex: number,
-  _flexDirection: number,
-  direction: number = C.DIRECTION_LTR,
-): Value | undefined {
-  const isRTL = direction === C.DIRECTION_RTL
-
-  // START/END always map to left/right (inline direction)
-  if (physicalIndex === 0) {
-    return isRTL ? arr[5] : arr[4] // Left: START (LTR) or END (RTL)
-  } else if (physicalIndex === 2) {
-    return isRTL ? arr[4] : arr[5] // Right: END (LTR) or START (RTL)
-  }
-  return undefined
-}
-
-/**
- * Resolve logical (START/END) margins/padding to physical values.
- * EDGE_START/EDGE_END always resolve along the inline (horizontal) axis:
- * - LTR: START→left, END→right
- * - RTL: START→right, END→left
- *
- * Physical edges (LEFT/RIGHT/TOP/BOTTOM) are used directly.
- * When both physical and logical are set, logical takes precedence.
- */
-export function resolveEdgeValue(
-  arr: [Value, Value, Value, Value, Value, Value],
-  physicalIndex: number, // 0=left, 1=top, 2=right, 3=bottom
-  flexDirection: number,
-  availableSize: number,
-  direction: number = C.DIRECTION_LTR,
-): number {
-  const logicalValue = getLogicalEdgeValue(arr, physicalIndex, flexDirection, direction)
-
-  // Logical takes precedence if defined
-  if (logicalValue && logicalValue.unit !== C.UNIT_UNDEFINED) {
-    return resolveValue(logicalValue, availableSize)
-  }
-
-  // Fall back to physical
-  return resolveValue(arr[physicalIndex]!, availableSize)
-}
-
-/**
- * Check if a logical edge margin is set to auto.
- */
-export function isEdgeAuto(
-  arr: [Value, Value, Value, Value, Value, Value],
-  physicalIndex: number,
-  flexDirection: number,
-  direction: number = C.DIRECTION_LTR,
-): boolean {
-  const logicalValue = getLogicalEdgeValue(arr, physicalIndex, flexDirection, direction)
-
-  // Check logical first
-  if (logicalValue && logicalValue.unit !== C.UNIT_UNDEFINED) {
-    return logicalValue.unit === C.UNIT_AUTO
-  }
-
-  // Fall back to physical
-  return arr[physicalIndex]!.unit === C.UNIT_AUTO
-}
-
-/**
- * Resolve logical (START/END) border widths to physical values.
- * Border values are plain numbers (always points), so resolution is simpler
- * than for margin/padding. Uses NaN as the "not set" sentinel for logical slots.
- * When both physical and logical are set, logical takes precedence.
- */
-export function resolveEdgeBorderValue(
-  arr: [number, number, number, number, number, number],
-  physicalIndex: number, // 0=left, 1=top, 2=right, 3=bottom
-  _flexDirection: number,
-  direction: number = C.DIRECTION_LTR,
-): number {
-  const isRTL = direction === C.DIRECTION_RTL
-
-  // START/END always map to left/right (inline direction)
-  let logicalSlot: number | undefined
-  if (physicalIndex === 0) logicalSlot = isRTL ? 5 : 4
-  else if (physicalIndex === 2) logicalSlot = isRTL ? 4 : 5
-
-  // Logical takes precedence if set (NaN = not set)
-  if (logicalSlot !== undefined && !Number.isNaN(arr[logicalSlot])) {
-    return arr[logicalSlot]!
-  }
-  return arr[physicalIndex]!
-}
+import {
+  isRowDirection,
+  isReverseDirection,
+  resolveEdgeValue,
+  isEdgeAuto,
+  resolveEdgeBorderValue,
+  resolveSpacingValue,
+} from "../layout-helpers.js"
+export {
+  isRowDirection,
+  isReverseDirection,
+  resolveEdgeValue,
+  isEdgeAuto,
+  resolveEdgeBorderValue,
+} from "../layout-helpers.js"
 
 export function markSubtreeLayoutSeen(node: Node): void {
   for (const child of node.children) {
@@ -441,15 +340,79 @@ function layoutNode(
   // Calculate spacing
   // CSS spec: percentage margins AND padding resolve against containing block's WIDTH only
   // Use resolveEdgeValue to respect logical EDGE_START/END
-  const marginLeft = resolveEdgeValue(style.margin, 0, style.flexDirection, availableWidth, direction)
-  const marginTop = resolveEdgeValue(style.margin, 1, style.flexDirection, availableWidth, direction)
-  const marginRight = resolveEdgeValue(style.margin, 2, style.flexDirection, availableWidth, direction)
-  const marginBottom = resolveEdgeValue(style.margin, 3, style.flexDirection, availableWidth, direction)
+  const marginLeft = resolveEdgeValue(
+    style.margin,
+    0,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    undefined,
+    "margin",
+  )
+  const marginTop = resolveEdgeValue(
+    style.margin,
+    1,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    undefined,
+    "margin",
+  )
+  const marginRight = resolveEdgeValue(
+    style.margin,
+    2,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    undefined,
+    "margin",
+  )
+  const marginBottom = resolveEdgeValue(
+    style.margin,
+    3,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    undefined,
+    "margin",
+  )
 
-  const paddingLeft = resolveEdgeValue(style.padding, 0, style.flexDirection, availableWidth, direction)
-  const paddingTop = resolveEdgeValue(style.padding, 1, style.flexDirection, availableWidth, direction)
-  const paddingRight = resolveEdgeValue(style.padding, 2, style.flexDirection, availableWidth, direction)
-  const paddingBottom = resolveEdgeValue(style.padding, 3, style.flexDirection, availableWidth, direction)
+  const paddingLeft = resolveEdgeValue(
+    style.padding,
+    0,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    undefined,
+    "padding",
+  )
+  const paddingTop = resolveEdgeValue(
+    style.padding,
+    1,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    undefined,
+    "padding",
+  )
+  const paddingRight = resolveEdgeValue(
+    style.padding,
+    2,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    undefined,
+    "padding",
+  )
+  const paddingBottom = resolveEdgeValue(
+    style.padding,
+    3,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    undefined,
+    "padding",
+  )
 
   const borderLeft = resolveEdgeBorderValue(style.border, 0, style.flexDirection, direction)
   const borderTop = resolveEdgeBorderValue(style.border, 1, style.flexDirection, direction)
@@ -621,7 +584,7 @@ function layoutNode(
 
     const mainAxisSize = isRow ? contentWidth : contentHeight
     const crossAxisSize = isRow ? contentHeight : contentWidth
-    const mainGap = isRow ? style.gap[0] : style.gap[1]
+    const mainGap = resolveSpacingValue(style.gap[isRow ? 0 : 1], 0, undefined, "gap")
 
     // Prepare child layout info
 
@@ -648,10 +611,26 @@ function layoutNode(
       const parentWidth = isRow ? mainAxisSize : crossAxisSize
       const mainStartMarginValue = mainStartMarginAuto
         ? 0
-        : resolveEdgeValue(childStyle.margin, mainStartIndex, style.flexDirection, parentWidth, direction)
+        : resolveEdgeValue(
+            childStyle.margin,
+            mainStartIndex,
+            style.flexDirection,
+            parentWidth,
+            direction,
+            undefined,
+            "margin",
+          )
       const mainEndMarginValue = mainEndMarginAuto
         ? 0
-        : resolveEdgeValue(childStyle.margin, mainEndIndex, style.flexDirection, parentWidth, direction)
+        : resolveEdgeValue(
+            childStyle.margin,
+            mainEndIndex,
+            style.flexDirection,
+            parentWidth,
+            direction,
+            undefined,
+            "margin",
+          )
 
       // Total non-auto margin for flex calculations
       const mainMargin = mainStartMarginValue + mainEndMarginValue
@@ -674,10 +653,26 @@ function layoutNode(
           // CSS spec: percentage margins resolve against containing block's WIDTH only
           // Use resolveEdgeValue to respect logical EDGE_START/END
           const crossMargin = isRow
-            ? resolveEdgeValue(childStyle.margin, 1, style.flexDirection, contentWidth, direction) +
-              resolveEdgeValue(childStyle.margin, 3, style.flexDirection, contentWidth, direction)
-            : resolveEdgeValue(childStyle.margin, 0, style.flexDirection, contentWidth, direction) +
-              resolveEdgeValue(childStyle.margin, 2, style.flexDirection, contentWidth, direction)
+            ? resolveEdgeValue(
+                childStyle.margin,
+                1,
+                style.flexDirection,
+                contentWidth,
+                direction,
+                undefined,
+                "margin",
+              ) +
+              resolveEdgeValue(childStyle.margin, 3, style.flexDirection, contentWidth, direction, undefined, "margin")
+            : resolveEdgeValue(
+                childStyle.margin,
+                0,
+                style.flexDirection,
+                contentWidth,
+                direction,
+                undefined,
+                "margin",
+              ) +
+              resolveEdgeValue(childStyle.margin, 2, style.flexDirection, contentWidth, direction, undefined, "margin")
           const availCross = crossAxisSize - crossMargin
           const measured = child.measureFunc!(
             mainAxisSize,
@@ -700,10 +695,42 @@ function layoutNode(
           // For row: mainAxisSize is contentWidth; for column: crossAxisSize is contentWidth
           const parentWidth = isRow ? mainAxisSize : crossAxisSize
           const childPadding = isRow
-            ? resolveEdgeValue(childStyle.padding, 0, childStyle.flexDirection, parentWidth, direction) +
-              resolveEdgeValue(childStyle.padding, 2, childStyle.flexDirection, parentWidth, direction)
-            : resolveEdgeValue(childStyle.padding, 1, childStyle.flexDirection, parentWidth, direction) +
-              resolveEdgeValue(childStyle.padding, 3, childStyle.flexDirection, parentWidth, direction)
+            ? resolveEdgeValue(
+                childStyle.padding,
+                0,
+                childStyle.flexDirection,
+                parentWidth,
+                direction,
+                undefined,
+                "padding",
+              ) +
+              resolveEdgeValue(
+                childStyle.padding,
+                2,
+                childStyle.flexDirection,
+                parentWidth,
+                direction,
+                undefined,
+                "padding",
+              )
+            : resolveEdgeValue(
+                childStyle.padding,
+                1,
+                childStyle.flexDirection,
+                parentWidth,
+                direction,
+                undefined,
+                "padding",
+              ) +
+              resolveEdgeValue(
+                childStyle.padding,
+                3,
+                childStyle.flexDirection,
+                parentWidth,
+                direction,
+                undefined,
+                "padding",
+              )
           const childBorder = isRow
             ? resolveEdgeBorderValue(childStyle.border, 0, childStyle.flexDirection, direction) +
               resolveEdgeBorderValue(childStyle.border, 2, childStyle.flexDirection, direction)
@@ -748,7 +775,7 @@ function layoutNode(
 
     // Break children into flex lines for wrap support
     const lines = breakIntoLines(children, mainAxisSize, mainGap, style.flexWrap)
-    const crossGap = isRow ? style.gap[1] : style.gap[0]
+    const crossGap = resolveSpacingValue(style.gap[isRow ? 1 : 0], 0, undefined, "gap")
 
     // Process each line: distribute flex space
     for (const line of lines) {
@@ -871,7 +898,15 @@ function layoutNode(
 
         // Get cross-axis (top/bottom) margins for this child
         // Use resolveEdgeValue to respect logical EDGE_START/END
-        const topMargin = resolveEdgeValue(childStyle.margin, 1, style.flexDirection, contentWidth, direction)
+        const topMargin = resolveEdgeValue(
+          childStyle.margin,
+          1,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          undefined,
+          "margin",
+        )
 
         // Compute child's dimensions - need to do a mini-layout or use the cached size
         let childWidth: number
@@ -933,11 +968,11 @@ function layoutNode(
         const childStyle = childLayout.node.style
         const crossDim = isRow ? childStyle.height : childStyle.width
         const crossMarginStart = isRow
-          ? resolveEdgeValue(childStyle.margin, 1, style.flexDirection, contentWidth, direction)
-          : resolveEdgeValue(childStyle.margin, 0, style.flexDirection, contentWidth, direction)
+          ? resolveEdgeValue(childStyle.margin, 1, style.flexDirection, contentWidth, direction, undefined, "margin")
+          : resolveEdgeValue(childStyle.margin, 0, style.flexDirection, contentWidth, direction, undefined, "margin")
         const crossMarginEnd = isRow
-          ? resolveEdgeValue(childStyle.margin, 3, style.flexDirection, contentWidth, direction)
-          : resolveEdgeValue(childStyle.margin, 2, style.flexDirection, contentWidth, direction)
+          ? resolveEdgeValue(childStyle.margin, 3, style.flexDirection, contentWidth, direction, undefined, "margin")
+          : resolveEdgeValue(childStyle.margin, 2, style.flexDirection, contentWidth, direction, undefined, "margin")
 
         let childCross = 0
         if (crossDim.unit === C.UNIT_POINT) {
@@ -1100,15 +1135,47 @@ function layoutNode(
             ? childLayout.mainStartMarginValue
             : childLayout.mainEndMarginAuto && isReverse
               ? childLayout.mainEndMarginValue
-              : resolveEdgeValue(childStyle.margin, 0, style.flexDirection, contentWidth, direction)
+              : resolveEdgeValue(
+                  childStyle.margin,
+                  0,
+                  style.flexDirection,
+                  contentWidth,
+                  direction,
+                  undefined,
+                  "margin",
+                )
         childMarginRight =
           childLayout.mainEndMarginAuto && !isReverse
             ? childLayout.mainEndMarginValue
             : childLayout.mainStartMarginAuto && isReverse
               ? childLayout.mainStartMarginValue
-              : resolveEdgeValue(childStyle.margin, 2, style.flexDirection, contentWidth, direction)
-        childMarginTop = resolveEdgeValue(childStyle.margin, 1, style.flexDirection, contentWidth, direction)
-        childMarginBottom = resolveEdgeValue(childStyle.margin, 3, style.flexDirection, contentWidth, direction)
+              : resolveEdgeValue(
+                  childStyle.margin,
+                  2,
+                  style.flexDirection,
+                  contentWidth,
+                  direction,
+                  undefined,
+                  "margin",
+                )
+        childMarginTop = resolveEdgeValue(
+          childStyle.margin,
+          1,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          undefined,
+          "margin",
+        )
+        childMarginBottom = resolveEdgeValue(
+          childStyle.margin,
+          3,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          undefined,
+          "margin",
+        )
       } else {
         // Column: main axis is vertical
         // In column-reverse, mainStart=bottom(3), mainEnd=top(1)
@@ -1117,15 +1184,47 @@ function layoutNode(
             ? childLayout.mainStartMarginValue
             : childLayout.mainEndMarginAuto && isReverse
               ? childLayout.mainEndMarginValue
-              : resolveEdgeValue(childStyle.margin, 1, style.flexDirection, contentWidth, direction)
+              : resolveEdgeValue(
+                  childStyle.margin,
+                  1,
+                  style.flexDirection,
+                  contentWidth,
+                  direction,
+                  undefined,
+                  "margin",
+                )
         childMarginBottom =
           childLayout.mainEndMarginAuto && !isReverse
             ? childLayout.mainEndMarginValue
             : childLayout.mainStartMarginAuto && isReverse
               ? childLayout.mainStartMarginValue
-              : resolveEdgeValue(childStyle.margin, 3, style.flexDirection, contentWidth, direction)
-        childMarginLeft = resolveEdgeValue(childStyle.margin, 0, style.flexDirection, contentWidth, direction)
-        childMarginRight = resolveEdgeValue(childStyle.margin, 2, style.flexDirection, contentWidth, direction)
+              : resolveEdgeValue(
+                  childStyle.margin,
+                  3,
+                  style.flexDirection,
+                  contentWidth,
+                  direction,
+                  undefined,
+                  "margin",
+                )
+        childMarginLeft = resolveEdgeValue(
+          childStyle.margin,
+          0,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          undefined,
+          "margin",
+        )
+        childMarginRight = resolveEdgeValue(
+          childStyle.margin,
+          2,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          undefined,
+          "margin",
+        )
       }
 
       // Main axis size comes from flex algorithm (already rounded)
@@ -1316,10 +1415,42 @@ function layoutNode(
 
       // Compute child's box model minimum early (needed for edge-based rounding)
       // Use resolveEdgeValue to respect logical EDGE_START/END for padding
-      const childPaddingL = resolveEdgeValue(childStyle.padding, 0, childStyle.flexDirection, contentWidth, direction)
-      const childPaddingT = resolveEdgeValue(childStyle.padding, 1, childStyle.flexDirection, contentWidth, direction)
-      const childPaddingR = resolveEdgeValue(childStyle.padding, 2, childStyle.flexDirection, contentWidth, direction)
-      const childPaddingB = resolveEdgeValue(childStyle.padding, 3, childStyle.flexDirection, contentWidth, direction)
+      const childPaddingL = resolveEdgeValue(
+        childStyle.padding,
+        0,
+        childStyle.flexDirection,
+        contentWidth,
+        direction,
+        undefined,
+        "padding",
+      )
+      const childPaddingT = resolveEdgeValue(
+        childStyle.padding,
+        1,
+        childStyle.flexDirection,
+        contentWidth,
+        direction,
+        undefined,
+        "padding",
+      )
+      const childPaddingR = resolveEdgeValue(
+        childStyle.padding,
+        2,
+        childStyle.flexDirection,
+        contentWidth,
+        direction,
+        undefined,
+        "padding",
+      )
+      const childPaddingB = resolveEdgeValue(
+        childStyle.padding,
+        3,
+        childStyle.flexDirection,
+        contentWidth,
+        direction,
+        undefined,
+        "padding",
+      )
       const childBorderL = resolveEdgeBorderValue(childStyle.border, 0, childStyle.flexDirection, direction)
       const childBorderT = resolveEdgeBorderValue(childStyle.border, 1, childStyle.flexDirection, direction)
       const childBorderR = resolveEdgeBorderValue(childStyle.border, 2, childStyle.flexDirection, direction)
@@ -1553,10 +1684,42 @@ function layoutNode(
     for (const childLayout of children) {
       const childCross = isRow ? childLayout.node.layout.height : childLayout.node.layout.width
       const childMargin = isRow
-        ? resolveEdgeValue(childLayout.node.style.margin, 1, style.flexDirection, contentWidth, direction) +
-          resolveEdgeValue(childLayout.node.style.margin, 3, style.flexDirection, contentWidth, direction)
-        : resolveEdgeValue(childLayout.node.style.margin, 0, style.flexDirection, contentWidth, direction) +
-          resolveEdgeValue(childLayout.node.style.margin, 2, style.flexDirection, contentWidth, direction)
+        ? resolveEdgeValue(
+            childLayout.node.style.margin,
+            1,
+            style.flexDirection,
+            contentWidth,
+            direction,
+            undefined,
+            "margin",
+          ) +
+          resolveEdgeValue(
+            childLayout.node.style.margin,
+            3,
+            style.flexDirection,
+            contentWidth,
+            direction,
+            undefined,
+            "margin",
+          )
+        : resolveEdgeValue(
+            childLayout.node.style.margin,
+            0,
+            style.flexDirection,
+            contentWidth,
+            direction,
+            undefined,
+            "margin",
+          ) +
+          resolveEdgeValue(
+            childLayout.node.style.margin,
+            2,
+            style.flexDirection,
+            contentWidth,
+            direction,
+            undefined,
+            "margin",
+          )
       maxCrossSize = Math.max(maxCrossSize, childCross + childMargin)
     }
     // Cross-axis shrink-wrap for auto-sized dimension
@@ -1636,10 +1799,42 @@ function layoutNode(
     const childStyle = child.style
     // CSS spec: percentage margins resolve against containing block's WIDTH only
     // Use resolveEdgeValue to respect logical EDGE_START/END
-    const childMarginLeft = resolveEdgeValue(childStyle.margin, 0, style.flexDirection, nodeWidth, direction)
-    const childMarginTop = resolveEdgeValue(childStyle.margin, 1, style.flexDirection, nodeWidth, direction)
-    const childMarginRight = resolveEdgeValue(childStyle.margin, 2, style.flexDirection, nodeWidth, direction)
-    const childMarginBottom = resolveEdgeValue(childStyle.margin, 3, style.flexDirection, nodeWidth, direction)
+    const childMarginLeft = resolveEdgeValue(
+      childStyle.margin,
+      0,
+      style.flexDirection,
+      nodeWidth,
+      direction,
+      undefined,
+      "margin",
+    )
+    const childMarginTop = resolveEdgeValue(
+      childStyle.margin,
+      1,
+      style.flexDirection,
+      nodeWidth,
+      direction,
+      undefined,
+      "margin",
+    )
+    const childMarginRight = resolveEdgeValue(
+      childStyle.margin,
+      2,
+      style.flexDirection,
+      nodeWidth,
+      direction,
+      undefined,
+      "margin",
+    )
+    const childMarginBottom = resolveEdgeValue(
+      childStyle.margin,
+      3,
+      style.flexDirection,
+      nodeWidth,
+      direction,
+      undefined,
+      "margin",
+    )
 
     // Position offsets from setPosition(edge, value)
     const leftPos = childStyle.position[0]

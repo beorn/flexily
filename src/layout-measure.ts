@@ -46,20 +46,84 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
   }
 
   // Calculate spacing
-  const marginLeft = resolveEdgeValue(style.margin, 0, style.flexDirection, availableWidth, direction)
-  const marginTop = resolveEdgeValue(style.margin, 1, style.flexDirection, availableWidth, direction)
-  const marginRight = resolveEdgeValue(style.margin, 2, style.flexDirection, availableWidth, direction)
-  const marginBottom = resolveEdgeValue(style.margin, 3, style.flexDirection, availableWidth, direction)
+  const marginLeft = resolveEdgeValue(
+    style.margin,
+    0,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    queryInlineSize,
+    "margin",
+  )
+  const marginTop = resolveEdgeValue(
+    style.margin,
+    1,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    queryInlineSize,
+    "margin",
+  )
+  const marginRight = resolveEdgeValue(
+    style.margin,
+    2,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    queryInlineSize,
+    "margin",
+  )
+  const marginBottom = resolveEdgeValue(
+    style.margin,
+    3,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    queryInlineSize,
+    "margin",
+  )
 
-  const paddingLeft = resolveEdgeValue(style.padding, 0, style.flexDirection, availableWidth, direction)
-  const paddingTop = resolveEdgeValue(style.padding, 1, style.flexDirection, availableWidth, direction)
-  const paddingRight = resolveEdgeValue(style.padding, 2, style.flexDirection, availableWidth, direction)
-  const paddingBottom = resolveEdgeValue(style.padding, 3, style.flexDirection, availableWidth, direction)
+  const paddingLeft = resolveEdgeValue(
+    style.padding,
+    0,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    queryInlineSize,
+    "padding",
+  )
+  const paddingTop = resolveEdgeValue(
+    style.padding,
+    1,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    queryInlineSize,
+    "padding",
+  )
+  const paddingRight = resolveEdgeValue(
+    style.padding,
+    2,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    queryInlineSize,
+    "padding",
+  )
+  const paddingBottom = resolveEdgeValue(
+    style.padding,
+    3,
+    style.flexDirection,
+    availableWidth,
+    direction,
+    queryInlineSize,
+    "padding",
+  )
 
-  const borderLeft = resolveEdgeBorderValue(style.border, 0, style.flexDirection, direction)
-  const borderTop = resolveEdgeBorderValue(style.border, 1, style.flexDirection, direction)
-  const borderRight = resolveEdgeBorderValue(style.border, 2, style.flexDirection, direction)
-  const borderBottom = resolveEdgeBorderValue(style.border, 3, style.flexDirection, direction)
+  const borderLeft = resolveEdgeBorderValue(style.border, 0, style.flexDirection, direction, queryInlineSize)
+  const borderTop = resolveEdgeBorderValue(style.border, 1, style.flexDirection, direction, queryInlineSize)
+  const borderRight = resolveEdgeBorderValue(style.border, 2, style.flexDirection, direction, queryInlineSize)
+  const borderBottom = resolveEdgeBorderValue(style.border, 3, style.flexDirection, direction, queryInlineSize)
 
   // Calculate node dimensions
   // FIT_CONTENT and SNUG_CONTENT resolve the same as AUTO — available - margins
@@ -180,7 +244,7 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
   const isRow = isRowDirection(style.flexDirection)
   const mainAxisSize = isRow ? contentWidth : contentHeight
   const crossAxisSize = isRow ? contentHeight : contentWidth
-  const mainGap = isRow ? style.gap[0] : style.gap[1]
+  const mainGap = resolveValue(style.gap[isRow ? 0 : 1], isRow ? availableWidth : availableHeight, queryInlineSize)
 
   // Second pass: measure each child and sum for intrinsic size
   let totalMainSize = 0
@@ -196,18 +260,83 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
     if (child.style.positionType === C.POSITION_TYPE_ABSOLUTE) continue
 
     const childStyle = child.style
+    const childQueryInlineSize = findContainerQuerySize(child)
 
     // Get child margins
     const childMarginMain = isRow
-      ? resolveEdgeValue(childStyle.margin, 0, style.flexDirection, contentWidth, direction) +
-        resolveEdgeValue(childStyle.margin, 2, style.flexDirection, contentWidth, direction)
-      : resolveEdgeValue(childStyle.margin, 1, style.flexDirection, contentWidth, direction) +
-        resolveEdgeValue(childStyle.margin, 3, style.flexDirection, contentWidth, direction)
+      ? resolveEdgeValue(
+          childStyle.margin,
+          0,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          childQueryInlineSize,
+          "margin",
+        ) +
+        resolveEdgeValue(
+          childStyle.margin,
+          2,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          childQueryInlineSize,
+          "margin",
+        )
+      : resolveEdgeValue(
+          childStyle.margin,
+          1,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          childQueryInlineSize,
+          "margin",
+        ) +
+        resolveEdgeValue(
+          childStyle.margin,
+          3,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          childQueryInlineSize,
+          "margin",
+        )
     const childMarginCross = isRow
-      ? resolveEdgeValue(childStyle.margin, 1, style.flexDirection, contentWidth, direction) +
-        resolveEdgeValue(childStyle.margin, 3, style.flexDirection, contentWidth, direction)
-      : resolveEdgeValue(childStyle.margin, 0, style.flexDirection, contentWidth, direction) +
-        resolveEdgeValue(childStyle.margin, 2, style.flexDirection, contentWidth, direction)
+      ? resolveEdgeValue(
+          childStyle.margin,
+          1,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          childQueryInlineSize,
+          "margin",
+        ) +
+        resolveEdgeValue(
+          childStyle.margin,
+          3,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          childQueryInlineSize,
+          "margin",
+        )
+      : resolveEdgeValue(
+          childStyle.margin,
+          0,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          childQueryInlineSize,
+          "margin",
+        ) +
+        resolveEdgeValue(
+          childStyle.margin,
+          2,
+          style.flexDirection,
+          contentWidth,
+          direction,
+          childQueryInlineSize,
+          "margin",
+        )
 
     // Measure child with appropriate constraints
     // For shrink-wrap: pass NaN for main axis, cross axis constraint for cross

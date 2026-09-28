@@ -19,7 +19,7 @@ Flexily provides two layout algorithm implementations:
 | **Zero-alloc** | `layout-zero.ts`    | ✅ Yes  | Faster for flat layouts, no GC pressure |
 | **Classic**    | `classic/layout.ts` | No      | Simpler code, good for debugging        |
 
-Both implement identical Yoga-compatible behavior. The zero-alloc version uses pre-allocated arrays and node-attached FlexInfo structs to eliminate temporary allocations during layout.
+Both implement the shared numeric Yoga-compatible behavior. Value spacing, CQ units and math lengths belong to the production engine; classic retains numeric, percentage and auto spacing. The zero-alloc version uses pre-allocated arrays and node-attached FlexInfo structs to eliminate temporary allocations during layout.
 
 ## Grow Algorithm
 

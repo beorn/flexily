@@ -5,7 +5,7 @@
  */
 
 import * as C from "./constants.js"
-import { LengthError } from "./length.js"
+import { assertLengthAxis, LengthError } from "./length.js"
 import type { Node } from "./node-zero.js"
 import type { MathExpr, Value } from "./types.js"
 
@@ -27,83 +27,73 @@ export function styleValueMatches(current: Value, value: number, unit: number): 
   return current.unit === unit && Object.is(current.value, value)
 }
 
+export function styleValuesEqual(current: Value, next: number | Value, unit = C.UNIT_POINT): boolean {
+  return typeof next === "number"
+    ? styleValueMatches(current, next, unit)
+    : styleValueMatches(current, next.value, next.unit) && current.expr === next.expr
+}
+
+/** Validate all selected axes before changing any edge slot. */
+export function assertEdgeLength(value: Value, edge: number, prop: string): void {
+  if (edge !== C.EDGE_TOP && edge !== C.EDGE_BOTTOM && edge !== C.EDGE_VERTICAL) assertLengthAxis(value, "inline", prop)
+  if (edge === C.EDGE_TOP || edge === C.EDGE_BOTTOM || edge === C.EDGE_VERTICAL || edge === C.EDGE_ALL)
+    assertLengthAxis(value, "block", prop)
+}
+
+/** Numeric style getters cannot discard a user-set unit. */
+export function pointSpacing(value: Value, getter: string, path: string): number {
+  if (value.unit === C.UNIT_UNDEFINED) return NaN
+  if (value.unit !== C.UNIT_POINT)
+    throw new LengthError(value.source ?? "<Value>", `read the stored Value at ${path}`, getter)
+  return value.value
+}
+
 /**
  * Return true when setEdgeValue would leave the edge array unchanged.
  */
 export function edgeValueMatches(
   arr: [Value, Value, Value, Value, Value, Value],
   edge: number,
-  value: number,
-  unit: number,
+  value: number | Value,
+  unit: number = C.UNIT_POINT,
 ): boolean {
   switch (edge) {
     case C.EDGE_LEFT:
-      return styleValueMatches(arr[0], value, unit)
+      return styleValuesEqual(arr[0], value, unit)
     case C.EDGE_TOP:
-      return styleValueMatches(arr[1], value, unit)
+      return styleValuesEqual(arr[1], value, unit)
     case C.EDGE_RIGHT:
-      return styleValueMatches(arr[2], value, unit)
+      return styleValuesEqual(arr[2], value, unit)
     case C.EDGE_BOTTOM:
-      return styleValueMatches(arr[3], value, unit)
+      return styleValuesEqual(arr[3], value, unit)
     case C.EDGE_HORIZONTAL:
-      return styleValueMatches(arr[0], value, unit) && styleValueMatches(arr[2], value, unit)
+      return styleValuesEqual(arr[0], value, unit) && styleValuesEqual(arr[2], value, unit)
     case C.EDGE_VERTICAL:
-      return styleValueMatches(arr[1], value, unit) && styleValueMatches(arr[3], value, unit)
+      return styleValuesEqual(arr[1], value, unit) && styleValuesEqual(arr[3], value, unit)
     case C.EDGE_ALL:
       return (
-        styleValueMatches(arr[0], value, unit) &&
-        styleValueMatches(arr[1], value, unit) &&
-        styleValueMatches(arr[2], value, unit) &&
-        styleValueMatches(arr[3], value, unit)
+        styleValuesEqual(arr[0], value, unit) &&
+        styleValuesEqual(arr[1], value, unit) &&
+        styleValuesEqual(arr[2], value, unit) &&
+        styleValuesEqual(arr[3], value, unit)
       )
     case C.EDGE_START:
-      return styleValueMatches(arr[4], value, unit)
+      return styleValuesEqual(arr[4], value, unit)
     case C.EDGE_END:
-      return styleValueMatches(arr[5], value, unit)
+      return styleValuesEqual(arr[5], value, unit)
     default:
       return true
   }
 }
 
-function borderMatches(current: number, value: number): boolean {
-  return Object.is(current, value)
-}
-
-/**
- * Return true when setEdgeBorder would leave the edge array unchanged.
- */
 export function edgeBorderMatches(
-  arr: [number, number, number, number, number, number],
+  arr: [Value, Value, Value, Value, Value, Value],
   edge: number,
-  value: number,
+  value: number | Value,
 ): boolean {
-  switch (edge) {
-    case C.EDGE_LEFT:
-      return borderMatches(arr[0], value)
-    case C.EDGE_TOP:
-      return borderMatches(arr[1], value)
-    case C.EDGE_RIGHT:
-      return borderMatches(arr[2], value)
-    case C.EDGE_BOTTOM:
-      return borderMatches(arr[3], value)
-    case C.EDGE_HORIZONTAL:
-      return borderMatches(arr[0], value) && borderMatches(arr[2], value)
-    case C.EDGE_VERTICAL:
-      return borderMatches(arr[1], value) && borderMatches(arr[3], value)
-    case C.EDGE_ALL:
-      return (
-        borderMatches(arr[0], value) &&
-        borderMatches(arr[1], value) &&
-        borderMatches(arr[2], value) &&
-        borderMatches(arr[3], value)
-      )
-    case C.EDGE_START:
-      return borderMatches(arr[4], value)
-    case C.EDGE_END:
-      return borderMatches(arr[5], value)
-    default:
-      return true
-  }
+  if (typeof value === "number" && Number.isNaN(value) && (edge === C.EDGE_START || edge === C.EDGE_END))
+    return edgeValueMatches(arr, edge, 0, C.UNIT_UNDEFINED)
+  return edgeValueMatches(arr, edge, value)
 }
 
 /**
@@ -112,10 +102,10 @@ export function edgeBorderMatches(
 export function setEdgeValue(
   arr: [Value, Value, Value, Value, Value, Value],
   edge: number,
-  value: number,
-  unit: number,
+  value: number | Value,
+  unit: number = C.UNIT_POINT,
 ): void {
-  const v = { value, unit }
+  const v = typeof value === "number" ? { value, unit } : value
   switch (edge) {
     case C.EDGE_LEFT:
       arr[0] = v
@@ -158,90 +148,47 @@ export function setEdgeValue(
  * Set a border value on an edge array.
  */
 export function setEdgeBorder(
-  arr: [number, number, number, number, number, number],
+  arr: [Value, Value, Value, Value, Value, Value],
   edge: number,
-  value: number,
+  value: number | Value,
 ): void {
-  switch (edge) {
-    case C.EDGE_LEFT:
-      arr[0] = value
-      break
-    case C.EDGE_TOP:
-      arr[1] = value
-      break
-    case C.EDGE_RIGHT:
-      arr[2] = value
-      break
-    case C.EDGE_BOTTOM:
-      arr[3] = value
-      break
-    case C.EDGE_HORIZONTAL:
-      arr[0] = value
-      arr[2] = value
-      break
-    case C.EDGE_VERTICAL:
-      arr[1] = value
-      arr[3] = value
-      break
-    case C.EDGE_ALL:
-      arr[0] = value
-      arr[1] = value
-      arr[2] = value
-      arr[3] = value
-      break
-    case C.EDGE_START:
-      // Store in logical START slot (resolved to physical at layout time)
-      arr[4] = value
-      break
-    case C.EDGE_END:
-      // Store in logical END slot (resolved to physical at layout time)
-      arr[5] = value
-      break
-  }
+  if (typeof value === "number" && Number.isNaN(value) && (edge === C.EDGE_START || edge === C.EDGE_END))
+    setEdgeValue(arr, edge, 0, C.UNIT_UNDEFINED)
+  else setEdgeValue(arr, edge, value)
 }
 
 /**
- * Get a value from an edge array.
+ * Normalize an edge getter to its stored slot. Aggregates use the left edge.
  */
-export function getEdgeValue(arr: [Value, Value, Value, Value, Value, Value], edge: number): Value {
+export function getEdgeIndex(edge: number): number {
   switch (edge) {
     case C.EDGE_LEFT:
-      return arr[0]
+      return 0
     case C.EDGE_TOP:
-      return arr[1]
+      return 1
     case C.EDGE_RIGHT:
-      return arr[2]
+      return 2
     case C.EDGE_BOTTOM:
-      return arr[3]
+      return 3
     case C.EDGE_START:
-      return arr[4]
+      return 4
     case C.EDGE_END:
-      return arr[5]
+      return 5
     default:
-      return arr[0] // Default to left
+      return 0 // Default to left
   }
+}
+
+/** Read a stored edge Value with the existing aggregate/unknown left fallback. */
+export function getEdgeValue(arr: [Value, Value, Value, Value, Value, Value], edge: number): Value {
+  return arr[getEdgeIndex(edge)]!
 }
 
 /**
  * Get a border value from an edge array.
  */
-export function getEdgeBorderValue(arr: [number, number, number, number, number, number], edge: number): number {
-  switch (edge) {
-    case C.EDGE_LEFT:
-      return arr[0]
-    case C.EDGE_TOP:
-      return arr[1]
-    case C.EDGE_RIGHT:
-      return arr[2]
-    case C.EDGE_BOTTOM:
-      return arr[3]
-    case C.EDGE_START:
-      return arr[4]
-    case C.EDGE_END:
-      return arr[5]
-    default:
-      return arr[0] // Default to left
-  }
+export function getEdgeBorderValue(arr: [Value, Value, Value, Value, Value, Value], edge: number): number {
+  return pointSpacing(getEdgeValue(arr, edge), "getBorder", "node.style.border")
 }
 
 /**
@@ -414,7 +361,7 @@ export function pctIndefinite(value: Value, available: number): boolean {
   return Number.isNaN(available) && containsPercent(value)
 }
 
-function containsPercent(expr: MathExpr): boolean {
+export function containsPercent(expr: MathExpr): boolean {
   if ("unit" in expr) return expr.unit === C.UNIT_PERCENT || (expr.expr !== undefined && containsPercent(expr.expr))
   if ("op" in expr) return containsPercent(expr.left) || containsPercent(expr.right)
   for (const arg of expr.args) if (containsPercent(arg)) return true
