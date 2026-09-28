@@ -2163,6 +2163,11 @@ describe("Flexily Layout Engine", () => {
       ["zero", Node],
       ["classic", ClassicNode],
     ] as const)("numeric auto caps (%s)", (_engine, EngineNode) => {
+      const insert = (parent: Node | ClassicNode, child: Node | ClassicNode) => {
+        if (parent instanceof Node && child instanceof Node) parent.insertChild(child, 0)
+        else if (parent instanceof ClassicNode && child instanceof ClassicNode) parent.insertChild(child, 0)
+        else throw new Error("Numeric cap fixture mixed layout engines")
+      }
       it.each([
         ["height", 16, 0, 16],
         ["height", 50, 0, 36],
@@ -2197,9 +2202,9 @@ describe("Flexily Layout Engine", () => {
           content.setHeight(72)
           content.setWidth(intrinsic)
         }
-        guard.insertChild(content, 0)
-        box.insertChild(guard, 0)
-        root.insertChild(box, 0)
+        insert(guard, content)
+        insert(box, guard)
+        insert(root, box)
         root.calculateLayout(axis === "height" ? 120 : 36, axis === "height" ? 36 : 120, DIRECTION_LTR)
         expect(axis === "height" ? box.getComputedHeight() : box.getComputedWidth()).toBe(expected)
         expect(axis === "height" ? guard.getComputedHeight() : guard.getComputedWidth()).toBe(expected)
@@ -2238,9 +2243,9 @@ describe("Flexily Layout Engine", () => {
           content.setHeight(72)
           content.setWidth(16)
         }
-        inner.insertChild(content, 0)
-        outer.insertChild(inner, 0)
-        root.insertChild(outer, 0)
+        insert(inner, content)
+        insert(outer, inner)
+        insert(root, outer)
         root.calculateLayout(axis === "height" ? 120 : NaN, axis === "height" ? NaN : 120, DIRECTION_LTR)
         for (const box of [outer, inner]) {
           expect(axis === "height" ? box.getComputedHeight() : box.getComputedWidth()).toBe(16)
@@ -2262,8 +2267,8 @@ describe("Flexily Layout Engine", () => {
           const usedWidth = widthMode === MEASURE_MODE_UNDEFINED ? 50 : Math.min(50, width)
           return { width: usedWidth, height: Math.ceil(50 / Math.max(1, usedWidth)) }
         })
-        column.insertChild(text, 0)
-        root.insertChild(column, 0)
+        insert(column, text)
+        insert(root, column)
         root.calculateLayout(120, NaN, DIRECTION_LTR)
         expect(column.getComputedWidth()).toBe(36)
         expect(column.getComputedHeight()).toBe(2)
