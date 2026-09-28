@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-09-28
+
+### Fixed
+
+- **Descendants use the flex item's committed box before sizing.** Items whose
+  preferred dimensions exceed their allocated space now size percentage
+  descendants and container queries against the final border box. This fixes
+  the narrowed chat pane losing the last character of the bullet tail
+  (`19845`), including layouts with gutters, margins and borders. Cache reuse
+  also accounts for allocation changes when the containing box stays the same.
+- **The second stretch pass honors the child's constraints.** Re-stretch after
+  an auto-sized parent shrinks to its content applies min/max and padding/border
+  minimums before committing the cross size. It preserves the existing main
+  allocation decision, including intrinsic items whose main size is uncommitted.
+- **Committed cross sizes use absolute edges.** At an absolute cross start of
+  `0.4` with a constrained extent of `20.1`, the item and its percentage
+  descendants now consistently occupy `21` cells instead of `20`. Both axes
+  use the same edge calculation during initial layout and re-stretch.
+- **Relative insets are counted once.** Numeric insets at depth no longer shift
+  descendant rounding twice. Percentage insets on children resolve against the
+  parent's original content box, including when the child's available size is
+  smaller or indefinite. Re-stretch retains the original float origin, including
+  the parent's margin and inset. Root relative-inset output is preserved.
+
 ## [0.8.1] - 2026-09-28
 
 ### Fixed
