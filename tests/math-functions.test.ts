@@ -288,6 +288,108 @@ describe("[A0.3] engine integration — Box.width with min/max", () => {
   })
 })
 
+describe("[A0.3a] seven-property layout equivalence", () => {
+  const properties = ["width", "height", "minWidth", "minHeight", "maxWidth", "maxHeight", "flexBasis"] as const
+  const contexts = ["row main", "column main", "cross axis", "CQ container", "auto parent"] as const
+  const cases = properties.flatMap((property) => contexts.map((context) => ({ property, context })))
+
+  test.each(cases)("$property in $context matches its numeric length", ({ property, context }) => {
+    const row = context === "column main" || context === "auto parent"
+      ? false
+      : context === "cross axis" ? property.includes("Height") || property === "height" : true
+    const inline = property === "flexBasis" ? row : property.includes("Width") || property === "width"
+    const expected = inline ? 20 : 6
+    const unit = inline ? "ch" : "lh"
+    const inputs = context === "CQ container" && inline
+      ? ["25cqi", "calc(25cqi + 0ch)", "max(10ch, 25cqi)"]
+      : context === "auto parent"
+        ? [`${expected}${unit}`, `calc(${expected}${unit} * 1)`, `max(1${unit}, ${expected}${unit})`]
+        : [`${expected}${unit}`, `calc(25% + 0${unit})`, `max(1${unit}, 25%)`]
+
+    const layout = (input: number | string) => {
+      const flex = createFlexily()
+      const root = flex.createNode()
+      root.setWidth(80)
+      root.setHeight(24)
+      root.setAlignItems(C.ALIGN_FLEX_START)
+      const parent = context === "auto parent" ? flex.createNode() : root
+      parent.setFlexDirection(row ? C.FLEX_DIRECTION_ROW : C.FLEX_DIRECTION_COLUMN)
+      parent.setAlignItems(C.ALIGN_FLEX_START)
+      if (parent !== root) root.insertChild(parent, 0)
+      if (context === "CQ container") {
+        root.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+        root.setContainSize(true)
+      }
+      const child = flex.createNode()
+      child.setFlexShrink(0)
+      child.setWidth(property === "minWidth" ? 4 : 40)
+      child.setHeight(property === "minHeight" ? 1 : 12)
+      if (context === "auto parent" && property === "flexBasis") child.setHeightAuto()
+      if (context === "CQ container") {
+        // Its own dimension queries the ancestor, not its own frozen size.
+        child.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+        child.setContainSize(true)
+      }
+      const value = typeof input === "string" ? Flexily.parseLength(input, { ch: 1, lh: 1 }) : input
+      const setters = {
+        width: child.setWidth, height: child.setHeight,
+        minWidth: child.setMinWidth, minHeight: child.setMinHeight,
+        maxWidth: child.setMaxWidth, maxHeight: child.setMaxHeight,
+        flexBasis: child.setFlexBasis,
+      }
+      setters[property].call(child, value)
+      const content = flex.createNode()
+      content.setWidth(3)
+      content.setHeight(1)
+      child.insertChild(content, 0)
+      parent.insertChild(child, 0)
+      flex.calculateLayout(root, 80, 24)
+      const dimensions = [child.getComputedWidth(), child.getComputedHeight()]
+      return {
+        dimensions,
+        geometry: [root, parent, child, content].map((node) => [
+          node.getComputedLeft(), node.getComputedTop(), node.getComputedWidth(), node.getComputedHeight(),
+        ]),
+      }
+    }
+
+    const numeric = layout(expected)
+    expect(numeric.dimensions[inline ? 0 : 1]).toBe(expected)
+    for (const input of inputs) expect(layout(input), input).toEqual(numeric)
+    if (context === "auto parent" && (property.startsWith("min") || property.startsWith("max"))) {
+      // #26246: percentage-containing constraints have the same indefinite
+      // parent semantics as plain percentages, even with a constant operand.
+      const unconstrained = layout(property.startsWith("max") ? Infinity : 0)
+      expect(unconstrained.dimensions[inline ? 0 : 1]).toBe(
+        property.startsWith("min") ? (inline ? 4 : 1) : (inline ? 40 : 12),
+      )
+      expect(layout(`max(10${unit}, 100%)`)).toEqual(unconstrained)
+    }
+  })
+
+  test("the implicit query root resizes cqi through an unchanged-width wrapper", () => {
+    const flex = createFlexily()
+    const root = flex.createNode()
+    root.setWidth(80)
+    root.setHeight(24)
+    const wrapper = flex.createNode()
+    wrapper.setWidth(30)
+    wrapper.setHeight(12)
+    wrapper.setAlignItems(C.ALIGN_FLEX_START)
+    const child = flex.createNode()
+    child.setWidth(Flexily.parseLength("max(1ch, 25cqi)", { ch: 1, lh: 1 }))
+    child.setHeight(1)
+    wrapper.insertChild(child, 0)
+    root.insertChild(wrapper, 0)
+    flex.calculateLayout(root, 80, 24)
+    expect(child.getComputedWidth()).toBe(20)
+    root.setWidth(40)
+    flex.calculateLayout(root, 40, 24)
+    expect(wrapper.getComputedWidth()).toBe(30)
+    expect(child.getComputedWidth()).toBe(10)
+  })
+})
+
 describe("[A0.3] property tests", () => {
   test("min(a, b) ≤ both args (1000 random pairs)", () => {
     let seed = 0xdeadbeef
