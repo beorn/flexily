@@ -2152,6 +2152,126 @@ describe("Flexily Layout Engine", () => {
   // Bug fixes: min/max sizing edge cases
   // ==========================================================================
   describe("min/max sizing edge cases", () => {
+    /**
+     * @failure A numeric maximum becomes an auto box's used size before content sizing (#26388).
+     * @level l0
+     * @consumer Silvery modal rows and auto columns through both public Node engines.
+     * @testonly none
+     * Percentage owners above this layer do not exercise finite numeric caps.
+     */
+    describe.each([
+      ["zero", Node],
+      ["classic", ClassicNode],
+    ] as const)("numeric auto caps (%s)", (_engine, EngineNode) => {
+      it.each([
+        ["height", 16, 0, 16],
+        ["height", 50, 0, 36],
+        ["height", 16, 40, 40],
+        ["width", 16, 0, 16],
+        ["width", 50, 0, 36],
+        ["width", 16, 40, 40],
+      ] as const)("sizes and centers %s content %s with minimum %s", (axis, intrinsic, minimum, expected) => {
+        const make = () => EngineNode.create({ defaults: "css" })
+        const root = make()
+        root.setWidth(axis === "height" ? 120 : 36)
+        root.setHeight(axis === "height" ? 36 : 120)
+        root.setFlexDirection(axis === "height" ? FLEX_DIRECTION_COLUMN : FLEX_DIRECTION_ROW)
+        root.setJustifyContent(JUSTIFY_CENTER)
+        const box = make()
+        box.setFlexDirection(axis === "height" ? FLEX_DIRECTION_ROW : FLEX_DIRECTION_COLUMN)
+        const guard = make()
+        guard.setFlexDirection(axis === "height" ? FLEX_DIRECTION_COLUMN : FLEX_DIRECTION_ROW)
+        const content = make()
+        if (axis === "height") {
+          box.setWidth(120)
+          box.setMaxHeight(36)
+          box.setMinHeight(minimum)
+          guard.setWidth(72)
+          content.setWidth(72)
+          content.setHeight(intrinsic)
+        } else {
+          box.setHeight(120)
+          box.setMaxWidth(36)
+          box.setMinWidth(minimum)
+          guard.setHeight(72)
+          content.setHeight(72)
+          content.setWidth(intrinsic)
+        }
+        guard.insertChild(content, 0)
+        box.insertChild(guard, 0)
+        root.insertChild(box, 0)
+        root.calculateLayout(axis === "height" ? 120 : 36, axis === "height" ? 36 : 120, DIRECTION_LTR)
+        expect(axis === "height" ? box.getComputedHeight() : box.getComputedWidth()).toBe(expected)
+        expect(axis === "height" ? guard.getComputedHeight() : guard.getComputedWidth()).toBe(expected)
+        if (minimum === 0) {
+          expect(axis === "height" ? box.getComputedTop() : box.getComputedLeft()).toBe(intrinsic === 16 ? 10 : 0)
+        }
+        root.freeRecursive()
+      })
+
+      it.each([
+        ["height", false],
+        ["height", true],
+        ["width", false],
+        ["width", true],
+      ] as const)("keeps nested boxes intrinsic on %s with outer cap %s", (axis, cappedOuter) => {
+        const make = () => EngineNode.create({ defaults: "css" })
+        const root = make()
+        root.setFlexDirection(axis === "height" ? FLEX_DIRECTION_COLUMN : FLEX_DIRECTION_ROW)
+        if (axis === "height") root.setWidth(120)
+        else root.setHeight(120)
+        const outer = make()
+        const inner = make()
+        const content = make()
+        for (const box of [outer, inner]) {
+          box.setFlexDirection(axis === "height" ? FLEX_DIRECTION_ROW : FLEX_DIRECTION_COLUMN)
+          if (axis === "height") box.setWidth(72)
+          else box.setHeight(72)
+        }
+        const capped = cappedOuter ? outer : inner
+        if (axis === "height") {
+          capped.setMaxHeight(36)
+          content.setWidth(72)
+          content.setHeight(16)
+        } else {
+          capped.setMaxWidth(36)
+          content.setHeight(72)
+          content.setWidth(16)
+        }
+        inner.insertChild(content, 0)
+        outer.insertChild(inner, 0)
+        root.insertChild(outer, 0)
+        root.calculateLayout(axis === "height" ? 120 : NaN, axis === "height" ? NaN : 120, DIRECTION_LTR)
+        for (const box of [outer, inner]) {
+          expect(axis === "height" ? box.getComputedHeight() : box.getComputedWidth()).toBe(16)
+        }
+        root.freeRecursive()
+      })
+
+      it("keeps binding maxWidth text wrapping in an auto column", () => {
+        const make = () => EngineNode.create({ defaults: "css" })
+        const root = make()
+        root.setWidth(120)
+        root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        root.setAlignItems(ALIGN_FLEX_START)
+        const column = make()
+        column.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        column.setMaxWidth(36)
+        const text = make()
+        text.setMeasureFunc((width, widthMode) => {
+          const usedWidth = widthMode === MEASURE_MODE_UNDEFINED ? 50 : Math.min(50, width)
+          return { width: usedWidth, height: Math.ceil(50 / Math.max(1, usedWidth)) }
+        })
+        column.insertChild(text, 0)
+        root.insertChild(column, 0)
+        root.calculateLayout(120, NaN, DIRECTION_LTR)
+        expect(column.getComputedWidth()).toBe(36)
+        expect(column.getComputedHeight()).toBe(2)
+        expect(text.getComputedHeight()).toBe(2)
+        root.freeRecursive()
+      })
+    })
+
     it.each(["100%", "min(100%, 60ch)", "max(10ch, 100%)"])(
       "keeps intrinsic width with maxWidth=%s in the CSS column fixture",
       (maxWidth) => {
