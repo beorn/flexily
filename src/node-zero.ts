@@ -258,6 +258,10 @@ export class Node {
     // Constraint fingerprinting
     lastAvailW: NaN,
     lastAvailH: NaN,
+    lastContainingW: NaN,
+    lastContainingH: NaN,
+    lastAllocatedW: NaN,
+    lastAllocatedH: NaN,
     lastOffsetX: NaN,
     lastOffsetY: NaN,
     lastAbsX: NaN,
