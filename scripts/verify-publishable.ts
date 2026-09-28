@@ -24,8 +24,9 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:f
 import { tmpdir } from "node:os"
 import { join, relative } from "node:path"
 import { spawnSync } from "node:child_process"
+import { fileURLToPath } from "node:url"
 
-const FLEXILY_ROOT = new URL("..", import.meta.url).pathname.replace(/\/$/, "")
+const FLEXILY_ROOT = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "")
 
 function fail(msg: string): never {
   console.error(`verify-publishable: FAIL — ${msg}`)
