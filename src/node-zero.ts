@@ -5,6 +5,7 @@
  */
 
 import * as C from "./constants.js"
+import { assertLengthAxis } from "./length.js"
 import { computeLayout, countNodes, markSubtreeLayoutSeen } from "./layout-zero.js"
 import {
   type BaselineFunc,
@@ -306,7 +307,17 @@ export class Node {
     this._style = createDefaultStyle(preset)
   }
 
-  private setStyleValue(key: StyleValueKey, value: number, unit: number): void {
+  private setStyleValue(key: StyleValueKey, value: number | Value, unit: number): void {
+    if (typeof value === "object") {
+      if (key !== "flexBasis") {
+        const axis = key === "width" || key === "minWidth" || key === "maxWidth" ? "inline" : "block"
+        assertLengthAxis(value, axis, key)
+      }
+      if (styleValuesEqual(this._style[key], value)) return
+      this._style[key] = value
+      this.markDirty()
+      return
+    }
     if (styleValueMatches(this._style[key], value, unit)) {
       return
     }
@@ -1301,13 +1312,13 @@ export class Node {
   // ============================================================================
 
   /**
-   * Set the width to a fixed value in points.
+   * Set the width to a number in points or a parsed inline-axis length.
    *
    * @param value - Width in points
    */
-  setWidth(value: number): void {
+  setWidth(value: number | Value): void {
     // NaN means "auto" in Yoga API
-    if (Number.isNaN(value)) {
+    if (typeof value === "number" && Number.isNaN(value)) {
       this.setStyleValue("width", 0, C.UNIT_AUTO)
     } else {
       this.setStyleValue("width", value, C.UNIT_POINT)
@@ -1378,13 +1389,13 @@ export class Node {
   // ============================================================================
 
   /**
-   * Set the height to a fixed value in points.
+   * Set the height to a number in points or a parsed block-axis length.
    *
    * @param value - Height in points
    */
-  setHeight(value: number): void {
+  setHeight(value: number | Value): void {
     // NaN means "auto" in Yoga API
-    if (Number.isNaN(value)) {
+    if (typeof value === "number" && Number.isNaN(value)) {
       this.setStyleValue("height", 0, C.UNIT_AUTO)
     } else {
       this.setStyleValue("height", value, C.UNIT_POINT)
@@ -1430,7 +1441,7 @@ export class Node {
    *
    * @param value - Minimum width in points
    */
-  setMinWidth(value: number): void {
+  setMinWidth(value: number | Value): void {
     this.setStyleValue("minWidth", value, C.UNIT_POINT)
   }
 
@@ -1448,7 +1459,7 @@ export class Node {
    *
    * @param value - Minimum height in points
    */
-  setMinHeight(value: number): void {
+  setMinHeight(value: number | Value): void {
     this.setStyleValue("minHeight", value, C.UNIT_POINT)
   }
 
@@ -1466,7 +1477,7 @@ export class Node {
    *
    * @param value - Maximum width in points
    */
-  setMaxWidth(value: number): void {
+  setMaxWidth(value: number | Value): void {
     this.setStyleValue("maxWidth", value, C.UNIT_POINT)
   }
 
@@ -1484,7 +1495,7 @@ export class Node {
    *
    * @param value - Maximum height in points
    */
-  setMaxHeight(value: number): void {
+  setMaxHeight(value: number | Value): void {
     this.setStyleValue("maxHeight", value, C.UNIT_POINT)
   }
 
@@ -1561,12 +1572,12 @@ export class Node {
   }
 
   /**
-   * Set the flex basis to a fixed value in points.
+   * Set the flex basis to a number in points or a parsed length.
    * The initial size of the node before flex grow/shrink is applied.
    *
    * @param value - Flex basis in points
    */
-  setFlexBasis(value: number): void {
+  setFlexBasis(value: number | Value): void {
     this.setStyleValue("flexBasis", value, C.UNIT_POINT)
   }
 

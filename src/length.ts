@@ -74,7 +74,7 @@ export function parseLength(input: string, scale: LengthScale): Value {
       return Object.freeze({ fn: name as "min" | "max", args: Object.freeze(args) })
     }
     const token = /^[+-]?(?:\d*\.\d+|\d+)(?:e[+-]?\d+)?/i.exec(input.slice(pos))?.[0]
-    if (!token) fail("expected a length")
+    if (!token) return fail("expected a length")
     pos += token.length
     const value = Number(token)
     if (input[pos] === "%") {

@@ -98,6 +98,19 @@ describe("[A0.3a] public length grammar and style setters", () => {
     expect(() => node.setHeight(Flexily.parseLength("2ch", scale))).toThrow(/height.*2ch/)
     expect(() => node.setMaxHeight(Flexily.parseLength("10cqi", scale))).toThrow(/maxHeight.*10cqi/)
   })
+
+  test.each([
+    ["2lh", C.FLEX_DIRECTION_ROW],
+    ["2ch", C.FLEX_DIRECTION_COLUMN],
+  ])("flexBasis %s defers its axis refusal until the parent's first layout", (input, direction) => {
+    const flex = createFlexily()
+    const parent = flex.createNode()
+    const child = flex.createNode()
+    child.setFlexBasis(Flexily.parseLength(input, scale))
+    parent.setFlexDirection(direction)
+    parent.insertChild(child, 0)
+    expect(() => flex.calculateLayout(parent, 80, 10)).toThrow(new RegExp(`flexBasis.*${input}`))
+  })
 })
 
 describe("[A0.3] evaluateMathExpr — min / max / clamp", () => {

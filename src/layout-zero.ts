@@ -16,6 +16,7 @@
  */
 
 import * as C from "./constants.js"
+import { assertLengthAxis } from "./length.js"
 import type { Node } from "./node-zero.js"
 import { applyMinMax, findContainerQuerySize, pctIndefinite, resolveValue } from "./utils.js"
 import { log } from "./logger.js"
@@ -530,6 +531,12 @@ function layoutNode(
     child.flex.relativeIndex = relativeCount++
     const childStyle = child.style
     const cflex = child.flex
+
+    // Parsed basis units follow the parent's axis, which is unknown at set time.
+    // Numeric/CQI setters retain their published A0.2 contract.
+    if (childStyle.flexBasis.source !== undefined) {
+      assertLengthAxis(childStyle.flexBasis, isRow ? "inline" : "block", "flexBasis")
+    }
 
     // Check for auto margins on main axis
     // Physical indices depend on axis and effective reverse (including RTL):
