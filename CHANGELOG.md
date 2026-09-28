@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the narrowed chat pane losing the last character of the bullet tail
   (`19845`), including layouts with gutters, margins and borders. Cache reuse
   also accounts for allocation changes when the containing box stays the same.
+  An auto-sized item given an allocation keeps that allocation instead of
+  shrinking its box to fit its content.
 - **The second stretch pass honors the child's constraints.** Re-stretch after
   an auto-sized parent shrinks to its content applies min/max and padding/border
   minimums before committing the cross size. It preserves the existing main
