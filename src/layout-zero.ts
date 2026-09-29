@@ -457,28 +457,6 @@ function layoutNode(
   if (hasAllocatedWidth) nodeWidth = allocatedWidth
   if (hasAllocatedHeight) nodeHeight = allocatedHeight
 
-  // A maximum becomes a used size only when the natural size reaches it.
-  // Infinity defaults and definite parent allocations need no intrinsic pass.
-  const widthCeiling = Number.isNaN(nodeWidth)
-    ? applyMinMax(Infinity, style.minWidth, style.maxWidth, containingWidth, ownQueryInlineSize)
-    : Infinity
-  const heightCeiling = Number.isNaN(nodeHeight)
-    ? applyMinMax(Infinity, style.minHeight, style.maxHeight, earlyHeightBasis, ownQueryInlineSize)
-    : Infinity
-  if (Number.isFinite(widthCeiling) || Number.isFinite(heightCeiling)) {
-    const savedWidth = node.layout.width
-    const savedHeight = node.layout.height
-    const approximate = measureNode(node, nodeWidth, nodeHeight, direction)
-    if (Number.isFinite(widthCeiling) && (node.layout.width >= widthCeiling || approximate)) {
-      nodeWidth = widthCeiling
-    }
-    if (Number.isFinite(heightCeiling) && (node.layout.height >= heightCeiling || approximate)) {
-      nodeHeight = heightCeiling
-    }
-    node.layout.width = savedWidth
-    node.layout.height = savedHeight
-  }
-
   // Content area (inside border and padding)
   // When node dimensions are NaN (unconstrained), content dimensions are also NaN
   const innerLeft = borderLeft + paddingLeft
@@ -1298,13 +1276,7 @@ function layoutNode(
         const maxMainVal = isRow ? style.maxWidth : style.maxHeight
         const availableMain = isRow ? containingWidth : containingHeight
         if (maxMainVal.unit !== C.UNIT_UNDEFINED && !pctIndefinite(maxMainVal, availableMain)) {
-          const maxMain = applyMinMax(
-            Infinity,
-            isRow ? style.minWidth : style.minHeight,
-            maxMainVal,
-            availableMain,
-            ownQueryInlineSize,
-          )
+          const maxMain = resolveValue(maxMainVal, availableMain, ownQueryInlineSize)
           if (!Number.isNaN(maxMain) && lineTotalBaseMain + lineTotalGaps > maxMain) {
             const innerMain = isRow ? innerLeft + innerRight : innerTop + innerBottom
             effectiveMainSize = maxMain - innerMain
