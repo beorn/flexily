@@ -2154,6 +2154,7 @@ describe("Flexily Layout Engine", () => {
   describe("min/max sizing edge cases", () => {
     /**
      * @failure A numeric maximum becomes an auto box's used size before content sizing (#26388).
+     * Cyclic percentages collapse intrinsic columns or stretch non-100% rows to the parent width (#26660).
      * @level l0
      * @consumer Silvery modal rows and auto columns through both public Node engines.
      * @testonly none
@@ -2169,37 +2170,44 @@ describe("Flexily Layout Engine", () => {
         else throw new Error("Numeric cap fixture mixed layout engines")
       }
       it.each([
-        [16, 16],
-        [19, 19],
-        [50, 36],
-      ])("measures a percentage row inside an auto capped column with content %s", (intrinsic, expected) => {
-        // #26660: the percentage row is auto during intrinsic measurement;
-        // its parent's maximum is a ceiling, not a definite percentage base.
-        const make = () => EngineNode.create({ defaults: "css" })
-        const root = make()
-        root.setWidth(120)
-        root.setFlexDirection(FLEX_DIRECTION_ROW)
-        root.setJustifyContent(JUSTIFY_CENTER)
-        const box = make()
-        box.setFlexDirection(FLEX_DIRECTION_COLUMN)
-        box.setMaxWidth(36)
-        box.setMinWidth(0)
-        const row = make()
-        row.setFlexDirection(FLEX_DIRECTION_ROW)
-        row.setWidthPercent(100)
-        const text = make()
-        text.setMeasureFunc((width) => ({
-          width: Math.min(intrinsic, Number.isFinite(width) ? width : intrinsic),
-          height: 1,
-        }))
-        insert(row, text)
-        insert(box, row)
-        insert(root, box)
-        root.calculateLayout(120, 40, DIRECTION_LTR)
-        expect(box.getComputedWidth()).toBe(expected)
-        expect(row.getComputedWidth()).toBe(expected)
-        root.freeRecursive()
-      })
+        [16, 100, 16, 16],
+        [19, 100, 19, 19],
+        [50, 100, 36, 36],
+        [20, 100, 20, 20],
+        [20, 50, 20, 10],
+      ])(
+        "measures content %s with percentage %s inside an auto capped column",
+        (intrinsic, percentage, parentWidth, rowWidth) => {
+          // #26660: the percentage row is auto during intrinsic measurement;
+          // its parent's maximum is a ceiling, not a definite percentage base.
+          // Final percentages resolve against the frozen intrinsic parent width;
+          // 50% must shrink the row without shrinking its parent or stretching to 100%.
+          const make = () => EngineNode.create({ defaults: "css" })
+          const root = make()
+          root.setWidth(120)
+          root.setFlexDirection(FLEX_DIRECTION_ROW)
+          root.setJustifyContent(JUSTIFY_CENTER)
+          const box = make()
+          box.setFlexDirection(FLEX_DIRECTION_COLUMN)
+          box.setMaxWidth(36)
+          box.setMinWidth(0)
+          const row = make()
+          row.setFlexDirection(FLEX_DIRECTION_ROW)
+          row.setWidthPercent(percentage)
+          const text = make()
+          text.setMeasureFunc((width) => ({
+            width: Math.min(intrinsic, Number.isFinite(width) ? width : intrinsic),
+            height: 1,
+          }))
+          insert(row, text)
+          insert(box, row)
+          insert(root, box)
+          root.calculateLayout(120, 40, DIRECTION_LTR)
+          expect(box.getComputedWidth()).toBe(parentWidth)
+          expect(row.getComputedWidth()).toBe(rowWidth)
+          root.freeRecursive()
+        },
+      )
       it.each([
         ["height", 16, 0, 16],
         ["height", 50, 0, 36],
