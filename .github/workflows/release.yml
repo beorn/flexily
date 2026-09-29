@@ -1,4 +1,4 @@
-# vendor-kit: release@f2c74981a898 — generated; edit packages/km-infra/vendor-kit/templates/release.yml in km, then re-sync
+# vendor-kit: release@7ce50784049d — generated; edit km/packages/km-infra/vendor-kit/templates/release.yml in km, then re-sync
 name: Release
 
 on:
@@ -18,7 +18,7 @@ jobs:
         with:
           bun-version: latest
       - run: bun install
-      - run: bun test
+      - run: bun run test
       - run: bun run build
       - uses: pnpm/action-setup@v4
         with:
