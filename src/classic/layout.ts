@@ -459,8 +459,8 @@ function layoutNode(
     nodeWidth = usedWidth
   } else if (style.width.unit === C.UNIT_POINT) {
     nodeWidth = style.width.value
-  } else if (style.width.unit === C.UNIT_PERCENT) {
-    // Percentage against NaN (auto-sized parent) resolves to 0 via resolveValue
+  } else if (style.width.unit === C.UNIT_PERCENT && !pctIndefinite(style.width, availableWidth)) {
+    // Percentages resolve only against a definite base; otherwise size as auto.
     nodeWidth = resolveValue(style.width, availableWidth)
   } else if (Number.isNaN(availableWidth)) {
     // Unconstrained: use NaN to signal shrink-wrap (will be computed from children)
@@ -1325,8 +1325,8 @@ function layoutNode(
       if (crossDim.unit === C.UNIT_POINT) {
         // Explicit cross size
         childCrossSize = crossDim.value
-      } else if (crossDim.unit === C.UNIT_PERCENT) {
-        // Percent of PARENT's cross axis (resolveValue handles NaN → 0)
+      } else if (crossDim.unit === C.UNIT_PERCENT && (isRow || !pctIndefinite(crossDim, crossAxisSize))) {
+        // Percentage width is auto until the parent's cross-axis base is definite.
         childCrossSize = resolveValue(crossDim, crossAxisSize)
       } else if (parentHasDefiniteCross && alignment === C.ALIGN_STRETCH) {
         // Stretch alignment with definite parent cross size - fill the cross axis

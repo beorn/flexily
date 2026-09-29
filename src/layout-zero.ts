@@ -397,7 +397,7 @@ function layoutNode(
       smallestFitValue = resolveValue(lastLane, availableWidth, ownQueryInlineSize)
     }
     nodeWidth = smallestFitValue
-  } else if (isLength(style.width.unit)) {
+  } else if (isLength(style.width.unit) && !pctIndefinite(style.width, availableWidth)) {
     nodeWidth = resolveValue(style.width, availableWidth, ownQueryInlineSize)
   } else if (Number.isNaN(availableWidth)) {
     // Unconstrained: use NaN to signal shrink-wrap (will be computed from children)
@@ -1942,7 +1942,7 @@ function layoutNode(
       // crossAxisSize comes from available space - if it's a real number, we have a constraint
       const parentHasDefiniteCross = parentHasDefiniteCrossStyle || !Number.isNaN(crossAxisSize)
 
-      if (isLength(crossDim.unit)) {
+      if (isLength(crossDim.unit) && (isRow || !pctIndefinite(crossDim, crossAxisSize))) {
         childCrossSize = resolveValue(crossDim, crossAxisSize, childQueryInlineSize)
       } else if (crossDim.unit === C.UNIT_FIT_CONTENT || crossDim.unit === C.UNIT_SNUG_CONTENT) {
         // Fit-content on cross axis: shrink-wrap to content, don't stretch

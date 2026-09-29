@@ -12,7 +12,7 @@
 
 import * as C from "./constants.js"
 import type { Node } from "./node-zero.js"
-import { resolveValue, applyMinMax, findContainerQuerySize, isLength } from "./utils.js"
+import { resolveValue, applyMinMax, findContainerQuerySize, isLength, pctIndefinite } from "./utils.js"
 import { resolveEdgeValue, resolveEdgeBorderValue, isRowDirection } from "./layout-helpers.js"
 import { incMeasureNodeCalls, incLayoutCacheHits } from "./layout-stats.js"
 
@@ -130,7 +130,7 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
   // (when constrained) or NaN (when unconstrained). The consuming layout pass
   // handles the shrink-wrap + clamp semantics.
   let nodeWidth: number
-  if (isLength(style.width.unit)) {
+  if (isLength(style.width.unit) && !pctIndefinite(style.width, availableWidth)) {
     nodeWidth = resolveValue(style.width, availableWidth, queryInlineSize)
   } else if (Number.isNaN(availableWidth)) {
     nodeWidth = NaN

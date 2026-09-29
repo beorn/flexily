@@ -2168,7 +2168,11 @@ describe("Flexily Layout Engine", () => {
         else if (parent instanceof ClassicNode && child instanceof ClassicNode) parent.insertChild(child, 0)
         else throw new Error("Numeric cap fixture mixed layout engines")
       }
-      it.each([[16, 16], [19, 19], [50, 36]])("measures a percentage row inside an auto capped column with content %s", (intrinsic, expected) => {
+      it.each([
+        [16, 16],
+        [19, 19],
+        [50, 36],
+      ])("measures a percentage row inside an auto capped column with content %s", (intrinsic, expected) => {
         // #26660: the percentage row is auto during intrinsic measurement;
         // its parent's maximum is a ceiling, not a definite percentage base.
         const make = () => EngineNode.create({ defaults: "css" })
