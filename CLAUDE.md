@@ -183,7 +183,7 @@ different presets coexist.
 existed. Strict-Yoga consumers can call `setFlexDirection(COLUMN)` per-tree.
 
 See `tests/defaults-preset.test.ts` for the full preset surface and bead
-`km-silvery.flexshrink-default` for the migration plan.
+`@si/layout/14442-flexshrink-default` for the migration plan.
 
 **Overflow**: Yoga defaults `flexShrink` to 0 (unlike CSS's default of 1) and doesn't implement CSS §4.5's rule that overflow containers have `min-size: auto = 0`. This means in Yoga, an `overflow:hidden` child with 30 lines of content inside a height-10 parent will compute as height 30 — defeating the purpose of overflow clipping. Flexily ensures overflow containers can always shrink (`flexShrink >= 1`), matching CSS browser behavior. See `tests/yoga-overflow-compare.test.ts` for comparison tests.
 

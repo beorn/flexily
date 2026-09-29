@@ -490,7 +490,7 @@ the auto-rule applies only to flex items on their main axis.
 
 **Defaults preset**: `createFlexily({ defaults: "css" | "yoga" })` and
 `Node.create({ defaults })` toggle `flexShrink`/`alignContent`. `DEFAULT_PRESET`
-constant is currently `"yoga"`; bead `km-silvery.flexshrink-default` tracks the
+constant is currently `"yoga"`; bead `@si/layout/14442-flexshrink-default` tracks the
 flip to `"css"` for multi-target consumers. Closure-captured per engine — no
 module state. See `defaults.ts`.
 
