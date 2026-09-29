@@ -56,14 +56,25 @@ const EPSILON_FLOAT = 0.001
 const intrinsicMaximum: Value = { unit: C.UNIT_UNDEFINED, value: NaN }
 
 /** Use classic's existing intrinsic layout without seeding its own auto caps. */
-function layoutIntrinsic(node: Node, availableWidth: number, availableHeight: number, direction: number): void {
+function layoutNatural(
+  node: Node,
+  availableWidth: number,
+  availableHeight: number,
+  offsetX: number,
+  offsetY: number,
+  absX: number,
+  absY: number,
+  direction: number,
+  usedWidth = NaN,
+  usedHeight = NaN,
+): void {
   const style = node.style
   const maxWidth = style.maxWidth
   const maxHeight = style.maxHeight
   if (Number.isNaN(availableWidth)) style.maxWidth = intrinsicMaximum
   if (Number.isNaN(availableHeight)) style.maxHeight = intrinsicMaximum
   try {
-    layoutNode(node, availableWidth, availableHeight, 0, 0, 0, 0, direction)
+    layoutNode(node, availableWidth, availableHeight, offsetX, offsetY, absX, absY, direction, usedWidth, usedHeight)
   } finally {
     style.maxWidth = maxWidth
     style.maxHeight = maxHeight
@@ -333,6 +344,8 @@ function layoutNode(
   absX: number,
   absY: number,
   direction: number = C.DIRECTION_LTR,
+  usedWidth = NaN,
+  usedHeight = NaN,
 ): void {
   log.debug?.(
     "layoutNode called: availW=%d, availH=%d, offsetX=%d, offsetY=%d, absX=%d, absY=%d, children=%d",
@@ -442,7 +455,9 @@ function layoutNode(
   // When available dimension is NaN (unconstrained), auto-sized nodes use NaN
   // and will be sized by shrink-wrap logic based on children
   let nodeWidth: number
-  if (style.width.unit === C.UNIT_POINT) {
+  if (!Number.isNaN(usedWidth)) {
+    nodeWidth = usedWidth
+  } else if (style.width.unit === C.UNIT_POINT) {
     nodeWidth = style.width.value
   } else if (style.width.unit === C.UNIT_PERCENT) {
     // Percentage against NaN (auto-sized parent) resolves to 0 via resolveValue
@@ -457,7 +472,9 @@ function layoutNode(
   nodeWidth = applyMinMax(nodeWidth, style.minWidth, style.maxWidth, availableWidth)
 
   let nodeHeight: number
-  if (style.height.unit === C.UNIT_POINT) {
+  if (!Number.isNaN(usedHeight)) {
+    nodeHeight = usedHeight
+  } else if (style.height.unit === C.UNIT_POINT) {
     nodeHeight = style.height.value
   } else if (style.height.unit === C.UNIT_PERCENT) {
     // Percentage against NaN (auto-sized parent) resolves to 0 via resolveValue
@@ -496,9 +513,32 @@ function layoutNode(
     ? applyMinMax(Infinity, style.minHeight, style.maxHeight, availableHeight)
     : Infinity
   if (Number.isFinite(widthCeiling) || Number.isFinite(heightCeiling)) {
-    layoutIntrinsic(node, nodeWidth, nodeHeight, direction)
-    if (Number.isFinite(widthCeiling) && node.layout.width >= widthCeiling) nodeWidth = widthCeiling
-    if (Number.isFinite(heightCeiling) && node.layout.height >= heightCeiling) nodeHeight = heightCeiling
+    // The caller's bases and position remain unchanged during both natural layouts.
+    for (let pass = 0; pass < 2; pass++) {
+      layoutNatural(
+        node,
+        availableWidth,
+        availableHeight,
+        offsetX,
+        offsetY,
+        absX,
+        absY,
+        direction,
+        usedWidth,
+        usedHeight,
+      )
+      const bindsWidth = Number.isFinite(widthCeiling) && node.layout.width >= widthCeiling
+      const bindsHeight = Number.isFinite(heightCeiling) && node.layout.height >= heightCeiling
+      if (!bindsWidth && !bindsHeight) return
+      if (bindsWidth) nodeWidth = widthCeiling
+      if (bindsHeight) nodeHeight = heightCeiling
+      if (pass > 0 || bindsWidth === bindsHeight) break
+      if (bindsWidth && !Number.isFinite(heightCeiling)) break
+      if (bindsHeight && !Number.isFinite(widthCeiling)) break
+      // Judge the other auto axis once at the bound size, without changing its containing block.
+      usedWidth = bindsWidth ? nodeWidth : NaN
+      usedHeight = bindsHeight ? nodeHeight : NaN
+    }
   }
 
   // Content area (inside border and padding)
@@ -716,7 +756,7 @@ function layoutNode(
           // For auto-sized children WITH children but no measureFunc,
           // recursively compute intrinsic size by laying out with unconstrained main axis
           // Use 0,0 for absX/absY since this is just measurement, not final positioning
-          layoutIntrinsic(child, isRow ? NaN : crossAxisSize, isRow ? crossAxisSize : NaN, direction)
+          layoutNatural(child, isRow ? NaN : crossAxisSize, isRow ? crossAxisSize : NaN, 0, 0, 0, 0, direction)
           baseSize = isRow ? child.layout.width : child.layout.height
         } else {
           // For auto-sized LEAF children without measureFunc, use padding + border as minimum

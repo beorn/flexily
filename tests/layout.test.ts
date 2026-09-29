@@ -2253,7 +2253,59 @@ describe("Flexily Layout Engine", () => {
         root.freeRecursive()
       })
 
-      it("keeps binding maxWidth text wrapping in an auto column", () => {
+      it("rejudges the height cap after the width cap wraps text", () => {
+        // Main ddbb945c1d gives these exact layouts in both engines (#26388 cost ruling).
+        const root = EngineNode.create()
+        root.setWidth(120)
+        root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        root.setAlignItems(ALIGN_FLEX_START)
+        const box = EngineNode.create()
+        box.setFlexDirection(FLEX_DIRECTION_ROW)
+        box.setMaxWidth(36)
+        box.setMaxHeight(2)
+        const text = EngineNode.create()
+        text.setMeasureFunc((width, mode) => {
+          const used = mode === MEASURE_MODE_UNDEFINED || !Number.isFinite(width) ? 100 : Math.min(100, width)
+          return { width: used, height: Math.ceil(100 / Math.max(1, used)) }
+        })
+        insert(box, text)
+        insert(root, box)
+        root.calculateLayout(120, NaN, DIRECTION_LTR)
+        expect([root.layout, box.layout, text.layout]).toEqual([
+          { left: 0, top: 0, width: 120, height: 2 },
+          { left: 0, top: 0, width: 36, height: 2 },
+          { left: 0, top: 0, width: 36, height: 3 },
+        ])
+        root.freeRecursive()
+      })
+
+      it.each(["margin", "percent padding"])("keeps the below-cap layout with %s", (spacing) => {
+        const layouts = [false, true].map((capped) => {
+          const root = EngineNode.create()
+          root.setWidth(120)
+          root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+          const box = EngineNode.create()
+          box.setFlexDirection(FLEX_DIRECTION_ROW)
+          if (capped) box.setMaxHeight(100)
+          if (spacing === "margin") {
+            box.setMargin(EDGE_LEFT, 10)
+            box.setMargin(EDGE_RIGHT, 10)
+          } else box.setPaddingPercent(EDGE_ALL, 10)
+          const content = EngineNode.create()
+          content.setWidth(30)
+          content.setHeight(16)
+          insert(box, content)
+          insert(root, box)
+          root.calculateLayout(120, NaN, DIRECTION_LTR)
+          const result = [root, box, content].map((node) => ({ ...node.layout }))
+          root.freeRecursive()
+          return result
+        })
+        expect(layouts[1]).toEqual(layouts[0])
+      })
+
+      // Classic's pre-existing column measurement transposes axes (#26476); CTO 26388 §4 amendment.
+      ;(_engine === "classic" ? it.fails : it)("keeps binding maxWidth text wrapping in an auto column", () => {
         const make = () => EngineNode.create({ defaults: "css" })
         const root = make()
         root.setWidth(120)
