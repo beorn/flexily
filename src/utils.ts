@@ -396,18 +396,9 @@ export function applyMinMax(size: number, min: Value, max: Value, available: num
     } else {
       const maxValue = resolveValue(max, available, queryInlineSize)
       if (!Number.isNaN(maxValue)) {
-        // Apply max as ceiling even when size is NaN (auto-sized).
-        // This constrains children's layout to the max bound.
-        // Phase 9 shrink-wrap may reduce it further; the post-shrink-wrap
-        // applyMinMax call ensures max is still respected.
-        if (Number.isNaN(result)) {
-          // For auto-sized nodes, only apply finite max constraints.
-          // Infinity means "no real constraint" (e.g., silvery sets
-          // maxWidth=Infinity as default) and should not replace NaN.
-          if (maxValue !== Infinity) {
-            result = maxValue
-          }
-        } else {
+        // An unknown natural size remains unknown. Layout chooses a finite
+        // ceiling only after intrinsic sizing proves that it binds.
+        if (!Number.isNaN(result)) {
           result = Math.min(result, maxValue)
         }
       }
