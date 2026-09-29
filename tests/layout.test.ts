@@ -2252,6 +2252,41 @@ describe("Flexily Layout Engine", () => {
         expect(second.getComputedWidth()).toBe(20)
         root.freeRecursive()
       })
+      it("keeps a fractional-inset item's 50% row within its containing box", () => {
+        // The inset rounds the auto item's edges. A deferred percentage may
+        // change the row's contents, but cannot widen them past that item.
+        const make = () => EngineNode.create({ defaults: "css" })
+        const root = make()
+        root.setWidth(100)
+        root.setHeight(40)
+        root.setFlexDirection(FLEX_DIRECTION_ROW)
+        const item = make()
+        item.setPositionType(POSITION_TYPE_RELATIVE)
+        item.setPositionPercent(EDGE_LEFT, 1.4)
+        const inner = make()
+        inner.setWidth(20.1)
+        const row = make()
+        row.setFlexDirection(FLEX_DIRECTION_ROW)
+        row.setWidthPercent(50)
+        const text = make()
+        text.setMinWidth(0)
+        text.setMeasureFunc((width) => ({
+          width: Math.min(20.1, Number.isFinite(width) ? width : 20.1),
+          height: 1,
+        }))
+        insert(row, text)
+        insert(inner, row)
+        insert(item, inner)
+        insert(root, item)
+        root.calculateLayout(100, 40, DIRECTION_LTR)
+        expect(item.getComputedLeft()).toBe(1)
+        expect(item.getComputedWidth()).toBeGreaterThan(0)
+        expect(inner.getComputedWidth()).toBeLessThanOrEqual(item.getComputedWidth())
+        expect(row.getComputedWidth()).toBeGreaterThan(0)
+        expect(row.getComputedWidth()).toBeLessThanOrEqual(inner.getComputedWidth())
+        expect(text.getComputedWidth()).toBeLessThanOrEqual(row.getComputedWidth())
+        root.freeRecursive()
+      })
       it.each([
         ["height", 16, 0, 16],
         ["height", 50, 0, 36],
