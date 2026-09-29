@@ -2168,6 +2168,34 @@ describe("Flexily Layout Engine", () => {
         else if (parent instanceof ClassicNode && child instanceof ClassicNode) parent.insertChild(child, 0)
         else throw new Error("Numeric cap fixture mixed layout engines")
       }
+      it.each([[16, 16], [19, 19], [50, 36]])("measures a percentage row inside an auto capped column with content %s", (intrinsic, expected) => {
+        // #26660: the percentage row is auto during intrinsic measurement;
+        // its parent's maximum is a ceiling, not a definite percentage base.
+        const make = () => EngineNode.create({ defaults: "css" })
+        const root = make()
+        root.setWidth(120)
+        root.setFlexDirection(FLEX_DIRECTION_ROW)
+        root.setJustifyContent(JUSTIFY_CENTER)
+        const box = make()
+        box.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        box.setMaxWidth(36)
+        box.setMinWidth(0)
+        const row = make()
+        row.setFlexDirection(FLEX_DIRECTION_ROW)
+        row.setWidthPercent(100)
+        const text = make()
+        text.setMeasureFunc((width) => ({
+          width: Math.min(intrinsic, Number.isFinite(width) ? width : intrinsic),
+          height: 1,
+        }))
+        insert(row, text)
+        insert(box, row)
+        insert(root, box)
+        root.calculateLayout(120, 40, DIRECTION_LTR)
+        expect(box.getComputedWidth()).toBe(expected)
+        expect(row.getComputedWidth()).toBe(expected)
+        root.freeRecursive()
+      })
       it.each([
         ["height", 16, 0, 16],
         ["height", 50, 0, 36],
