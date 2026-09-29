@@ -1569,7 +1569,10 @@ function layoutNode(
       const crossIsPercent = crossDimForLayoutCall.unit === C.UNIT_PERCENT
 
       let passWidthToChild: number
-      if (isRow && mainIsAuto && !hasFlexGrow) {
+      if (isRow && mainIsAuto && shouldMeasure) {
+        // Keep the measured width; layoutNode subtracts these declared margins once.
+        passWidthToChild = childWidth + childMarginLeft + childMarginRight
+      } else if (isRow && mainIsAuto && !hasFlexGrow) {
         passWidthToChild = NaN
       } else if (!isRow && crossIsAutoForLayoutCall && !parentHasDefiniteCross) {
         passWidthToChild = NaN

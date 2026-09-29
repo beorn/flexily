@@ -2279,6 +2279,44 @@ describe("Flexily Layout Engine", () => {
         root.freeRecursive()
       })
 
+      it.each([
+        ["nonbinding height cap", true, undefined, false, 3],
+        ["no cap", false, undefined, false, 3],
+        ["fixed height and flex-start", false, 5, false, 5],
+        ["leaf margins", false, undefined, true, 7],
+      ] as const)("keeps a measured row leaf's wrapped height with %s", (_name, capped, height, margins, boxHeight) => {
+        // #26388: Phase 8 and the leaf's own layout must use the same width, including margins.
+        const root = EngineNode.create()
+        root.setWidth(120)
+        root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        root.setAlignItems(ALIGN_FLEX_START)
+        const box = EngineNode.create()
+        box.setFlexDirection(FLEX_DIRECTION_ROW)
+        if (capped) {
+          box.setMaxWidth(36)
+          box.setMaxHeight(9)
+        } else box.setWidth(36)
+        if (height !== undefined) {
+          box.setHeight(height)
+          box.setAlignItems(ALIGN_FLEX_START)
+        }
+        const text = EngineNode.create()
+        if (margins) text.setMargin(EDGE_ALL, 2)
+        text.setMeasureFunc((width, mode) => {
+          const used = mode === MEASURE_MODE_UNDEFINED || !Number.isFinite(width) ? 100 : Math.min(100, width)
+          return { width: used, height: Math.ceil(100 / Math.max(1, used)) }
+        })
+        insert(box, text)
+        insert(root, box)
+        root.calculateLayout(120, NaN, DIRECTION_LTR)
+        expect([root.layout, box.layout, text.layout]).toEqual([
+          { left: 0, top: 0, width: 120, height: boxHeight },
+          { left: 0, top: 0, width: 36, height: boxHeight },
+          { left: margins ? 2 : 0, top: margins ? 2 : 0, width: 36, height: 3 },
+        ])
+        root.freeRecursive()
+      })
+
       it.each(["margin", "percent padding"])("keeps the below-cap layout with %s", (spacing) => {
         const layouts = [false, true].map((capped) => {
           const root = EngineNode.create()

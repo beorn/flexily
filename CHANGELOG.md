@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Numeric maxima cap auto-sized boxes after intrinsic content measurement.
+  Classic wrapped text in a row previously collapsed to one line; measured
+  leaves now keep their wrapping width, including margins, with or without a cap.
+
 ## [0.8.2] - 2026-09-28
 
 ### Fixed
