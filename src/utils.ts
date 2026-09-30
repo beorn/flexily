@@ -357,6 +357,13 @@ export function evaluateMathExpr(
 }
 
 /** True when a percentage or percentage-containing math constraint is indefinite. */
+/** Preferred width needs content when its percentage base is not known yet.
+ * Alignment eligibility and parent allocation are separate questions.
+ */
+export function widthUsesContent(value: Value, available: number): boolean {
+  return !isLength(value.unit) || pctIndefinite(value, available)
+}
+
 export function pctIndefinite(value: Value, available: number): boolean {
   return Number.isNaN(available) && containsPercent(value)
 }

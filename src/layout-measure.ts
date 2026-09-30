@@ -12,7 +12,14 @@
 
 import * as C from "./constants.js"
 import type { Node } from "./node-zero.js"
-import { resolveValue, applyMinMax, findContainerQuerySize, isLength } from "./utils.js"
+import {
+  resolveValue,
+  applyMinMax,
+  findContainerQuerySize,
+  isLength,
+  pctIndefinite,
+  widthUsesContent,
+} from "./utils.js"
 import { resolveEdgeValue, resolveEdgeBorderValue, isRowDirection } from "./layout-helpers.js"
 import { incMeasureNodeCalls, incLayoutCacheHits } from "./layout-stats.js"
 
@@ -130,7 +137,7 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
   // (when constrained) or NaN (when unconstrained). The consuming layout pass
   // handles the shrink-wrap + clamp semantics.
   let nodeWidth: number
-  if (isLength(style.width.unit)) {
+  if (!widthUsesContent(style.width, availableWidth)) {
     nodeWidth = resolveValue(style.width, availableWidth, queryInlineSize)
   } else if (Number.isNaN(availableWidth)) {
     nodeWidth = NaN
@@ -152,7 +159,7 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
   // Re-apply min/max on the derived dimension to respect CSS box model.
   const aspectRatio = style.aspectRatio
   if (!Number.isNaN(aspectRatio) && aspectRatio > 0) {
-    const widthIsAuto = Number.isNaN(nodeWidth) || style.width.unit === C.UNIT_AUTO
+    const widthIsAuto = Number.isNaN(nodeWidth) || widthUsesContent(style.width, availableWidth)
     const heightIsAuto = Number.isNaN(nodeHeight) || style.height.unit === C.UNIT_AUTO
     if (widthIsAuto && !heightIsAuto && !Number.isNaN(nodeHeight)) {
       nodeWidth = nodeHeight * aspectRatio
@@ -184,8 +191,7 @@ export function measureNode(node: Node, availableWidth: number, availableHeight:
 
   // Handle measure function (text nodes)
   if (node.hasMeasureFunc() && node.children.length === 0) {
-    const widthIsAuto =
-      style.width.unit === C.UNIT_AUTO || style.width.unit === C.UNIT_UNDEFINED || Number.isNaN(nodeWidth)
+    const widthIsAuto = widthUsesContent(style.width, availableWidth) || Number.isNaN(nodeWidth)
     const heightIsAuto =
       style.height.unit === C.UNIT_AUTO || style.height.unit === C.UNIT_UNDEFINED || Number.isNaN(nodeHeight)
     const widthMode = widthIsAuto ? C.MEASURE_MODE_AT_MOST : C.MEASURE_MODE_EXACTLY

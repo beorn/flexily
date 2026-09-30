@@ -2154,6 +2154,7 @@ describe("Flexily Layout Engine", () => {
   describe("min/max sizing edge cases", () => {
     /**
      * @failure A numeric maximum becomes an auto box's used size before content sizing (#26388).
+     * Cyclic percentages collapse intrinsic columns or stretch non-100% rows to the parent width (#26660).
      * @level l0
      * @consumer Silvery modal rows and auto columns through both public Node engines.
      * @testonly none
@@ -2163,11 +2164,129 @@ describe("Flexily Layout Engine", () => {
       ["zero", Node],
       ["classic", ClassicNode],
     ] as const)("numeric auto caps (%s)", (_engine, EngineNode) => {
-      const insert = (parent: Node | ClassicNode, child: Node | ClassicNode) => {
-        if (parent instanceof Node && child instanceof Node) parent.insertChild(child, 0)
-        else if (parent instanceof ClassicNode && child instanceof ClassicNode) parent.insertChild(child, 0)
+      const insert = (parent: Node | ClassicNode, child: Node | ClassicNode, index = 0) => {
+        if (parent instanceof Node && child instanceof Node) parent.insertChild(child, index)
+        else if (parent instanceof ClassicNode && child instanceof ClassicNode) parent.insertChild(child, index)
         else throw new Error("Numeric cap fixture mixed layout engines")
       }
+      it.each([
+        [16, 100, 36, false, 16, 16],
+        [19, 100, 36, false, 19, 19],
+        [50, 100, 36, false, 36, 36],
+        [20, 100, 36, false, 20, 20],
+        [20, 50, 36, false, 20, 10],
+        [19, 100, null, false, 19, 19],
+        [20, 50, null, false, 20, 10],
+        [20, 50, null, true, 20, 10],
+      ] as const)(
+        "measures content %s with percentage %s, cap %s, unknown parent width %s",
+        (intrinsic, percentage, cap, unknownParentWidth, parentWidth, rowWidth) => {
+          // #26660: the percentage row is auto during intrinsic measurement;
+          // its parent's maximum is a ceiling, not a definite percentage base.
+          // Final percentages resolve against the frozen intrinsic parent width;
+          // 50% must shrink the row without shrinking its parent or stretching to 100%.
+          const make = () => EngineNode.create({ defaults: "css" })
+          const root = make()
+          root.setWidth(120)
+          root.setFlexDirection(unknownParentWidth ? FLEX_DIRECTION_COLUMN : FLEX_DIRECTION_ROW)
+          root.setJustifyContent(JUSTIFY_CENTER)
+          if (unknownParentWidth) root.setAlignItems(ALIGN_FLEX_START)
+          const box = make()
+          box.setFlexDirection(FLEX_DIRECTION_COLUMN)
+          if (cap !== null) box.setMaxWidth(cap)
+          box.setMinWidth(0)
+          const row = make()
+          row.setFlexDirection(FLEX_DIRECTION_ROW)
+          row.setWidthPercent(percentage)
+          const text = make()
+          text.setMeasureFunc((width) => ({
+            width: Math.min(intrinsic, Number.isFinite(width) ? width : intrinsic),
+            height: 1,
+          }))
+          insert(row, text)
+          insert(box, row)
+          if (unknownParentWidth) {
+            const line = make()
+            line.setFlexDirection(FLEX_DIRECTION_ROW)
+            insert(line, box)
+            insert(root, line)
+          } else insert(root, box)
+          root.calculateLayout(120, 40, DIRECTION_LTR)
+          expect(box.getComputedWidth()).toBe(parentWidth)
+          expect(row.getComputedWidth()).toBe(rowWidth)
+          root.freeRecursive()
+        },
+      )
+      it.each([100, 50])("keeps percentage %s at its natural width on an unknown cross axis", (percentage) => {
+        // The cross-axis target is Yoga's natural width, not percentage * box width.
+        // The capped main-axis table cannot catch a predicate that also stretches percentages.
+        const make = () => EngineNode.create({ defaults: "css" })
+        const root = make()
+        root.setWidth(120)
+        root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        root.setAlignItems(ALIGN_FLEX_START)
+        const box = make()
+        box.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        const first = make()
+        first.setFlexDirection(FLEX_DIRECTION_ROW)
+        first.setWidthPercent(percentage)
+        const second = make()
+        second.setFlexDirection(FLEX_DIRECTION_ROW)
+        for (const [row, intrinsic] of [
+          [first, 12],
+          [second, 20],
+        ] as const) {
+          const text = make()
+          text.setMeasureFunc((width) => ({
+            width: Math.min(intrinsic, Number.isFinite(width) ? width : intrinsic),
+            height: 1,
+          }))
+          insert(row, text)
+        }
+        insert(box, first)
+        insert(box, second, 1)
+        insert(root, box)
+        root.calculateLayout(120, 40, DIRECTION_LTR)
+        expect(box.getComputedWidth()).toBe(20)
+        expect(first.getComputedWidth()).toBe(12)
+        expect(second.getComputedWidth()).toBe(20)
+        root.freeRecursive()
+      })
+      it("keeps a fractional-inset item's 50% row within its containing box", () => {
+        // The inset rounds the auto item's edges. A deferred percentage may
+        // change the row's contents, but cannot widen them past that item.
+        const make = () => EngineNode.create({ defaults: "css" })
+        const root = make()
+        root.setWidth(100)
+        root.setHeight(40)
+        root.setFlexDirection(FLEX_DIRECTION_ROW)
+        const item = make()
+        item.setPositionType(POSITION_TYPE_RELATIVE)
+        item.setPositionPercent(EDGE_LEFT, 1.4)
+        const inner = make()
+        inner.setWidth(20.1)
+        const row = make()
+        row.setFlexDirection(FLEX_DIRECTION_ROW)
+        row.setWidthPercent(50)
+        const text = make()
+        text.setMinWidth(0)
+        text.setMeasureFunc((width) => ({
+          width: Math.min(20.1, Number.isFinite(width) ? width : 20.1),
+          height: 1,
+        }))
+        insert(row, text)
+        insert(inner, row)
+        insert(item, inner)
+        insert(root, item)
+        root.calculateLayout(100, 40, DIRECTION_LTR)
+        expect(item.getComputedLeft()).toBe(1)
+        expect(item.getComputedWidth()).toBeGreaterThan(0)
+        expect(inner.getComputedWidth()).toBeLessThanOrEqual(item.getComputedWidth())
+        expect(row.getComputedWidth()).toBeGreaterThan(0)
+        expect(row.getComputedWidth()).toBeLessThanOrEqual(inner.getComputedWidth())
+        expect(text.getComputedWidth()).toBeLessThanOrEqual(row.getComputedWidth())
+        root.freeRecursive()
+      })
       it.each([
         ["height", 16, 0, 16],
         ["height", 50, 0, 36],
