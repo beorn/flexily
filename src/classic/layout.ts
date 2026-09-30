@@ -332,13 +332,11 @@ export function computeLayout(
   availableHeight: number,
   direction: number = C.DIRECTION_LTR,
 ): void {
-  const outerUnknownBaseWidths = swapUnknownBaseWidthCount(0)
-  try {
-    // Pass absolute position (0,0) for root node - used for Yoga-compatible edge rounding
-    layoutNode(root, availableWidth, availableHeight, 0, 0, 0, 0, direction)
-  } finally {
-    swapUnknownBaseWidthCount(outerUnknownBaseWidths)
-  }
+  // Classic has no re-entrant pass; each pass starts its count at 0 and
+  // leaves it readable until the next one starts.
+  swapUnknownBaseWidthCount(0)
+  // Pass absolute position (0,0) for root node - used for Yoga-compatible edge rounding
+  layoutNode(root, availableWidth, availableHeight, 0, 0, 0, 0, direction)
 }
 
 /**

@@ -53,6 +53,7 @@ import {
 import { createChild, expectLayout, expectWidth } from "./test-utils.js"
 import { Node as ClassicNode } from "../src/index-classic.js"
 import { enableTrace, disableTrace } from "../src/trace.js"
+import { unknownBaseWidthCount } from "../src/utils.js"
 
 /**
  * @failure A flex item lays descendants out at its preferred size before its parent commits a smaller size.
@@ -2310,6 +2311,33 @@ describe("Flexily Layout Engine", () => {
         text.markDirty()
         root.calculateLayout(120, 40, DIRECTION_LTR)
         expect(widths()).toEqual([20, 10, 10])
+        root.freeRecursive()
+      })
+      it.each([
+        [true, 8],
+        [false, 0],
+      ] as const)("raises the pass count once per percentage item on a depth-8 chain (percentages %s)", (pct, rises) => {
+        // A repeated layout gives the item its width, so it never raises the
+        // count again: a repeat never causes a repeat (at most one per item).
+        const make = () => EngineNode.create({ defaults: "css" })
+        const root = make()
+        root.setWidth(120)
+        root.setFlexDirection(FLEX_DIRECTION_ROW)
+        let parent = make()
+        parent.setFlexDirection(FLEX_DIRECTION_ROW)
+        insert(root, parent)
+        for (let level = 0; level < 8; level++) {
+          const item = make()
+          item.setFlexDirection(FLEX_DIRECTION_ROW)
+          if (pct) item.setWidthPercent(50)
+          insert(parent, item)
+          parent = item
+        }
+        const text = make()
+        text.setMeasureFunc((width) => ({ width: Math.min(64, Number.isFinite(width) ? width : 64), height: 1 }))
+        insert(parent, text)
+        root.calculateLayout(120, 40, DIRECTION_LTR)
+        expect(unknownBaseWidthCount()).toBe(rises)
         root.freeRecursive()
       })
       it.each([

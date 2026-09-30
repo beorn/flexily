@@ -110,7 +110,9 @@ export function computeLayout(
   } finally {
     // Restore line state for outer pass (no-op at depth 0)
     exitLayout(saved)
-    swapUnknownBaseWidthCount(outerUnknownBaseWidths)
+    // A nested pass must not raise the outer item's count; an outermost pass
+    // leaves its own count readable until the next pass starts.
+    if (saved !== null) swapUnknownBaseWidthCount(outerUnknownBaseWidths)
   }
 }
 
