@@ -184,51 +184,66 @@ describe("Performance Regression: Large Tree", () => {
     expect(median).toBeLessThan(3)
   })
 
-  it("should re-layout large tree with dirty leaf under 1ms", () => {
+  it("should re-layout large tree with dirty leaf at under half the cost of a cold layout", () => {
     // Build tree: 5 columns x 20 rows with measure functions
-    const root = Node.create()
-    root.setWidth(120)
-    root.setHeight(40)
-    root.setFlexDirection(FLEX_DIRECTION_ROW)
-    root.setGap(C.GUTTER_ALL, 1)
+    function buildCardTree(): { root: Node; leaf: Node } {
+      const root = Node.create()
+      root.setWidth(120)
+      root.setHeight(40)
+      root.setFlexDirection(FLEX_DIRECTION_ROW)
+      root.setGap(C.GUTTER_ALL, 1)
 
-    let leafToMark: Node | undefined
-    for (let col = 0; col < 5; col++) {
-      const column = Node.create()
-      column.setFlexGrow(1)
-      column.setFlexShrink(1)
-      column.setFlexDirection(FLEX_DIRECTION_COLUMN)
-      root.insertChild(column, col)
+      let leaf: Node | undefined
+      for (let col = 0; col < 5; col++) {
+        const column = Node.create()
+        column.setFlexGrow(1)
+        column.setFlexShrink(1)
+        column.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        root.insertChild(column, col)
 
-      for (let row = 0; row < 20; row++) {
-        const card = Node.create()
-        card.setFlexDirection(FLEX_DIRECTION_COLUMN)
-        card.setBorder(EDGE_ALL, 1)
+        for (let row = 0; row < 20; row++) {
+          const card = Node.create()
+          card.setFlexDirection(FLEX_DIRECTION_COLUMN)
+          card.setBorder(EDGE_ALL, 1)
 
-        const text = Node.create()
-        const textLen = 15 + (row % 20)
-        text.setMeasureFunc((width: number) => {
-          const maxW = Number.isNaN(width) ? Infinity : width
-          const lines = Math.ceil(textLen / Math.max(1, maxW))
-          return { width: Math.min(textLen, maxW), height: lines }
-        })
-        card.insertChild(text, 0)
-        column.insertChild(card, row)
+          const text = Node.create()
+          const textLen = 15 + (row % 20)
+          text.setMeasureFunc((width: number) => {
+            const maxW = Number.isNaN(width) ? Infinity : width
+            const lines = Math.ceil(textLen / Math.max(1, maxW))
+            return { width: Math.min(textLen, maxW), height: lines }
+          })
+          card.insertChild(text, 0)
+          column.insertChild(card, row)
 
-        if (col === 2 && row === 10) {
-          leafToMark = text
+          if (col === 2 && row === 10) {
+            leaf = text
+          }
         }
       }
+      return { root, leaf: leaf! }
     }
 
+    const { root, leaf } = buildCardTree()
     root.calculateLayout(120, 40, DIRECTION_LTR)
 
-    const median = measureMs(() => {
-      leafToMark!.markDirty()
+    const dirty = measureMs(() => {
+      leaf.markDirty()
       root.calculateLayout(120, 40, DIRECTION_LTR)
     }, 100)
 
-    expect(median).toBeLessThan(1)
+    // The baseline is measured in this run, on this machine: the first layout of identical fresh trees.
+    // An absolute limit here flaked on shared CI runners (1.16ms and 1.10ms against 1ms, 26784),
+    // which run several times slower than a workstation. The property is relative: re-laying out one
+    // dirty leaf must cost a fraction of a full layout. Measured 0.08-0.21 of it; a dirty path that
+    // degrades to a full re-layout reads about 1.
+    const trees = Array.from({ length: 40 }, () => buildCardTree().root)
+    let next = 0
+    const cold = measureMs(() => {
+      trees[next++]!.calculateLayout(120, 40, DIRECTION_LTR)
+    }, 30)
+
+    expect(dirty).toBeLessThan(cold * 0.5)
   })
 })
 
