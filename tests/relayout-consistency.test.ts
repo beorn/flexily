@@ -873,6 +873,103 @@ describe("Fuzz: multi-step constraint sweep", () => {
   }
 })
 
+describe("Fuzz: structural edits across query containers (26875)", () => {
+  // A cache entry reads its nearest query container's frozen size, which the
+  // key does not hold, so a subtree carried to another container must not keep
+  // it. Both trees come from one spec: one is laid out before the edit, the
+  // other only after, and the two layouts must agree. Without the fix, seed 54
+  // (a move into another container) differs: 21 vs 16.
+  type Spec = {
+    parent: number
+    container: boolean
+    width: "auto" | "fixed" | "cqi"
+    size: number
+    shrink: number
+    row: boolean
+    measure: boolean
+  }
+  const specOf = (rng: () => number): Spec[] => {
+    const count = 4 + Math.floor(rng() * 8)
+    return Array.from({ length: count }, (_, i) => ({
+      parent: i === 0 ? -1 : Math.floor(rng() * i),
+      container: i > 0 && rng() < 0.35,
+      width: (["auto", "fixed", "cqi"] as const)[Math.floor(rng() * 3)]!,
+      size: 3 + Math.floor(rng() * 40),
+      shrink: Math.floor(rng() * 3),
+      row: rng() < 0.5,
+      measure: rng() < 0.3,
+    }))
+  }
+  const buildFrom = (specs: readonly Spec[]): Node[] => {
+    const nodes = specs.map((spec, i) => {
+      const node = Node.create()
+      if (i === 0) {
+        node.setWidth(60)
+        node.setHeight(24)
+        return node
+      }
+      // A query container sized by its content is circular; its own guard
+      // (intrinsic-leak) asks for an explicit width, so every container has one.
+      if (spec.container) {
+        node.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+        node.setWidth(spec.size)
+      } else if (spec.width === "fixed") node.setWidth(spec.size)
+      else if (spec.width === "cqi") node.setWidthCqi(10 + spec.size * 2)
+      node.setFlexShrink(spec.container ? 0 : spec.shrink)
+      node.setFlexDirection(spec.row ? FLEX_DIRECTION_ROW : FLEX_DIRECTION_COLUMN)
+      return node
+    })
+    specs.forEach((spec, i) => {
+      if (i > 0) nodes[spec.parent]!.insertChild(nodes[i]!, nodes[spec.parent]!.getChildCount())
+    })
+    specs.forEach((spec, i) => {
+      if (spec.measure && nodes[i]!.getChildCount() === 0) nodes[i]!.setMeasureFunc(textMeasure(spec.size))
+    })
+    return nodes
+  }
+  const within = (node: Node, ancestor: Node): boolean => {
+    for (let cur: Node | null = node; cur !== null; cur = cur.getParent()) if (cur === ancestor) return true
+    return false
+  }
+  type Edit = (nodes: Node[]) => void
+  const editOf = (rng: () => number, specs: readonly Spec[]): Edit => {
+    const pick = () => 1 + Math.floor(rng() * (specs.length - 1))
+    const kind = Math.floor(rng() * 3)
+    const node = pick()
+    const target = Math.floor(rng() * specs.length)
+    const size = 10 + Math.floor(rng() * 60)
+    if (kind === 0)
+      return (nodes) => {
+        if (within(nodes[target]!, nodes[node]!)) return
+        nodes[target]!.insertChild(nodes[node]!, nodes[target]!.getChildCount())
+      }
+    if (kind === 1) return (nodes) => nodes[node]!.getParent()?.removeChild(nodes[node]!)
+    return (nodes) => {
+      const added = Node.create()
+      added.setWidthCqi(size)
+      nodes[target]!.insertChild(added, nodes[target]!.getChildCount())
+    }
+  }
+  for (let seed = 0; seed < 96; seed++) {
+    it(`seed=${seed}: a move, removal or append matches a fresh layout`, () => {
+      const rng = createRng(seed * 7919 + 26875)
+      const specs = specOf(rng)
+      const edit = editOf(rng, specs)
+
+      const incremental = buildFrom(specs)
+      incremental[0]!.calculateLayout(60, 24, DIRECTION_LTR)
+      incremental[0]!.calculateLayout(60, 24, DIRECTION_LTR)
+      edit(incremental)
+      incremental[0]!.calculateLayout(60, 24, DIRECTION_LTR)
+
+      const fresh = buildFrom(specs)
+      edit(fresh)
+      fresh[0]!.calculateLayout(60, 24, DIRECTION_LTR)
+      expect(diffLayouts(getLayout(fresh[0]!), getLayout(incremental[0]!))).toEqual([])
+    })
+  }
+})
+
 describe("Fuzz: container query resize", () => {
   // Existing random trees never generate CQ or math widths. Keep a CQ ancestor
   // above a fixed-size intermediate node so unchanged child constraints cannot
