@@ -1081,7 +1081,12 @@ export class Node {
   }
 
   // Returns stable _layoutResult object to avoid allocation on cache hit
-  private cacheResult(entry: LayoutCacheEntry): { width: number; height: number; approx: boolean; unknownWidths: number } {
+  private cacheResult(entry: LayoutCacheEntry): {
+    width: number
+    height: number
+    approx: boolean
+    unknownWidths: number
+  } {
     this._layoutResult.width = entry.computedW
     this._layoutResult.height = entry.computedH
     this._layoutResult.approx = entry.approx
@@ -1118,7 +1123,10 @@ export class Node {
     let entry: LayoutCacheEntry | undefined
     for (let i = 0; i < LAYOUT_CACHE_SLOTS; i++) {
       const held = lc[i]!
-      if (held.exact === exact && sameCacheKey(held, availW, availH, containingW, containingH, allocatedW, allocatedH)) {
+      if (
+        held.exact === exact &&
+        sameCacheKey(held, availW, availH, containingW, containingH, allocatedW, allocatedH)
+      ) {
         entry = held
         break
       }

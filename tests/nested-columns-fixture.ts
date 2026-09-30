@@ -86,7 +86,10 @@ export function mountRow(factory: NodeFactory, spec: NestedColumnsSpec, fx: Nest
   const mount = spec.mounts[index]!
   const row = factory.create({ defaults: "css" })
   row.setFlexDirection(C.FLEX_DIRECTION_ROW)
-  row.insertChild(proseNode(factory, () => spec.mounts[index]!.proseLength), 0)
+  row.insertChild(
+    proseNode(factory, () => spec.mounts[index]!.proseLength),
+    0,
+  )
   fx.columns[mount.depth]!.insertChild(row, 0)
   return row
 }

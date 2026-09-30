@@ -130,4 +130,3 @@ export const applySpecEdit =
   }
 export const specPaddings = (tree: ReturnType<typeof buildSpecTree>) =>
   Object.values(tree.nodes).map((node) => node.getComputedPadding(EDGE_LEFT))
-

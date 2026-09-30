@@ -29,8 +29,7 @@ const mutations: Mutation[] = [
     file: "src/layout-zero.ts",
     find: `    root.resetLayoutCache(true)`,
     replace: `    // root.resetLayoutCache(true) // MUTATION: skip the pass-start intrinsic refresh`,
-    description:
-      "Skip the pass-start refresh of intrinsic lengths — a stale min-content should cause wrong results",
+    description: "Skip the pass-start refresh of intrinsic lengths — a stale min-content should cause wrong results",
     equivalent: true, // markDirty() and a query-size change clear min-content on every node whose inputs changed
   },
   {
@@ -87,8 +86,7 @@ const mutations: Mutation[] = [
       current._flex.layoutValid = false
     }
   }`,
-    description:
-      "Only mark the node itself dirty, skip ancestor propagation — parents won't know children changed",
+    description: "Only mark the node itself dirty, skip ancestor propagation — parents won't know children changed",
   },
   {
     name: "markDirty-keeps-lc",
@@ -213,8 +211,7 @@ const mutations: Mutation[] = [
         replace: `      true // MUTATION: and a dirty node answers from any pass`,
       },
     ],
-    description:
-      "Both defences against a changed subtree answering with its old size removed together (#26840 F1+F2)",
+    description: "Both defences against a changed subtree answering with its old size removed together (#26840 F1+F2)",
   },
   {
     name: "kinds-share-entries",
@@ -223,8 +220,8 @@ const mutations: Mutation[] = [
     replace: `      (entry.exact === exact || entry.exact) && // MUTATION: an exact entry answers an estimate`,
     also: [
       {
-        find: `      if (held.exact === exact && sameCacheKey(`,
-        replace: `      if (/* MUTATION: an exact write replaces the estimate */ sameCacheKey(`,
+        find: `        held.exact === exact &&`,
+        replace: `        true && // MUTATION: an exact write replaces the estimate`,
       },
     ],
     description:
@@ -298,8 +295,7 @@ const mutations: Mutation[] = [
   }`,
     replace: `  // MUTATION: skip display:none handling — nodes should still render
   // if (style.display === C.DISPLAY_NONE) { ... }`,
-    description:
-      "Skip display:none handling — hidden nodes would participate in layout and consume space",
+    description: "Skip display:none handling — hidden nodes would participate in layout and consume space",
     testFiles: ["tests/layout.test.ts"],
   },
   {
@@ -307,8 +303,7 @@ const mutations: Mutation[] = [
     file: "src/layout-zero.ts",
     find: `    if (!explicitShrink && childStyle.overflow !== C.OVERFLOW_VISIBLE) shrink = Math.max(shrink, 1)`,
     replace: `    // MUTATION: removed overflow flexShrink override`,
-    description:
-      "Remove CSS 4.5 overflow:hidden flexShrink override — overflow containers won't shrink to fit parent",
+    description: "Remove CSS 4.5 overflow:hidden flexShrink override — overflow containers won't shrink to fit parent",
     testFiles: ["tests/layout.test.ts"],
   },
   {

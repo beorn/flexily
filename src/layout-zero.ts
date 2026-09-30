@@ -570,8 +570,7 @@ function layoutNode(
   // before intrinsic child contributions. NaN keeps indefinite queries explicit.
   // MEASURE freezes nothing (#26840): it lets its own descent see the size it
   // would freeze and puts the stored one back at its exit.
-  const queryFreeze =
-    style.containerType !== C.CONTAINER_TYPE_NORMAL || node.getParent() === null ? nodeWidth : NaN
+  const queryFreeze = style.containerType !== C.CONTAINER_TYPE_NORMAL || node.getParent() === null ? nodeWidth : NaN
   let measureQuerySwapped = false
   let measureQueryOuter = NaN
   if (mode === MEASURE) {

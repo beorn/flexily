@@ -1300,7 +1300,11 @@ function expectNestedColumnsStepsMatchFresh(
   spec: NestedColumnsSpec,
   steps: Step<NestedColumnsState, NestedColumns>[],
 ): void {
-  expectStepsMatchFresh({ width: 220, height: 50, spec }, (state) => buildNestedColumns(Node, state.spec, state.width), steps)
+  expectStepsMatchFresh(
+    { width: 220, height: 50, spec },
+    (state) => buildNestedColumns(Node, state.spec, state.width),
+    steps,
+  )
 }
 
 const resizeTo =
@@ -1689,7 +1693,8 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
       const text = Node.create()
       text.setMeasureFunc((width, mode) => {
         const cells = state.cells
-        if (mode === C.MEASURE_MODE_UNDEFINED || !Number.isFinite(width) || width >= cells) return { width: cells, height: 1 }
+        if (mode === C.MEASURE_MODE_UNDEFINED || !Number.isFinite(width) || width >= cells)
+          return { width: cells, height: 1 }
         return { width, height: Math.ceil(cells / Math.max(1, Math.floor(width))) }
       })
       // 5 cells in a 1-wide row: the item's estimate is approximate.
