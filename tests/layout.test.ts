@@ -2252,9 +2252,10 @@ describe("Flexily Layout Engine", () => {
         expect(second.getComputedWidth()).toBe(20)
         root.freeRecursive()
       })
-      it("keeps a fractional-inset item's 50% row within its containing box", () => {
-        // The inset rounds the auto item's edges. A deferred percentage may
-        // change the row's contents, but cannot widen them past that item.
+      it("keeps a fractional-inset item's 50% row within the item it resolves against", () => {
+        // The inset rounds the auto item's edges. The row's percentage has no
+        // base until the item is sized, so the item lays out once more; after
+        // that repeat no box may be wider than the box that took its size from it.
         const make = () => EngineNode.create({ defaults: "css" })
         const root = make()
         root.setWidth(100)
@@ -2263,8 +2264,6 @@ describe("Flexily Layout Engine", () => {
         const item = make()
         item.setPositionType(POSITION_TYPE_RELATIVE)
         item.setPositionPercent(EDGE_LEFT, 1.4)
-        const inner = make()
-        inner.setWidth(20.1)
         const row = make()
         row.setFlexDirection(FLEX_DIRECTION_ROW)
         row.setWidthPercent(50)
@@ -2275,16 +2274,42 @@ describe("Flexily Layout Engine", () => {
           height: 1,
         }))
         insert(row, text)
-        insert(inner, row)
-        insert(item, inner)
+        insert(item, row)
         insert(root, item)
         root.calculateLayout(100, 40, DIRECTION_LTR)
         expect(item.getComputedLeft()).toBe(1)
         expect(item.getComputedWidth()).toBeGreaterThan(0)
-        expect(inner.getComputedWidth()).toBeLessThanOrEqual(item.getComputedWidth())
         expect(row.getComputedWidth()).toBeGreaterThan(0)
-        expect(row.getComputedWidth()).toBeLessThanOrEqual(inner.getComputedWidth())
+        expect(row.getComputedWidth()).toBeLessThan(item.getComputedWidth())
         expect(text.getComputedWidth()).toBeLessThanOrEqual(row.getComputedWidth())
+        root.freeRecursive()
+      })
+      it("lays out a repeated item the same on a second pass, clean or dirtied", () => {
+        // The repeat reads a per-pass count; a count left over from the first
+        // pass, or a cached first layout, must not change the second.
+        const make = () => EngineNode.create({ defaults: "css" })
+        const root = make()
+        root.setWidth(120)
+        root.setFlexDirection(FLEX_DIRECTION_ROW)
+        const box = make()
+        box.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        box.setMaxWidth(36)
+        const row = make()
+        row.setFlexDirection(FLEX_DIRECTION_ROW)
+        row.setWidthPercent(50)
+        const text = make()
+        text.setMeasureFunc((width) => ({ width: Math.min(20, Number.isFinite(width) ? width : 20), height: 1 }))
+        insert(row, text)
+        insert(box, row)
+        insert(root, box)
+        const widths = () => [box, row, text].map((node) => node.getComputedWidth())
+        root.calculateLayout(120, 40, DIRECTION_LTR)
+        expect(widths()).toEqual([20, 10, 10])
+        root.calculateLayout(120, 40, DIRECTION_LTR)
+        expect(widths()).toEqual([20, 10, 10])
+        text.markDirty()
+        root.calculateLayout(120, 40, DIRECTION_LTR)
+        expect(widths()).toEqual([20, 10, 10])
         root.freeRecursive()
       })
       it.each([
