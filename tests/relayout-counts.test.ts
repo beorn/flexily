@@ -9,6 +9,14 @@
  * and does not depend on what the clean rows contain.
  *
  * Only the zero engine counts calls; classic has no layout cache.
+ *
+ * @failure  One dirty leaf relayouts every clean row beside it again: yrd
+ *           watch at 220x50 spent 87 ms of layout a second (8,197 layoutNode
+ *           calls per pass) on a 1-row update before #26840.
+ * @level    l0 (flexily engine, no renderer)
+ * @consumer silvery's incremental layout of deep auto-height columns: yrd
+ *           watch, its detail pane, km board views
+ * @testonly none
  */
 import { describe, expect, it } from "vitest"
 import { DIRECTION_LTR, Node } from "../src/index.js"

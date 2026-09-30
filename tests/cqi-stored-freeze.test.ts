@@ -5,6 +5,13 @@
  * apart from relayout-consistency.test.ts so that the mutation tests of
  * scripts/mutation-test.ts, which run that file, never read a pinned row
  * flipping as a caught mutation.
+ *
+ * @failure  A cqi length resolves against a query size frozen by an earlier
+ *           pass, so an incremental layout differs from a fresh one; when
+ *           #26857 lands these rows pass and must be turned into plain rows.
+ * @level    l0 (flexily engine, no renderer)
+ * @consumer container-query users under incremental relayout (#26857)
+ * @testonly none
  */
 import { describe, it } from "vitest"
 import {
