@@ -2313,12 +2313,10 @@ describe("Flexily Layout Engine", () => {
         expect(widths()).toEqual([20, 10, 10])
         root.freeRecursive()
       })
-      it.each([
-        [true, 8],
-        [false, 0],
-      ] as const)("raises the pass count once per percentage item on a depth-8 chain (percentages %s)", (pct, rises) => {
-        // A repeated layout gives the item its width, so it never raises the
-        // count again: a repeat never causes a repeat (at most one per item).
+      it("halves every percentage row of a depth-4 chain under an auto item", () => {
+        // Each first layout that meets the unknown base owes one repeat; after
+        // it every 50% row resolves against its parent. Classic's cost for this
+        // chain (at most twice the chain without percentages) is recorded on #26660.
         const make = () => EngineNode.create({ defaults: "css" })
         const root = make()
         root.setWidth(120)
@@ -2326,20 +2324,57 @@ describe("Flexily Layout Engine", () => {
         let parent = make()
         parent.setFlexDirection(FLEX_DIRECTION_ROW)
         insert(root, parent)
-        for (let level = 0; level < 8; level++) {
+        const chain = [parent]
+        for (let level = 0; level < 4; level++) {
           const item = make()
           item.setFlexDirection(FLEX_DIRECTION_ROW)
-          if (pct) item.setWidthPercent(50)
+          item.setWidthPercent(50)
           insert(parent, item)
+          chain.push(item)
           parent = item
         }
         const text = make()
         text.setMeasureFunc((width) => ({ width: Math.min(64, Number.isFinite(width) ? width : 64), height: 1 }))
         insert(parent, text)
         root.calculateLayout(120, 40, DIRECTION_LTR)
-        expect(unknownBaseWidthCount()).toBe(rises)
+        expect(chain.map((node) => node.getComputedWidth())).toEqual([64, 32, 16, 8, 4])
+        expect(text.getComputedWidth()).toBe(4)
         root.freeRecursive()
       })
+      // Zero gives an item one first layout per pass, so one rise per item.
+      // Classic re-lays an item 2^k times before any percentage (no cache), and
+      // each of those first layouts raises the count; its bound lives on #26660.
+      if (_engine === "zero")
+        it.each([
+          [true, 8],
+          [false, 0],
+        ] as const)(
+          "raises the pass count once per percentage item on a depth-8 chain (percentages %s)",
+          (pct, rises) => {
+            // A repeated layout gives the item its width, so it never raises the
+            // count again: a repeat never causes a repeat (at most one per item).
+            const make = () => EngineNode.create({ defaults: "css" })
+            const root = make()
+            root.setWidth(120)
+            root.setFlexDirection(FLEX_DIRECTION_ROW)
+            let parent = make()
+            parent.setFlexDirection(FLEX_DIRECTION_ROW)
+            insert(root, parent)
+            for (let level = 0; level < 8; level++) {
+              const item = make()
+              item.setFlexDirection(FLEX_DIRECTION_ROW)
+              if (pct) item.setWidthPercent(50)
+              insert(parent, item)
+              parent = item
+            }
+            const text = make()
+            text.setMeasureFunc((width) => ({ width: Math.min(64, Number.isFinite(width) ? width : 64), height: 1 }))
+            insert(parent, text)
+            root.calculateLayout(120, 40, DIRECTION_LTR)
+            expect(unknownBaseWidthCount()).toBe(rises)
+            root.freeRecursive()
+          },
+        )
       it.each([
         ["height", 16, 0, 16],
         ["height", 50, 0, 36],
