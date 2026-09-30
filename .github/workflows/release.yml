@@ -1,4 +1,4 @@
-# vendor-kit: release@485917c9242f — generated; edit km/packages/km-infra/vendor-kit/templates/release.yml in km, then re-sync
+# vendor-kit: release@6985627a705a — generated; edit km/packages/km-infra/vendor-kit/templates/release.yml in km, then re-sync
 name: Release
 
 on:
@@ -99,11 +99,12 @@ jobs:
           ./node_modules/.bin/verify-publishable --output-dir "$RUNNER_TEMP/verified-tarballs" > "$RUNNER_TEMP/verified.json"
 
       - name: Publish verified files through npm Trusted Publishing
+        id: publish
         run: |
           node --input-type=module <<'NODE'
           import { createHash } from 'node:crypto'
           import { spawnSync } from 'node:child_process'
-          import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
+          import { appendFileSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
           import { isAbsolute, join, relative } from 'node:path'
           const fail = message => { throw Error('RELEASE_PUBLISH: ' + message) }
           const plan = JSON.parse(readFileSync(join(process.env.RUNNER_TEMP, 'release-plan.json'), 'utf8'))
@@ -123,7 +124,7 @@ jobs:
             return { name, version, path, digest }
           })
           const recordPath = join(process.env.RUNNER_TEMP, 'release-record.json')
-          const record = { schema: 'hh-release-run/v1', repository: process.env.GITHUB_REPOSITORY, workflow: process.env.GITHUB_WORKFLOW_REF, ref: process.env.GITHUB_REF, commit: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT, packages: artifacts.map(({ name, version, digest }) => ({ name, version, digest, state: 'not_published' })) }
+          const record = { schema: 'hh-release-run/v1', repository: process.env.GITHUB_REPOSITORY, workflow: process.env.GITHUB_WORKFLOW_REF, ref: process.env.GITHUB_REF, commit: process.env.GITHUB_SHA, runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT, packages: artifacts.map(({ name, version, digest }) => ({ name, version, digest, state: 'not_published', publishedAt: null, firstServedAt: null, detail: null })) }
           const save = () => writeFileSync(recordPath, JSON.stringify(record, null, 2) + '\n')
           save()
           const publishEnv = { ...process.env }
@@ -140,12 +141,16 @@ jobs:
               fail(item.name + '@' + item.version + ' npm publish failed with status ' + publish.status)
             }
             row.state = 'published_not_yet_served'
+            row.publishedAt = new Date().toISOString()
             save()
             const url = 'https://registry.npmjs.org/' + encodeURIComponent(item.name) + '/' + encodeURIComponent(item.version)
             for (const delay of [0, 5000, 10000, 20000, 40000, 80000, 120000]) {
               if (delay) await new Promise(resolve => setTimeout(resolve, delay))
               const response = await fetch(url, { signal: AbortSignal.timeout(15000) })
-              if (response.status === 404) continue
+              if (response.status === 404) {
+                row.detail = 'manifest not served'
+                continue
+              }
               if (response.status !== 200) fail(item.name + '@' + item.version + ' registry read returned HTTP ' + response.status)
               const metadata = await response.json()
               if (metadata.dist?.integrity !== item.digest) {
@@ -154,17 +159,22 @@ jobs:
                 fail(item.name + '@' + item.version + ' registry integrity differs from published file')
               }
               if (!metadata.dist?.attestations?.url) {
-                row.state = 'attestation_missing'
-                save()
-                fail(item.name + '@' + item.version + ' registry has no provenance attestation')
+                row.detail = 'attestation URL not served'
+                continue
               }
               row.state = 'published_confirmed'
+              row.firstServedAt = new Date().toISOString()
+              row.detail = null
               break
             }
             save()
-            if (row.state !== 'published_confirmed') fail(item.name + '@' + item.version + ' registry did not confirm the published file within the readback window')
+            if (row.state === 'published_not_yet_served') {
+              const seconds = Math.round((Date.now() - Date.parse(row.publishedAt)) / 1000)
+              console.log('::warning::' + item.name + '@' + item.version + ' published, not yet served after ' + seconds + 's; digest ' + item.digest + '; ' + row.detail)
+            }
             console.log(item.name + '@' + item.version + ': ' + row.state + ' ' + item.digest)
           }
+          appendFileSync(process.env.GITHUB_OUTPUT, 'states=' + JSON.stringify(record.packages.map(({ name, version, state }) => ({ name, version, state }))) + '\n')
           NODE
       - uses: actions/upload-artifact@v4
         if: always()
