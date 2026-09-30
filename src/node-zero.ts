@@ -460,8 +460,12 @@ export class Node {
       ancestor = ancestor._parent
     }
 
+    // A moved node's cache entries read the nearest query container's frozen
+    // size, which is not in their key: carried under a different size, they
+    // are stale. A move that keeps the size (a reorder) keeps them (26875).
+    const movedFrom = child._parent === null ? undefined : findContainerQuerySize(child)
     if (child._parent !== null) {
-      child._parent.removeChild(child)
+      child._parent.detachChild(child)
     }
     child._parent = this
     // Clamp index to valid range to ensure deterministic behavior
@@ -472,6 +476,7 @@ export class Node {
     for (let i = clampedIndex + 1; i < this._children.length; i++) {
       this._children[i]!._flex.layoutValid = false
     }
+    if (movedFrom !== undefined && !Object.is(movedFrom, findContainerQuerySize(child))) child.resetLayoutCache()
     this.markDirty()
   }
 
@@ -484,17 +489,24 @@ export class Node {
    * @param child - The child node to remove
    */
   removeChild(child: Node): void {
+    // A detached subtree's next insert cannot know the query size its entries
+    // were computed under, so they go now (26875).
+    if (this.detachChild(child)) child.resetLayoutCache()
+  }
+
+  /** Unlink `child` without touching its cache; insertChild's move path. */
+  private detachChild(child: Node): boolean {
     const index = this._children.indexOf(child)
-    if (index !== -1) {
-      this._children.splice(index, 1)
-      child._parent = null
-      // Invalidate layoutValid for remaining siblings after the removal point
-      // Their positions may change due to the removal
-      for (let i = index; i < this._children.length; i++) {
-        this._children[i]!._flex.layoutValid = false
-      }
-      this.markDirty()
+    if (index === -1) return false
+    this._children.splice(index, 1)
+    child._parent = null
+    // Invalidate layoutValid for remaining siblings after the removal point
+    // Their positions may change due to the removal
+    for (let i = index; i < this._children.length; i++) {
+      this._children[i]!._flex.layoutValid = false
     }
+    this.markDirty()
+    return true
   }
 
   /**

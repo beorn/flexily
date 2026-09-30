@@ -1773,7 +1773,21 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
 
       const fresh = build(to)
       fresh.root.calculateLayout(60, 24, DIRECTION_LTR)
-      // Child order differs for "root" (the holder lands after the containers either way).
+      // The holder lands after the containers' own children either way.
+      expect(getLayout(moved.root)).toEqual(getLayout(fresh.root))
+    })
+
+    it.each(moves)("removed from %s, then inserted into %s, matches a fresh layout", (from, to) => {
+      const moved = build(from)
+      moved.root.calculateLayout(60, 24, DIRECTION_LTR)
+      moved.holder.getParent()!.removeChild(moved.holder)
+      moved.root.calculateLayout(60, 24, DIRECTION_LTR)
+      const target = to === "root" ? moved.root : to === "narrow" ? moved.shrinker : moved.wide
+      target.insertChild(moved.holder, target.getChildCount())
+      moved.root.calculateLayout(60, 24, DIRECTION_LTR)
+
+      const fresh = build(to)
+      fresh.root.calculateLayout(60, 24, DIRECTION_LTR)
       expect(getLayout(moved.root)).toEqual(getLayout(fresh.root))
     })
   })
