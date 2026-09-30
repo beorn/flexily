@@ -1726,6 +1726,58 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
     ])
   })
 
+  // A moved node's entries read the nearest query container's frozen size
+  // (findContainerQuerySize), which is not in the cache key. Insert and remove
+  // mark only the parent chain dirty, so a subtree carried across a container
+  // boundary must not keep the entries it computed under the old container
+  // (@dev/review2 seed 833, 26875).
+  describe("cache-moved-subtree: a subtree moved across a query-container boundary", () => {
+    type Place = "root" | "narrow" | "wide"
+    const build = (place: Place) => {
+      const root = Node.create()
+      root.setWidth(60)
+      root.setHeight(24)
+      const narrow = Node.create()
+      narrow.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+      narrow.setWidth(5)
+      const shrinker = Node.create()
+      shrinker.setFlexShrink(2)
+      const wide = Node.create()
+      wide.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+      wide.setWidth(20)
+      const holder = Node.create()
+      const sized = Node.create()
+      sized.setWidthCqi(55)
+      holder.insertChild(sized, 0)
+      narrow.insertChild(shrinker, 0)
+      root.insertChild(narrow, 0)
+      root.insertChild(wide, 1)
+      if (place === "root") root.insertChild(holder, 2)
+      else if (place === "narrow") shrinker.insertChild(holder, 0)
+      else wide.insertChild(holder, 0)
+      return { root, shrinker, wide, holder }
+    }
+    const moves: Array<[Place, Place]> = [
+      ["root", "narrow"],
+      ["narrow", "root"],
+      ["wide", "narrow"],
+      ["narrow", "wide"],
+    ]
+    it.each(moves)("from %s into %s matches a fresh layout", (from, to) => {
+      const moved = build(from)
+      moved.root.calculateLayout(60, 24, DIRECTION_LTR)
+      moved.root.calculateLayout(60, 24, DIRECTION_LTR)
+      const target = to === "root" ? moved.root : to === "narrow" ? moved.shrinker : moved.wide
+      target.insertChild(moved.holder, target.getChildCount())
+      moved.root.calculateLayout(60, 24, DIRECTION_LTR)
+
+      const fresh = build(to)
+      fresh.root.calculateLayout(60, 24, DIRECTION_LTR)
+      // Child order differs for "root" (the holder lands after the containers either way).
+      expect(getLayout(moved.root)).toEqual(getLayout(fresh.root))
+    })
+  })
+
   // Query containers under the contract, without cqi: every seed matches fresh.
   for (let seed = 1; seed <= 300; seed++) {
     it(`seeded query containers without cqi ${seed}: random edits match fresh`, () => {
