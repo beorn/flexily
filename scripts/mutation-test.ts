@@ -191,6 +191,33 @@ const mutations: Mutation[] = [
       "A MEASURE call answers from measureNode's flex-basis estimate instead of a layoutNode result (#26840 exact entries)",
   },
   {
+    name: "estimate-reads-exact",
+    file: "src/node-zero.ts",
+    find: `      entry.exact === exact &&`,
+    replace: `      (entry.exact === exact || entry.exact) && // MUTATION: an exact entry answers an estimate`,
+    description:
+      "measureNode and the Phase 5/6c probes accept an exact MEASURE entry, where a fresh pass computes the estimate (#26840, seed 6000)",
+  },
+  {
+    name: "restretch-reads-fingerprint-origin",
+    file: "src/layout-zero.ts",
+    find: `        const cAbsX = isContainer ? child.flex.passedAbsX : absX + innerLeft + savedLeft - cMarginL
+        const cAbsY = isContainer ? child.flex.passedAbsY : absY + innerTop + savedTop - cMarginT`,
+    replace: `        const cAbsX = isContainer ? child.flex.lastAbsX : absX + innerLeft + savedLeft - cMarginL // MUTATION
+        const cAbsY = isContainer ? child.flex.lastAbsY : absY + innerTop + savedTop - cMarginT`,
+    description:
+      "Phase 9b re-stretches at the fingerprint's origin, which a MEASURE call never writes (#26840, seed 5987)",
+  },
+  {
+    name: "measure-restore-skips-refresh",
+    file: "src/node-zero.ts",
+    find: `    this._frozenQuerySize = stored
+    this.refreshQueryDependents()`,
+    replace: `    this._frozenQuerySize = stored // MUTATION: keep entries derived from the MEASURE query size`,
+    description:
+      "A MEASURE call's descent cached sizes under its own query size and they survive the restore (#26840 C1)",
+  },
+  {
     name: "measure-freezes-query-size",
     file: "src/layout-zero.ts",
     find: `  if (mode === MEASURE) {

@@ -40,17 +40,20 @@ function leafEditCost(depth: number, rows: number, proseBoxes: number) {
 //   (allocated width) that misses, the same Phase 8 MEASURE reached again
 //   through the other ancestor MEASURE, which hits, and 1 LAYOUT = 4;
 // - the innermost column is measured under both keys, and each visits every
-//   row, so a clean row costs 2 MEASURE hits + 1 LAYOUT fingerprint hit = 3;
+//   row: 2 MEASURE hits; its LAYOUT then re-derives each approximate row in
+//   Phase 5b (the flex-basis estimate is approximate), an exact-entry hit; and
+//   the row's LAYOUT is a fingerprint hit: a clean row costs 4;
 // - the dirty row and its subtree cost a constant 13.
-// Total 1 + 2 + 3 + 4(D-2) + 3(K-1) + 13 = 4D + 3K + 8.
-const layoutBound = (depth: number, rows: number) => 4 * depth + 3 * rows + 8
-// measureNode: 5 per column level and 3 per row plus 2, derived the same way
-// from the Phase 5/6c flex-basis probes that miss.
+// Total 1 + 2 + 3 + 4(D-2) + 4(K-1) + 13 = 4D + 4K + 7.
+const layoutBound = (depth: number, rows: number) => 4 * depth + 4 * rows + 7
+// measureNode: 5 per column level and 3 per row plus 2 (measured on the same
+// grid; estimates are cached apart from exact entries, so the estimate probes
+// of the dirty path miss and every clean row's probes hit).
 const measureBound = (depth: number, rows: number) => 5 * depth + 3 * rows + 2
 
 describe("relayout cost of one leaf edit (#26840)", () => {
-  it("Fx(4,10,2) costs exactly 54 layoutNode calls (main before #26840: 405)", () => {
-    expect(leafEditCost(4, 10, 2).layoutNodeCalls).toBe(54)
+  it("Fx(4,10,2) costs exactly 63 layoutNode calls (main before #26840: 405)", () => {
+    expect(leafEditCost(4, 10, 2).layoutNodeCalls).toBe(63)
   })
 
   it.each([
@@ -61,7 +64,7 @@ describe("relayout cost of one leaf edit (#26840)", () => {
     [2, 20],
     [4, 20],
     [8, 20],
-  ])("Fx(%i,%i,2) stays within 4D+3K+8 layoutNode and 5D+3K+2 measureNode calls", (depth, rows) => {
+  ])("Fx(%i,%i,2) stays within 4D+4K+7 layoutNode and 5D+3K+2 measureNode calls", (depth, rows) => {
     const cost = leafEditCost(depth, rows, 2)
     expect(cost.layoutNodeCalls).toBeLessThanOrEqual(layoutBound(depth, rows))
     expect(cost.measureNodeCalls).toBeLessThanOrEqual(measureBound(depth, rows))
