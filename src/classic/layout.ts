@@ -11,6 +11,7 @@ import type { Value } from "../types.js"
 import {
   resolveValue,
   applyMinMax,
+  countUnknownBaseWidth,
   pctIndefinite,
   swapUnknownBaseWidthCount,
   unknownBaseWidthCount,
@@ -467,6 +468,7 @@ function layoutNode(
   // When available dimension is NaN (unconstrained), auto-sized nodes use NaN
   // and will be sized by shrink-wrap logic based on children
   let nodeWidth: number
+  if (Number.isNaN(usedWidth)) countUnknownBaseWidth(style.width, availableWidth)
   if (!Number.isNaN(usedWidth)) {
     nodeWidth = usedWidth
   } else if (style.width.unit === C.UNIT_POINT) {

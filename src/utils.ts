@@ -356,11 +356,11 @@ export function evaluateMathExpr(
   return val
 }
 
-// Width percentages met with an unknown base in this layout pass. A row reads
-// it around one item's layout and repeats that layout once when it rose (#26660).
+// Nodes in this layout pass whose own percentage width had no base yet. A row
+// reads it around one item's layout and repeats that layout once when it rose (#26660).
 let unknownBaseWidths = 0
 
-/** The pass count of width percentages sized as content for an unknown base. */
+/** The pass count of nodes that sized their own percentage width as content. */
 export function unknownBaseWidthCount(): number {
   return unknownBaseWidths
 }
@@ -376,10 +376,12 @@ export function swapUnknownBaseWidthCount(value: number): number {
  * Alignment eligibility and parent allocation are separate questions.
  */
 export function widthUsesContent(value: Value, available: number): boolean {
-  if (!isLength(value.unit)) return true
-  if (!pctIndefinite(value, available)) return false
-  unknownBaseWidths++
-  return true
+  return !isLength(value.unit) || pctIndefinite(value, available)
+}
+
+/** Count a node's own percentage width that must size as content for now. */
+export function countUnknownBaseWidth(value: Value, available: number): void {
+  if (isLength(value.unit) && pctIndefinite(value, available)) unknownBaseWidths++
 }
 
 /** True when a percentage or percentage-containing math constraint is indefinite. */

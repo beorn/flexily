@@ -20,6 +20,7 @@ import { assertLengthAxis } from "./length.js"
 import type { Node } from "./node-zero.js"
 import {
   applyMinMax,
+  countUnknownBaseWidth,
   findContainerQuerySize,
   isLength,
   pctIndefinite,
@@ -369,6 +370,7 @@ function layoutNode(
   // Used for cqi/cqmin resolution of width/height/etc. on this node — the node's
   // OWN inline-size resolves against its parent's containment context, never its own.
   const hasAllocatedWidth = Number.isFinite(allocatedWidth)
+  if (!hasAllocatedWidth) countUnknownBaseWidth(style.width, availableWidth)
   const hasAllocatedHeight = Number.isFinite(allocatedHeight)
 
   let nodeWidth: number
