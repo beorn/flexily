@@ -172,6 +172,14 @@ export interface FlexInfo {
    * distribute from it.
    */
   baseApprox: boolean
+  /**
+   * The absolute origin (flow margin-box, as layoutNode's absX/absY) this
+   * node's parent passed it in Phase 8, in either mode. Phase 9b re-lays a
+   * stretched child at it. The fingerprint's lastAbsX/lastAbsY are not a
+   * substitute: a MEASURE call writes no fingerprint (#26840).
+   */
+  passedAbsX: number
+  passedAbsY: number
 
   // Constraint fingerprinting for layout caching
   /** Last availableWidth passed to layoutNode */

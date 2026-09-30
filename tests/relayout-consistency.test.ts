@@ -1280,34 +1280,57 @@ describe("Fuzz: content change", () => {
 // incrementally, and compares every box against a tree built fresh from the
 // spec.
 
-interface NestedColumnsStep {
+interface Step<State, Tree> {
   name: string
-  width?: number
-  apply: (spec: NestedColumnsSpec, live: NestedColumns) => void
+  apply: (state: State, live: Tree) => void
 }
 
-function expectNestedColumnsStepsMatchFresh(spec: NestedColumnsSpec, steps: NestedColumnsStep[]): void {
-  let width = 220
-  const live = buildNestedColumns(Node, spec, width)
-  live.root.calculateLayout(width, 50, DIRECTION_LTR)
-  live.root.calculateLayout(width, 50, DIRECTION_LTR)
+// Lay the live tree out twice, then for each step: edit, lay out incrementally,
+// and compare every box (and any extra `facts`) against a fresh build.
+function expectStepsMatchFresh<State extends { width: number; height: number }, Tree extends { root: Node }>(
+  state: State,
+  build: (state: State) => Tree,
+  steps: Step<State, Tree>[],
+  facts: (tree: Tree) => unknown = () => null,
+): void {
+  const live = build(state)
+  live.root.calculateLayout(state.width, state.height, DIRECTION_LTR)
+  live.root.calculateLayout(state.width, state.height, DIRECTION_LTR)
   for (const step of steps) {
-    step.apply(spec, live)
-    if (step.width !== undefined) {
-      width = step.width
-      live.root.setWidth(width)
-    }
-    live.root.calculateLayout(width, 50, DIRECTION_LTR)
-    const fresh = buildNestedColumns(Node, spec, width)
-    fresh.root.calculateLayout(width, 50, DIRECTION_LTR)
+    step.apply(state, live)
+    live.root.calculateLayout(state.width, state.height, DIRECTION_LTR)
+    const fresh = build(state)
+    fresh.root.calculateLayout(state.width, state.height, DIRECTION_LTR)
     const diffs = diffLayouts(getLayout(fresh.root), getLayout(live.root))
+    const freshFacts = facts(fresh)
     fresh.root.freeRecursive()
     if (diffs.length > 0) {
       expect.unreachable(`step "${step.name}" differs from fresh (${diffs.length} diffs):\n  ${diffs.join("\n  ")}`)
     }
+    expect(facts(live), `step "${step.name}"`).toEqual(freshFacts)
   }
   live.root.freeRecursive()
 }
+
+interface NestedColumnsState {
+  width: number
+  height: number
+  spec: NestedColumnsSpec
+}
+
+function expectNestedColumnsStepsMatchFresh(
+  spec: NestedColumnsSpec,
+  steps: Step<NestedColumnsState, NestedColumns>[],
+): void {
+  expectStepsMatchFresh({ width: 220, height: 50, spec }, (state) => buildNestedColumns(Node, state.spec, state.width), steps)
+}
+
+const resizeTo =
+  (width: number) =>
+  (state: NestedColumnsState, live: NestedColumns): void => {
+    state.width = width
+    live.root.setWidth(width)
+  }
 
 describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
   it("Fx(4,10,2): leaf edits, a resize, a query-container resize and a mount each match fresh", () => {
@@ -1317,46 +1340,86 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
     expectNestedColumnsStepsMatchFresh(spec, [
       {
         name: "a prose wraps differently",
-        apply: (s, live) => {
+        apply: ({ spec: s }, live) => {
           s.proseLengths[3]![1] = 470
           live.proses[3]![1]!.markDirty()
         },
       },
       {
         name: "the last label narrows",
-        apply: (s, live) => {
+        apply: ({ spec: s }, live) => {
           s.labelWidths[9] = 7
           live.labels[9]!.markDirty()
         },
       },
       {
         name: "the first prose shrinks to one line",
-        apply: (s, live) => {
+        apply: ({ spec: s }, live) => {
           s.proseLengths[0]![0] = 40
           live.proses[0]![0]!.markDirty()
         },
       },
       {
         name: "a middle label widens",
-        apply: (s, live) => {
+        apply: ({ spec: s }, live) => {
           s.labelWidths[5] = 55
           live.labels[5]!.markDirty()
         },
       },
-      { name: "the root narrows 220 -> 180", width: 180, apply: () => {} },
-      { name: "the query container widens 180 -> 200", width: 200, apply: () => {} },
+      { name: "the root narrows 220 -> 180", apply: resizeTo(180) },
+      { name: "the query container widens 180 -> 200", apply: resizeTo(200) },
       {
         name: "a dirty row mounts mid-chain",
-        apply: (s, live) => {
+        apply: ({ spec: s }, live) => {
           s.mounts.push({ depth: 2, proseLength: 390 })
           mountRow(Node, s, live, s.mounts.length - 1)
         },
       },
       {
         name: "a prose under the mount changes after it",
-        apply: (s, live) => {
+        apply: ({ spec: s }, live) => {
           s.proseLengths[7]![0] = 12
           live.proses[7]![0]!.markDirty()
+        },
+      },
+    ])
+  })
+
+  // A clean row measured for the first time while its fingerprint is valid:
+  // the sibling's flexGrow arms the column's Phase 5b, and the row's MEASURE
+  // geometry differs from its layout (its percentage minHeight has no base
+  // without the column's height), so every child box it moved must come back.
+  it("a clean row first measured under a valid fingerprint keeps its children's boxes", () => {
+    const state = { width: 100, height: 30, grow: 0 }
+    const build = (st: typeof state) => {
+      const root = Node.create()
+      root.setWidth(st.width)
+      root.setHeight(st.height)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      const row = Node.create()
+      row.setFlexDirection(FLEX_DIRECTION_ROW)
+      row.setAlignItems(C.ALIGN_CENTER)
+      row.setMinHeightPercent(50)
+      const tag = Node.create()
+      tag.setWidth(10)
+      tag.setHeight(1)
+      const text = Node.create()
+      text.setMeasureFunc(textMeasure(300))
+      row.insertChild(tag, 0)
+      row.insertChild(text, 1)
+      const sibling = Node.create()
+      sibling.setHeight(1)
+      sibling.setFlexGrow(st.grow)
+      root.insertChild(row, 0)
+      root.insertChild(sibling, 1)
+      return { root, sibling }
+    }
+    expectStepsMatchFresh(state, build, [
+      {
+        name: "the sibling starts to grow",
+        apply: (st, live) => {
+          st.grow = 1
+          live.sibling.setFlexGrow(1)
         },
       },
     ])
@@ -1373,14 +1436,14 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
         spec.labelWidths[k] = pick(1, 60)
         for (let j = 0; j < spec.proseBoxes; j++) spec.proseLengths[k]![j] = pick(1, 600)
       }
-      const steps: NestedColumnsStep[] = []
+      const steps: Step<NestedColumnsState, NestedColumns>[] = []
       for (let n = 0; n < 4; n++) {
         const k = pick(0, rows - 1)
         if (rng() < 0.5) {
           const labelWidth = pick(1, 60)
           steps.push({
             name: `label ${k} -> ${labelWidth}`,
-            apply: (s, live) => {
+            apply: ({ spec: s }, live) => {
               s.labelWidths[k] = labelWidth
               live.labels[k]!.markDirty()
             },
@@ -1390,7 +1453,7 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
           const length = pick(1, 600)
           steps.push({
             name: `prose ${k}.${j} -> ${length}`,
-            apply: (s, live) => {
+            apply: ({ spec: s }, live) => {
               s.proseLengths[k]![j] = length
               live.proses[k]![j]!.markDirty()
             },

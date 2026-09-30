@@ -304,6 +304,8 @@ export class Node {
     relativeIndex: -1,
     baseline: 0,
     baseApprox: false,
+    passedAbsX: NaN,
+    passedAbsY: NaN,
     // Constraint fingerprinting
     lastAvailW: NaN,
     lastAvailH: NaN,
@@ -1019,10 +1021,17 @@ export class Node {
    * (`layoutGeneration()`), as Yoga's `generationCount` does: its content
    * changed since any older entry, but not since one this pass wrote.
    *
-   * `exactOnly` asks for an entry a full layoutNode wrote (the MEASURE mode of
-   * layout-zero.ts), never one measureNode's shortcut wrote. Such an entry also
-   * reports `unknownWidths`, the percentage widths its descent counted, so a
-   * hit can replay that count (#26660).
+   * Two kinds of entry never answer each other, even under the same key:
+   * - an estimate (`exact` false), written by measureNode's shortcut and the
+   *   Phase 5/6c flex-basis probes, answers only those callers;
+   * - an exact entry (`exact` true), written by a full layoutNode in MEASURE
+   *   mode (layout-zero.ts), answers only MEASURE. It also reports
+   *   `unknownWidths`, the percentage widths its descent counted, so a hit can
+   *   replay that count (#26660).
+   * An exact answer to the same key is not the answer an estimator wants: the
+   * estimator models how the parent would lay the child out, and an estimate
+   * read back where a fresh pass would compute one keeps an incremental pass
+   * on the fresh pass's path.
    *
    * NaN dimensions are handled specially via Object.is (NaN === NaN is false, but Object.is(NaN, NaN) is true).
    */
@@ -1033,13 +1042,13 @@ export class Node {
     containingH: number = availH,
     allocatedW: number = NaN,
     allocatedH: number = NaN,
-    exactOnly: boolean = false,
+    exact: boolean = false,
   ): { width: number; height: number; approx: boolean; unknownWidths: number } | null {
     const lc = this._lc
     if (lc === undefined) return null
     for (let i = 0; i < LAYOUT_CACHE_SLOTS; i++) {
       const entry = lc[i]!
-      if (this.cacheEntryAnswers(entry, availW, availH, containingW, containingH, allocatedW, allocatedH, exactOnly)) {
+      if (this.cacheEntryAnswers(entry, availW, availH, containingW, containingH, allocatedW, allocatedH, exact)) {
         return this.cacheResult(entry)
       }
     }
@@ -1054,11 +1063,11 @@ export class Node {
     containingH: number,
     allocatedW: number,
     allocatedH: number,
-    exactOnly: boolean,
+    exact: boolean,
   ): boolean {
     return (
+      entry.exact === exact &&
       sameCacheKey(entry, availW, availH, containingW, containingH, allocatedW, allocatedH) &&
-      (!exactOnly || entry.exact) &&
       (!this._isDirty || entry.gen === layoutGeneration())
     )
   }
@@ -1081,10 +1090,10 @@ export class Node {
   }
 
   /**
-   * Cache a computed layout result under its six constraints, stamped with the
-   * current pass. A write to a key already held replaces that entry, except
-   * that measureNode's write (`exact` false) never replaces a full layoutNode's
-   * (`exact` true); a new key overwrites the ring's oldest slot.
+   * Cache a computed layout result under its six constraints and its kind
+   * (`exact`, see getCachedLayout), stamped with the current pass. A write to a
+   * key and kind already held replaces that entry; a new one overwrites the
+   * ring's oldest slot.
    * Zero-allocation: lazily allocates cache entries once, then reuses.
    */
   setCachedLayout(
@@ -1108,17 +1117,16 @@ export class Node {
     }
     let entry: LayoutCacheEntry | undefined
     for (let i = 0; i < LAYOUT_CACHE_SLOTS; i++) {
-      if (sameCacheKey(lc[i]!, availW, availH, containingW, containingH, allocatedW, allocatedH)) {
-        entry = lc[i]!
+      const held = lc[i]!
+      if (held.exact === exact && sameCacheKey(held, availW, availH, containingW, containingH, allocatedW, allocatedH)) {
+        entry = held
         break
       }
     }
     if (entry === undefined) {
       entry = lc[this._lcNext]!
       this._lcNext = (this._lcNext + 1) % LAYOUT_CACHE_SLOTS
-      entry.exact = false
     }
-    if (entry.exact && !exact) return
     entry.availW = availW
     entry.availH = availH
     entry.containingW = containingW

@@ -2195,6 +2195,8 @@ function layoutNode(
       // Include BOTH parent's position offset and child's position offset
       const childAbsX = borderBoxStart(absX, marginLeft, parentPosOffsetX) + fractionalLeft - childMarginLeft
       const childAbsY = borderBoxStart(absY, marginTop, parentPosOffsetY) + fractionalTop - childMarginTop
+      cflex.passedAbsX = childAbsX
+      cflex.passedAbsY = childAbsY
       const absChildLeft = borderBoxStart(childAbsX, childMarginLeft, posOffsetX)
       const absChildTop = borderBoxStart(childAbsY, childMarginTop, posOffsetY)
 
@@ -2929,12 +2931,11 @@ function layoutNode(
           "margin",
         )
         const isContainer = child.children.length > 0
-        // Phase 8 and 9b skip the same relativeIndex<0 children. Every
-        // container has completed Phase 8 here: its full exit stores the
-        // passed abs, and a fingerprint hit requires equal abs. Leaf exits
-        // precede that write; their absolute input is unused and stays old.
-        const cAbsX = isContainer ? child.flex.lastAbsX : absX + innerLeft + savedLeft - cMarginL
-        const cAbsY = isContainer ? child.flex.lastAbsY : absY + innerTop + savedTop - cMarginT
+        // Phase 8 and 9b skip the same relativeIndex<0 children, and Phase 8
+        // recorded the absolute origin it passed each one, in either mode.
+        // Leaves keep the position-derived origin; their absolute input is unused.
+        const cAbsX = isContainer ? child.flex.passedAbsX : absX + innerLeft + savedLeft - cMarginL
+        const cAbsY = isContainer ? child.flex.passedAbsY : absY + innerTop + savedTop - cMarginT
         const crossAbsStart = isRow
           ? borderBoxStart(cAbsY, cMarginT, relativeInset(child, false, contentHeight, direction))
           : borderBoxStart(cAbsX, cMarginL, relativeInset(child, true, contentWidth, direction))
