@@ -78,12 +78,16 @@ export interface MeasureEntry {
 
 /**
  * Cache entry for layout results.
- * Stores input available dimensions and computed size.
- * Used to avoid redundant recursive layout calls during a single pass.
+ * Stores the six input constraints and the computed size. Used to avoid
+ * redundant recursive layout calls, within a pass and across passes (#26840).
  */
 export interface LayoutCacheEntry {
-  availW: number // Available width (may be NaN)
+  availW: number // Available width (may be NaN; -1 marks an invalidated entry)
   availH: number // Available height (may be NaN)
+  containingW: number // Percentage base width passed with this query
+  containingH: number // Percentage base height passed with this query
+  allocatedW: number // Width the parent allocated (NaN when none)
+  allocatedH: number // Height the parent allocated (NaN when none)
   computedW: number // Computed width
   computedH: number // Computed height
   // measureNode's shrink-wrap shortcut hit a row that overflows a definite
@@ -92,6 +96,15 @@ export interface LayoutCacheEntry {
   // it is a property of THIS query, not of the node: a hit must not report a
   // neighbouring query's verdict.
   approx: boolean
+  // Written by a full layoutNode (layout-zero.ts MEASURE), not by measureNode's
+  // shortcut. Only such an entry may stand in for a layoutNode call.
+  exact: boolean
+  // Percentage widths the writing descent counted without a base (#26660), so
+  // a hit can replay the count the skipped descent would have added.
+  unknownWidths: number
+  // The layout pass that wrote this entry (layout-flex-lines.ts
+  // layoutGeneration). A dirty node answers only from its own pass's entries.
+  gen: number
 }
 
 /**

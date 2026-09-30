@@ -26,60 +26,34 @@ const mutations: Mutation[] = [
   {
     name: "skip-resetLayoutCache",
     file: "src/layout-zero.ts",
-    find: `  resetLayoutStats()
-  // Clear layout cache from previous pass (important for correct layout after tree changes)
-  root.resetLayoutCache()`,
-    replace: `  resetLayoutStats()
-  // Clear layout cache from previous pass (important for correct layout after tree changes)
-  // root.resetLayoutCache() // MUTATION: skip cache reset`,
+    find: `    root.resetLayoutCache(true)`,
+    replace: `    // root.resetLayoutCache(true) // MUTATION: skip the pass-start intrinsic refresh`,
     description:
-      "Skip clearing layout cache at start of calculateLayout — stale cache entries should cause wrong results",
-    equivalent: true, // markDirty() clears caches for dirty-path nodes; clean nodes' cached entries match constraints → correct
+      "Skip the pass-start refresh of intrinsic lengths — a stale min-content should cause wrong results",
+    equivalent: true, // markDirty() and a query-size change clear min-content on every node whose inputs changed
   },
   {
     name: "skip-fingerprint-check",
     file: "src/layout-zero.ts",
-    find: `  // Constraint fingerprinting: skip layout if constraints unchanged and node not dirty
-  // Use Object.is() for NaN-safe comparison (NaN === NaN is false, Object.is(NaN, NaN) is true)
-  const flex = node.flex
-  if (
-    flex.layoutValid &&
-    !node.isDirty() &&
-    Object.is(flex.lastAvailW, availableWidth) &&
-    Object.is(flex.lastAvailH, availableHeight) &&
-    flex.lastDir === direction
-  ) {`,
-    replace: `  // Constraint fingerprinting: skip layout if constraints unchanged and node not dirty
-  // Use Object.is() for NaN-safe comparison (NaN === NaN is false, Object.is(NaN, NaN) is true)
-  const flex = node.flex
-  if (
+    find: `  if (
+    mode === LAYOUT &&
+    flex.layoutValid &&`,
+    replace: `  if (
     false && // MUTATION: always recompute (never skip)
-    flex.layoutValid &&
-    !node.isDirty() &&
-    Object.is(flex.lastAvailW, availableWidth) &&
-    Object.is(flex.lastAvailH, availableHeight) &&
-    flex.lastDir === direction
-  ) {`,
+    mode === LAYOUT &&
+    flex.layoutValid &&`,
     description:
       "Disable fingerprint-based skip — forces full recompute every time (should still produce correct results if caching is correct)",
     equivalent: true, // Disables optimization, doesn't affect correctness
   },
   {
-    name: "always-return-cached-layout",
+    name: "dirty-entry-any-gen",
     file: "src/node-zero.ts",
-    find: `  getCachedLayout(availW: number, availH: number): { width: number; height: number } | null {
-    // Never return cached layout for dirty nodes - content may have changed
-    if (this._isDirty) {
-      return null
-    }`,
-    replace: `  getCachedLayout(availW: number, availH: number): { width: number; height: number } | null {
-    // Never return cached layout for dirty nodes - content may have changed
-    // MUTATION: removed dirty check — return stale cache for dirty nodes
-    if (false) {
-      return null
-    }`,
-    description: "Return cached layout even for dirty nodes — stale results should cause mismatches",
-    equivalent: true, // markDirty() sets _lc0=_lc1=undefined, so getCachedLayout returns null regardless of dirty check
+    find: `      (!this._isDirty || entry.gen === layoutGeneration())`,
+    replace: `      true // MUTATION: a dirty node answers from an entry of any pass`,
+    description:
+      "Let a dirty node answer from an entry an earlier pass wrote — stale sizes after content changes (#26840 F2)",
+    equivalent: true, // markDirty() invalidates the node's entries, so a dirty node only ever holds entries its current pass wrote; the generation check is the defence for a nested pass
   },
   {
     name: "skip-markDirty-propagation",
@@ -90,7 +64,10 @@ const mutations: Mutation[] = [
       // Always clear caches - even if already dirty, a child's content change
       // may invalidate cached layout results that used the old child size
       current._m0 = current._m1 = current._m2 = current._m3 = undefined
-      current._lc0 = current._lc1 = undefined
+      current.invalidateLayoutEntries()
+      // Min-content cache is also content-derived; same invalidation rules
+      current._minContentRow = -1
+      current._minContentCol = -1
       // Skip setting dirty flag if already dirty (but still cleared caches above)
       if (current._isDirty) break
       current._isDirty = true
@@ -104,26 +81,39 @@ const mutations: Mutation[] = [
     // MUTATION: only mark self dirty, don't propagate to ancestors
     if (current !== null) {
       current._m0 = current._m1 = current._m2 = current._m3 = undefined
-      current._lc0 = current._lc1 = undefined
+      current.invalidateLayoutEntries()
       current._isDirty = true
       current._flex.layoutValid = false
     }
   }`,
-    description: "Only mark the node itself dirty, skip ancestor propagation — parents won't know children changed",
+    description:
+      "Only mark the node itself dirty, skip ancestor propagation — parents won't know children changed",
+  },
+  {
+    name: "markDirty-keeps-lc",
+    file: "src/node-zero.ts",
+    find: `      current._m0 = current._m1 = current._m2 = current._m3 = undefined
+      current.invalidateLayoutEntries()
+      // Min-content cache is also content-derived; same invalidation rules`,
+    replace: `      current._m0 = current._m1 = current._m2 = current._m3 = undefined
+      // MUTATION: layout cache entries survive markDirty
+      // Min-content cache is also content-derived; same invalidation rules`,
+    description:
+      "Keep layout cache entries across markDirty — entries now live across passes, so a changed subtree answers with its old size (#26840)",
   },
   {
     name: "skip-save-restore-measureNode-phase5",
-    file: "src/layout-zero.ts",
+    file: "src/layout-measure.ts",
     find: `      // Save/restore layout around measureNode — it overwrites node.layout
       const savedW = child.layout.width
       const savedH = child.layout.height
-      measureNode(child, childAvailW, childAvailH, direction)
+      const childApprox = measureNode(child, childAvailW, childAvailH, direction)
       measuredW = child.layout.width
       measuredH = child.layout.height
       child.layout.width = savedW
       child.layout.height = savedH`,
     replace: `      // MUTATION: skip save/restore — let measureNode corrupt layout dimensions
-      measureNode(child, childAvailW, childAvailH, direction)
+      const childApprox = measureNode(child, childAvailW, childAvailH, direction)
       measuredW = child.layout.width
       measuredH = child.layout.height`,
     description:
@@ -132,55 +122,108 @@ const mutations: Mutation[] = [
   {
     name: "wrong-cache-sentinel",
     file: "src/node-zero.ts",
-    find: `      // Invalidate using -1 sentinel (not NaN — NaN is a legitimate "unconstrained" query
-      // value and Object.is(NaN, NaN) === true would cause false cache hits)
-      if (node._lc0) node._lc0.availW = -1
-      if (node._lc1) node._lc1.availW = -1`,
-    replace: `      // MUTATION: use NaN as sentinel — causes false cache hits for unconstrained queries
-      if (node._lc0) node._lc0.availW = NaN
-      if (node._lc1) node._lc1.availW = NaN`,
+    find: `    for (let i = 0; i < LAYOUT_CACHE_SLOTS; i++) lc[i]!.availW = -1`,
+    replace: `    for (let i = 0; i < LAYOUT_CACHE_SLOTS; i++) lc[i]!.availW = NaN // MUTATION: NaN sentinel`,
     description:
       "Use NaN as cache sentinel instead of -1 — Object.is(NaN, NaN) is true, so unconstrained queries will falsely match invalidated entries",
   },
   {
     name: "skip-flexDist-guard",
     file: "src/layout-zero.ts",
-    find: `      const flexDistChanged = child.flex.mainSize !== child.flex.baseSize
-      const passWidthToChild =
-        isRow && mainIsAuto && !hasFlexGrow && !flexDistChanged`,
-    replace: `      const flexDistChanged = child.flex.mainSize !== child.flex.baseSize
-      const passWidthToChild =
-        isRow && mainIsAuto && !hasFlexGrow /* MUTATION: removed flexDistChanged guard */`,
+    find: `        isRow && mainIsAutoChild && !flexGrowHasDefiniteMainBudget && !flexDistChanged && !hasMeasureLeaf
+          ? NaN`,
+    replace: `        isRow && mainIsAutoChild && !flexGrowHasDefiniteMainBudget /* MUTATION: removed flexDistChanged guard */ && !hasMeasureLeaf
+          ? NaN`,
     description:
       "Remove flexDistChanged guard — NaN===NaN matches across passes with different flex distributions, preserving stale dimensions",
   },
   {
     name: "skip-layoutValid-set",
     file: "src/layout-zero.ts",
-    find: `  // Update constraint fingerprint - layout is now valid for these constraints
-  flex.lastAvailW = availableWidth
-  flex.lastAvailH = availableHeight
-  flex.lastOffsetX = offsetX
-  flex.lastOffsetY = offsetY
-  flex.lastDir = direction
-  flex.layoutValid = true`,
-    replace: `  // Update constraint fingerprint - layout is now valid for these constraints
-  flex.lastAvailW = availableWidth
-  flex.lastAvailH = availableHeight
-  flex.lastOffsetX = offsetX
-  flex.lastOffsetY = offsetY
-  flex.lastDir = direction
+    find: `  flex.lastDir = direction
+  flex.layoutValid = true
+  _t?.layoutExit(_tn, layout.width, layout.height)
+}`,
+    replace: `  flex.lastDir = direction
   // MUTATION: don't mark layout as valid — forces recompute every time
-  // flex.layoutValid = true`,
+  // flex.layoutValid = true
+  _t?.layoutExit(_tn, layout.width, layout.height)
+}`,
     description:
       "Never mark layout as valid — fingerprint check always fails, forcing full recompute (should still be correct if algorithm is sound)",
     equivalent: true, // Disables optimization, doesn't affect correctness
   },
+  {
+    name: "measure-writes-fingerprint",
+    file: "src/layout-zero.ts",
+    find: `    _t?.layoutExit(_tn, layout.width, layout.height)
+    return
+  }
 
-  // =========================================================================
-  // Layout logic mutations (caught by layout.test.ts + relayout-consistency)
-  // =========================================================================
+  // Update constraint fingerprint - layout is now valid for these constraints`,
+    replace: `    // MUTATION: MEASURE falls through and writes the fingerprint
+  }
 
+  // Update constraint fingerprint - layout is now valid for these constraints`,
+    description:
+      "A MEASURE call leaves a valid fingerprint at the sizing geometry — the positioning pass skips a node it must re-lay out (#26840 W1)",
+  },
+  {
+    name: "measure-skips-child-restore",
+    file: "src/layout-zero.ts",
+    find: `      box.top = measureSaveStack[i++]!`,
+    replace: `      i++ // MUTATION: a child's top is not restored after MEASURE`,
+    description:
+      "A MEASURE call leaves one child's top where the sizing geometry put it — a clean child keeps a moved box (#26840 W6/W7, Bug 1)",
+  },
+  {
+    name: "measure-reads-approx",
+    file: "src/layout-zero.ts",
+    find: `      allocatedHeight,
+      true,
+    )
+    if (cached) {`,
+    replace: `      allocatedHeight,
+      false, // MUTATION: MEASURE accepts measureNode's estimates
+    )
+    if (cached) {`,
+    description:
+      "A MEASURE call answers from measureNode's flex-basis estimate instead of a layoutNode result (#26840 exact entries)",
+  },
+  {
+    name: "measure-freezes-query-size",
+    file: "src/layout-zero.ts",
+    find: `  if (mode === MEASURE) {
+    // A leaf has no descent to show it to, and returns before the exit below.`,
+    replace: `  if (false) { // MUTATION: MEASURE persists the container-query freeze like LAYOUT
+    // A leaf has no descent to show it to, and returns before the exit below.`,
+    description:
+      "A MEASURE call persists the query size it computed — a non-stretched query container keeps its sizing width (#26840 W9)",
+  },
+  {
+    name: "measure-writes-leaf-constraints",
+    file: "src/layout-zero.ts",
+    find: `  if (mode === LAYOUT && node.children.length === 0) {`,
+    replace: `  if (node.children.length === 0) { // MUTATION: MEASURE writes the leaf's lastAvail*`,
+    description:
+      "A MEASURE call leaves a leaf's constraints at the sizing width — percent padding reads the wrong base after a skipped relayout (#26840 W2)",
+  },
+  {
+    name: "measure-hit-skips-unknown-width-replay",
+    file: "src/layout-zero.ts",
+    find: `      if (cached.unknownWidths !== 0) swapUnknownBaseWidthCount(unknownBaseWidthCount() + cached.unknownWidths)`,
+    replace: `      // MUTATION: a MEASURE hit does not replay the #26660 count`,
+    description:
+      "A MEASURE cache hit skips the unknown-width count its descent added, so #26660's repeat branch differs between a hit and a miss",
+  },
+  {
+    name: "measure-caches-fractional-origin",
+    file: "src/layout-zero.ts",
+    find: `  const measureCacheable = mode === MEASURE && Number.isInteger(absX) && Number.isInteger(absY)`,
+    replace: `  const measureCacheable = mode === MEASURE // MUTATION: cache at a fractional origin too`,
+    description:
+      "A MEASURE answer computed at one fractional origin is reused at another, where edge rounding gives a different size",
+  },
   {
     name: "skip-display-none",
     file: "src/layout-zero.ts",
@@ -194,17 +237,17 @@ const mutations: Mutation[] = [
   }`,
     replace: `  // MUTATION: skip display:none handling — nodes should still render
   // if (style.display === C.DISPLAY_NONE) { ... }`,
-    description: "Skip display:none handling — hidden nodes would participate in layout and consume space",
+    description:
+      "Skip display:none handling — hidden nodes would participate in layout and consume space",
     testFiles: ["tests/layout.test.ts"],
   },
   {
     name: "skip-overflow-flexShrink-override",
     file: "src/layout-zero.ts",
-    find: `    cflex.flexShrink =
-      childStyle.overflow !== C.OVERFLOW_VISIBLE ? Math.max(childStyle.flexShrink, 1) : childStyle.flexShrink`,
-    replace: `    cflex.flexShrink =
-      childStyle.flexShrink /* MUTATION: removed overflow flexShrink override */`,
-    description: "Remove CSS 4.5 overflow:hidden flexShrink override — overflow containers won't shrink to fit parent",
+    find: `    if (!explicitShrink && childStyle.overflow !== C.OVERFLOW_VISIBLE) shrink = Math.max(shrink, 1)`,
+    replace: `    // MUTATION: removed overflow flexShrink override`,
+    description:
+      "Remove CSS 4.5 overflow:hidden flexShrink override — overflow containers won't shrink to fit parent",
     testFiles: ["tests/layout.test.ts"],
   },
   {
@@ -214,14 +257,18 @@ const mutations: Mutation[] = [
     layout.height = Math.round(nodeHeight)
     layout.left = Math.round(offsetX + marginLeft)
     layout.top = Math.round(offsetY + marginTop)
+    return
+  }
 
-    // Handle measure function for leaf nodes with intrinsic sizing`,
+  // MEASURE saves every child's box here`,
     replace: `    layout.width = Math.floor(nodeWidth)
     layout.height = Math.floor(nodeHeight)
     layout.left = Math.floor(offsetX + marginLeft)
     layout.top = Math.floor(offsetY + marginTop)
+    return // MUTATION: use floor instead of round — creates pixel drift
+  }
 
-    // MUTATION: use floor instead of round — creates pixel drift`,
+  // MEASURE saves every child's box here`,
     description:
       "Use Math.floor instead of Math.round for leaf node rounding — dimensions will be wrong for fractional values",
     testFiles: ["tests/layout.test.ts", "tests/relayout-consistency.test.ts"],
@@ -324,8 +371,8 @@ async function main() {
   if (unexpectedFail > 0) {
     console.log(`Unexpected failures: ${unexpectedFail} mutations marked equivalent were caught by tests`)
   }
-  // Exit non-zero only for real coverage gaps
-  process.exit(gaps.length > 0 ? 1 : 0)
+  // A skipped mutation is a stale pattern, not a pass: it tests nothing.
+  process.exit(gaps.length > 0 || skipped.length > 0 || unexpectedFail > 0 ? 1 : 0)
 }
 
 main()

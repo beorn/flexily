@@ -114,6 +114,30 @@ export interface LineStateSave {
 /** Current re-entrancy depth. 0 = outermost (no save needed). */
 let _layoutDepth = 0
 
+// Layout-cache generation (#26840, Yoga's generationCount). Every computeLayout
+// pass takes a number never used before; a nested pass (a measureFunc calling
+// calculateLayout) restores the outer pass's number when it exits, so it
+// neither invalidates nor adopts the outer pass's entries. Never reset.
+let _generationCounter = 0
+let _generation = 0
+
+/** The pass that cache writes are stamped with and dirty-node reads must match. */
+export function layoutGeneration(): number {
+  return _generation
+}
+
+/** Start a pass's generation; returns the outer pass's, for exitLayoutGeneration. */
+export function enterLayoutGeneration(): number {
+  const outer = _generation
+  _generation = ++_generationCounter
+  return outer
+}
+
+/** Restore the outer pass's generation (the value enterLayoutGeneration returned). */
+export function exitLayoutGeneration(outer: number): void {
+  _generation = outer
+}
+
 /**
  * Enter a layout pass. If re-entrant (depth > 0), saves current line state.
  * @returns The saved state (to pass to restoreLineState), or null at depth 0.

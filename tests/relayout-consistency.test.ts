@@ -48,6 +48,13 @@ import {
   textMeasure,
   type BuildTreeResult,
 } from "../src/testing.js"
+import {
+  buildNestedColumns,
+  mountRow,
+  nestedColumnsSpec,
+  type NestedColumns,
+  type NestedColumnsSpec,
+} from "./nested-columns-fixture.js"
 
 // ============================================================================
 // Test-local helpers
@@ -1258,6 +1265,139 @@ describe("Fuzz: content change", () => {
           `Content change differs (changed nodes: ${changingNodes.join(",")}; ${diffs.length} diffs):\n${detail}`,
         )
       }
+    })
+  }
+})
+
+// ============================================================================
+// MEASURE-only sizing pass (#26840)
+// ============================================================================
+//
+// The sizing pass (layout-zero.ts sizeByLayout) answers from each node's layout
+// cache, which now lives across passes, and leaves no fingerprint, leaf
+// constraint, child box or container-query freeze behind. Each step below
+// edits the spec, applies the same edit to the live tree, lays it out
+// incrementally, and compares every box against a tree built fresh from the
+// spec.
+
+interface NestedColumnsStep {
+  name: string
+  width?: number
+  apply: (spec: NestedColumnsSpec, live: NestedColumns) => void
+}
+
+function expectNestedColumnsStepsMatchFresh(spec: NestedColumnsSpec, steps: NestedColumnsStep[]): void {
+  let width = 220
+  const live = buildNestedColumns(Node, spec, width)
+  live.root.calculateLayout(width, 50, DIRECTION_LTR)
+  live.root.calculateLayout(width, 50, DIRECTION_LTR)
+  for (const step of steps) {
+    step.apply(spec, live)
+    if (step.width !== undefined) {
+      width = step.width
+      live.root.setWidth(width)
+    }
+    live.root.calculateLayout(width, 50, DIRECTION_LTR)
+    const fresh = buildNestedColumns(Node, spec, width)
+    fresh.root.calculateLayout(width, 50, DIRECTION_LTR)
+    const diffs = diffLayouts(getLayout(fresh.root), getLayout(live.root))
+    fresh.root.freeRecursive()
+    if (diffs.length > 0) {
+      expect.unreachable(`step "${step.name}" differs from fresh (${diffs.length} diffs):\n  ${diffs.join("\n  ")}`)
+    }
+  }
+  live.root.freeRecursive()
+}
+
+describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
+  it("Fx(4,10,2): leaf edits, a resize, a query-container resize and a mount each match fresh", () => {
+    const spec = nestedColumnsSpec(4, 10, 2)
+    spec.queryColumn = 1
+    spec.labelCqi = 12
+    expectNestedColumnsStepsMatchFresh(spec, [
+      {
+        name: "a prose wraps differently",
+        apply: (s, live) => {
+          s.proseLengths[3]![1] = 470
+          live.proses[3]![1]!.markDirty()
+        },
+      },
+      {
+        name: "the last label narrows",
+        apply: (s, live) => {
+          s.labelWidths[9] = 7
+          live.labels[9]!.markDirty()
+        },
+      },
+      {
+        name: "the first prose shrinks to one line",
+        apply: (s, live) => {
+          s.proseLengths[0]![0] = 40
+          live.proses[0]![0]!.markDirty()
+        },
+      },
+      {
+        name: "a middle label widens",
+        apply: (s, live) => {
+          s.labelWidths[5] = 55
+          live.labels[5]!.markDirty()
+        },
+      },
+      { name: "the root narrows 220 -> 180", width: 180, apply: () => {} },
+      { name: "the query container widens 180 -> 200", width: 200, apply: () => {} },
+      {
+        name: "a dirty row mounts mid-chain",
+        apply: (s, live) => {
+          s.mounts.push({ depth: 2, proseLength: 390 })
+          mountRow(Node, s, live, s.mounts.length - 1)
+        },
+      },
+      {
+        name: "a prose under the mount changes after it",
+        apply: (s, live) => {
+          s.proseLengths[7]![0] = 12
+          live.proses[7]![0]!.markDirty()
+        },
+      },
+    ])
+  })
+
+  for (let seed = 1; seed <= 50; seed++) {
+    it(`seeded nested columns ${seed}: random leaf edits match fresh`, () => {
+      const rng = createRng(seed * 1051 + 29)
+      const pick = (lo: number, hi: number) => lo + Math.floor(rng() * (hi - lo + 1))
+      const depth = pick(1, 6)
+      const rows = pick(1, 12)
+      const spec = nestedColumnsSpec(depth, rows, pick(1, 4))
+      for (let k = 0; k < rows; k++) {
+        spec.labelWidths[k] = pick(1, 60)
+        for (let j = 0; j < spec.proseBoxes; j++) spec.proseLengths[k]![j] = pick(1, 600)
+      }
+      const steps: NestedColumnsStep[] = []
+      for (let n = 0; n < 4; n++) {
+        const k = pick(0, rows - 1)
+        if (rng() < 0.5) {
+          const labelWidth = pick(1, 60)
+          steps.push({
+            name: `label ${k} -> ${labelWidth}`,
+            apply: (s, live) => {
+              s.labelWidths[k] = labelWidth
+              live.labels[k]!.markDirty()
+            },
+          })
+        } else {
+          const j = pick(0, spec.proseBoxes - 1)
+          const length = pick(1, 600)
+          steps.push({
+            name: `prose ${k}.${j} -> ${length}`,
+            apply: (s, live) => {
+              s.proseLengths[k]![j] = length
+              live.proses[k]![j]!.markDirty()
+            },
+          })
+        }
+      }
+      expectNestedColumnsStepsMatchFresh(spec, steps)
     })
   }
 })

@@ -86,7 +86,29 @@ import {
   distributeFlexSpaceForLine,
   enterLayout,
   exitLayout,
+  enterLayoutGeneration,
+  exitLayoutGeneration,
 } from "./layout-flex-lines.js"
+
+/**
+ * Why a layoutNode call runs (#26840).
+ *
+ * - LAYOUT: the real pass. It writes this node's box, positions every child,
+ *   and leaves a constraint fingerprint so a later pass can skip it.
+ * - MEASURE: the size is all the caller wants (Yoga's `performLayout = false`).
+ *   The call answers from the node's layout cache when it can, and otherwise
+ *   runs the same phases, but nothing it writes outlives the call except the
+ *   answer and that cache entry: it writes no fingerprint and no leaf
+ *   constraint, restores every child box it moved, and never persists a
+ *   container-query freeze. The caller restores the node's own box.
+ */
+const LAYOUT = 0
+const MEASURE = 1
+type LayoutMode = typeof LAYOUT | typeof MEASURE
+
+// Children's boxes saved by a MEASURE call while it runs, four numbers per
+// child, indexed by nesting. Reused across passes; never shrinks its storage.
+const measureSaveStack: number[] = []
 
 /**
  * Compute layout for a node tree.
@@ -99,15 +121,20 @@ export function computeLayout(
 ): void {
   // Save line state if re-entrant (nested calculateLayout from measureFunc)
   const saved = enterLayout()
+  const outerGeneration = enterLayoutGeneration()
   const outerUnknownBaseWidths = swapUnknownBaseWidthCount(0)
+  const outerSaveDepth = measureSaveStack.length
   try {
     resetLayoutStats()
     getTrace()?.resetCounter()
-    // Clear layout cache from previous pass (important for correct layout after tree changes)
-    root.resetLayoutCache()
+    // Refresh intrinsic lengths for the new pass. Layout cache entries survive:
+    // markDirty cleared every entry whose inputs changed (#26840).
+    root.resetLayoutCache(true)
     // Pass absolute position (0,0) for root node - used for Yoga-compatible edge rounding
-    layoutNode(root, availableWidth, availableHeight, 0, 0, 0, 0, direction)
+    layoutNode(root, LAYOUT, availableWidth, availableHeight, 0, 0, 0, 0, direction)
   } finally {
+    measureSaveStack.length = outerSaveDepth
+    exitLayoutGeneration(outerGeneration)
     // Restore line state for outer pass (no-op at depth 0)
     exitLayout(saved)
     // A nested pass must not raise the outer item's count; an outermost pass
@@ -156,26 +183,19 @@ function borderBoxStart(marginBoxStart: number, margin: number, inset: number): 
  * only for a child measureNode flagged approximate, and only when this
  * container is about to distribute from the number.
  *
- * Leaves the exact size in `node.layout`; the caller save/restores as it does
- * around measureNode.
+ * A MEASURE call (#26840): it leaves the exact size in `node.layout`, which
+ * the caller save/restores as it does around measureNode, and records it as
+ * the node's exact cache entry. It leaves no fingerprint and no moved box
+ * behind, so a clean subtree keeps its fingerprints and the positioning pass
+ * skips it; a later pass answers from the entry without descending.
+ *
+ * No enterLayout/exitLayout bracket: Phase 5 runs before this container
+ * breaks its own lines, so no live line data is in the module scratch
+ * arrays, and the nested call is no more exposed than Phase 8's own
+ * recursion into a child.
  */
 function sizeByLayout(node: Node, availableWidth: number, availableHeight: number, direction: number): void {
-  layoutNode(node, availableWidth, availableHeight, 0, 0, 0, 0, direction)
-  // The pass just overwrote layout.left/top/width/height throughout the
-  // subtree, at absolute (0,0) with offsets 0, and left a VALID fingerprint on
-  // every node it touched. Both halves are poison for the positioning pass: a
-  // fingerprint hit would keep an origin-relative position, and on this node
-  // the caller additionally restores layout.width/height to their pre-measure
-  // values the moment we return — "Bug 1: measureNode corruption"
-  // (src/CLAUDE.md) one level up. Drop the whole subtree's fingerprints so the
-  // real pass recomputes every node it is about to reposition. The plain
-  // measureNode path writes no fingerprints at all; this restores parity.
-  //
-  // No enterLayout/exitLayout bracket: Phase 5 runs before this container
-  // breaks its own lines, so no live line data is in the module scratch
-  // arrays, and the nested pass is no more exposed than Phase 8's own
-  // recursion into a child.
-  invalidateFingerprintsAround(node)
+  layoutNode(node, MEASURE, availableWidth, availableHeight, 0, 0, 0, 0, direction)
 }
 
 /**
@@ -186,6 +206,7 @@ function sizeByLayout(node: Node, availableWidth: number, availableHeight: numbe
  */
 function layoutNode(
   node: Node,
+  mode: LayoutMode,
   availableWidth: number,
   availableHeight: number,
   offsetX: number,
@@ -200,7 +221,7 @@ function layoutNode(
 ): void {
   incLayoutNodeCalls()
   // Track sizing vs positioning calls
-  const isSizingPass = offsetX === 0 && offsetY === 0 && absX === 0 && absY === 0
+  const isSizingPass = mode === MEASURE
   if (isSizingPass && node.children.length > 0) {
     incLayoutSizingCalls()
   } else {
@@ -235,10 +256,37 @@ function layoutNode(
     return
   }
 
+  const flex = node.flex
+  const unknownWidthsBefore = unknownBaseWidthCount()
+  // A MEASURE answer depends on the six constraints and, through edge
+  // rounding, on the fractional part of the absolute origin. At an integer
+  // origin it is the same for every origin, so only then is it cached.
+  const measureCacheable = mode === MEASURE && Number.isInteger(absX) && Number.isInteger(absY)
+  if (measureCacheable) {
+    const cached = node.getCachedLayout(
+      availableWidth,
+      availableHeight,
+      containingWidth,
+      containingHeight,
+      allocatedWidth,
+      allocatedHeight,
+      true,
+    )
+    if (cached) {
+      incLayoutCacheHits()
+      _t?.cacheHit(_tn, availableWidth, availableHeight, cached.width, cached.height)
+      layout.width = cached.width
+      layout.height = cached.height
+      // Replay the count the skipped descent would have added (#26660).
+      if (cached.unknownWidths !== 0) swapUnknownBaseWidthCount(unknownBaseWidthCount() + cached.unknownWidths)
+      return
+    }
+  }
+
   // Constraint fingerprinting: skip layout if constraints unchanged and node not dirty
   // Use Object.is() for NaN-safe comparison (NaN === NaN is false, Object.is(NaN, NaN) is true)
-  const flex = node.flex
   if (
+    mode === LAYOUT &&
     flex.layoutValid &&
     !node.isDirty() &&
     Object.is(flex.lastAvailW, availableWidth) &&
@@ -520,12 +568,21 @@ function layoutNode(
   // PHASE 3a: Freeze container-query inline-size (A0.1 — Pass 1 of two-phase layout)
   // Freeze the used inline size after aspect ratio and parent allocation, but
   // before intrinsic child contributions. NaN keeps indefinite queries explicit.
-  if (style.containerType !== C.CONTAINER_TYPE_NORMAL || node.getParent() === null) {
-    if (!Object.is(node.getFrozenQuerySize(), nodeWidth)) invalidateFingerprintsAround(node)
-    node._setFrozenQuerySize(nodeWidth)
+  // MEASURE freezes nothing (#26840): it lets its own descent see the size it
+  // would freeze and puts the stored one back at its exit.
+  const queryFreeze =
+    style.containerType !== C.CONTAINER_TYPE_NORMAL || node.getParent() === null ? nodeWidth : NaN
+  let measureQuerySwapped = false
+  let measureQueryOuter = NaN
+  if (mode === MEASURE) {
+    // A leaf has no descent to show it to, and returns before the exit below.
+    if (node.children.length > 0 && !Object.is(node.getFrozenQuerySize(), queryFreeze)) {
+      measureQueryOuter = node._swapFrozenQuerySize(queryFreeze)
+      measureQuerySwapped = true
+    }
   } else {
-    if (!Number.isNaN(node.getFrozenQuerySize())) invalidateFingerprintsAround(node)
-    node._setFrozenQuerySize(NaN)
+    if (!Object.is(node.getFrozenQuerySize(), queryFreeze)) invalidateFingerprintsAround(node)
+    node._setFrozenQuerySize(queryFreeze)
   }
   const frozenQueryInlineSize = node.getFrozenQuerySize()
   const childQueryInlineSize = Number.isNaN(frozenQueryInlineSize) ? ownQueryInlineSize : frozenQueryInlineSize
@@ -544,7 +601,8 @@ function layoutNode(
 
   // Leaf exits retain the constraints used by computed spacing getters.
   // This is not a valid subtree fingerprint: layoutValid stays unchanged.
-  if (node.children.length === 0) {
+  // A MEASURE call is not the leaf's layout, so it leaves them alone.
+  if (mode === LAYOUT && node.children.length === 0) {
     flex.lastAvailW = availableWidth
     flex.lastAvailH = availableHeight
     flex.lastDir = direction
@@ -596,6 +654,16 @@ function layoutNode(
     layout.left = Math.round(offsetX + marginLeft)
     layout.top = Math.round(offsetY + marginTop)
     return
+  }
+
+  // MEASURE saves every child's box here and restores it at its exit; there is
+  // no return between here and that exit.
+  const measureSaveBase = measureSaveStack.length
+  if (mode === MEASURE) {
+    for (const child of node.children) {
+      const box = child.layout
+      measureSaveStack.push(box.left, box.top, box.width, box.height)
+    }
   }
 
   // =========================================================================
@@ -1241,15 +1309,18 @@ function layoutNode(
       for (const child of node.children) {
         const cflex = child.flex
         if (cflex.relativeIndex < 0 || !cflex.baseApprox) continue
-        // Same save/restore contract as the measureNode call this replaces.
+        // Same save/restore contract as the measureNode call this replaces,
+        // position included: a MEASURE call writes the node's whole box.
+        const savedL = child.layout.left
+        const savedT = child.layout.top
         const savedW = child.layout.width
         const savedH = child.layout.height
         sizeByLayout(child, sizingW, sizingH, direction)
-        const exactW = child.layout.width
         const exactMain = child.layout.height
+        child.layout.left = savedL
+        child.layout.top = savedT
         child.layout.width = savedW
         child.layout.height = savedH
-        child.setCachedLayout(sizingW, sizingH, exactW, exactMain, false)
         totalBaseMain += exactMain - cflex.baseSize
         cflex.baseSize = exactMain
         cflex.mainSize = exactMain
@@ -2374,6 +2445,7 @@ function layoutNode(
       const unknownBaseWidthsBefore = unknownBaseWidthCount()
       layoutNode(
         child,
+        mode,
         passWidthToChild,
         passHeightToChild,
         childLeft,
@@ -2397,6 +2469,7 @@ function layoutNode(
       ) {
         layoutNode(
           child,
+          mode,
           passWidthToChild,
           passHeightToChild,
           childLeft,
@@ -2880,6 +2953,7 @@ function layoutNode(
         const allocatedCross = isContainer ? edgeBasedCrossSize : NaN
         layoutNode(
           child,
+          mode,
           passW,
           passH,
           savedLeft,
@@ -3252,6 +3326,7 @@ function layoutNode(
     const clampIfNumber = (v: number) => (Number.isNaN(v) ? NaN : Math.max(0, v))
     layoutNode(
       child,
+      mode,
       clampIfNumber(childAvailWidth),
       clampIfNumber(childAvailHeight),
       layout.left + absInnerLeft + childX,
@@ -3394,6 +3469,38 @@ function layoutNode(
     // Set final position (relative to container padding box)
     child.layout.left = Math.round(absInnerLeft + childX)
     child.layout.top = Math.round(absInnerTop + childY)
+  }
+
+  if (mode === MEASURE) {
+    let i = measureSaveBase
+    for (const child of node.children) {
+      const box = child.layout
+      box.left = measureSaveStack[i++]!
+      box.top = measureSaveStack[i++]!
+      box.width = measureSaveStack[i++]!
+      box.height = measureSaveStack[i++]!
+    }
+    measureSaveStack.length = measureSaveBase
+    // Entries and intrinsic lengths below were derived from this call's query
+    // size; the stored one is back, so they are refreshed like a real resize.
+    if (measureQuerySwapped) node._restoreFrozenQuerySize(measureQueryOuter)
+    if (measureCacheable) {
+      node.setCachedLayout(
+        availableWidth,
+        availableHeight,
+        layout.width,
+        layout.height,
+        false,
+        containingWidth,
+        containingHeight,
+        allocatedWidth,
+        allocatedHeight,
+        true,
+        unknownBaseWidthCount() - unknownWidthsBefore,
+      )
+    }
+    _t?.layoutExit(_tn, layout.width, layout.height)
+    return
   }
 
   // Update constraint fingerprint - layout is now valid for these constraints
