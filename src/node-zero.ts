@@ -41,6 +41,7 @@ import {
 import { isRowDirection, isEdgeAuto, resolveEdgeValue, resolveEdgeBorderValue } from "./layout-helpers.js"
 import { log } from "./logger.js"
 import { getTrace } from "./trace.js"
+import { layoutGeneration } from "./layout-flex-lines.js"
 
 /** Options for `Node.create()`. */
 export interface NodeCreateOptions {
@@ -133,6 +134,49 @@ function fitWidthMatches(current: readonly Value[] | undefined, lanes: FitWidthI
   return true
 }
 
+// Layout cache entries per node. Three distinct keys per node per pass are
+// measured on nested flexible columns (#26840: a flex-basis size, a MEASURE
+// with and without an allocated width), so two slots evict each other.
+const LAYOUT_CACHE_SLOTS = 4
+
+// Layout cache keys compare with Object.is: NaN is a real key (unconstrained),
+// and -1 on availW marks an invalidated entry.
+function sameCacheKey(
+  entry: LayoutCacheEntry,
+  availW: number,
+  availH: number,
+  containingW: number,
+  containingH: number,
+  allocatedW: number,
+  allocatedH: number,
+): boolean {
+  return (
+    Object.is(entry.availW, availW) &&
+    Object.is(entry.availH, availH) &&
+    Object.is(entry.containingW, containingW) &&
+    Object.is(entry.containingH, containingH) &&
+    Object.is(entry.allocatedW, allocatedW) &&
+    Object.is(entry.allocatedH, allocatedH)
+  )
+}
+
+function emptyCacheEntry(): LayoutCacheEntry {
+  return {
+    availW: -1,
+    availH: NaN,
+    containingW: NaN,
+    containingH: NaN,
+    allocatedW: NaN,
+    allocatedH: NaN,
+    computedW: 0,
+    computedH: 0,
+    approx: false,
+    exact: false,
+    unknownWidths: 0,
+    gen: 0,
+  }
+}
+
 /**
  * A layout node in the flexbox tree.
  */
@@ -158,11 +202,14 @@ export class Node {
   private _m2?: MeasureEntry
   private _m3?: MeasureEntry
 
-  // Layout cache - 2-entry cache for sizing pass (availW, availH -> computedW, computedH)
-  // Cleared at start of each calculateLayout pass via resetLayoutCache()
+  // Layout cache - 2-entry cache for the sizing work (six constraints -> computedW, computedH).
+  // Kept across passes; cleared by markDirty() on the node and its ancestors, and by
+  // resetLayoutCache() on a container-query resize or a direction change (#26840).
   // This avoids redundant recursive layout calls during intrinsic sizing
-  private _lc0?: LayoutCacheEntry
-  private _lc1?: LayoutCacheEntry
+  // A ring of LAYOUT_CACHE_SLOTS entries, allocated on first write; _lcNext is
+  // the slot the next new key overwrites.
+  private _lc?: LayoutCacheEntry[]
+  private _lcNext = 0
 
   // Tracks whether `setFlexShrink()` was called by the consumer. Used by
   // layout-zero.ts to gate the overflow-container flexShrink override:
@@ -197,7 +244,7 @@ export class Node {
   // getMinContent(direction). Cleared in markDirty() alongside the measure +
   // layout caches. Uses -1 as the invalidation sentinel (NOT NaN — NaN is a
   // legitimate intrinsic-size value and Object.is(NaN, NaN) === true would
-  // cause false cache hits, same reason _lc0/_lc1 use -1).
+  // cause false cache hits, same reason the _lc entries use -1).
   //
   // _minContentRow holds min-content along the row axis (i.e., min width).
   // _minContentCol holds min-content along the column axis (i.e., min height).
@@ -213,10 +260,11 @@ export class Node {
     width: 0,
     height: 0,
   }
-  private _layoutResult: { width: number; height: number; approx: boolean } = {
+  private _layoutResult: { width: number; height: number; approx: boolean; unknownWidths: number } = {
     width: 0,
     height: 0,
     approx: false,
+    unknownWidths: 0,
   }
 
   // Static counters for cache statistics (reset per layout pass)
@@ -256,6 +304,8 @@ export class Node {
     relativeIndex: -1,
     baseline: 0,
     baseApprox: false,
+    passedAbsX: NaN,
+    passedAbsY: NaN,
     // Constraint fingerprinting
     lastAvailW: NaN,
     lastAvailH: NaN,
@@ -961,77 +1011,154 @@ export class Node {
   // ============================================================================
 
   /**
-   * Check layout cache for a previously computed size with same available dimensions.
-   * Returns cached (width, height) or null if not found.
+   * Check the layout cache for a size computed under the same six constraints
+   * (available, containing and allocated, each width and height). Returns the
+   * cached size or null.
+   *
+   * Entries live across passes: `markDirty` clears the node and its ancestors,
+   * and a container-query resize or a direction change clears whole subtrees.
+   * A DIRTY node answers only from an entry written in the current pass
+   * (`layoutGeneration()`), as Yoga's `generationCount` does: its content
+   * changed since any older entry, but not since one this pass wrote.
+   *
+   * Two kinds of entry never answer each other, even under the same key:
+   * - an estimate (`exact` false), written by measureNode's shortcut and the
+   *   Phase 5/6c flex-basis probes, answers only those callers;
+   * - an exact entry (`exact` true), written by a full layoutNode in MEASURE
+   *   mode (layout-zero.ts), answers only MEASURE. It also reports
+   *   `unknownWidths`, the percentage widths its descent counted, so a hit can
+   *   replay that count (#26660).
+   * An exact answer to the same key is not the answer an estimator wants: the
+   * estimator models how the parent would lay the child out, and an estimate
+   * read back where a fresh pass would compute one keeps an incremental pass
+   * on the fresh pass's path.
    *
    * NaN dimensions are handled specially via Object.is (NaN === NaN is false, but Object.is(NaN, NaN) is true).
    */
-  getCachedLayout(availW: number, availH: number): { width: number; height: number; approx: boolean } | null {
-    // Never return cached layout for dirty nodes - content may have changed
-    if (this._isDirty) {
-      return null
-    }
-    // Returns stable _layoutResult object to avoid allocation on cache hit
-    const lc0 = this._lc0
-    if (lc0 && Object.is(lc0.availW, availW) && Object.is(lc0.availH, availH)) {
-      this._layoutResult.width = lc0.computedW
-      this._layoutResult.height = lc0.computedH
-      this._layoutResult.approx = lc0.approx
-      return this._layoutResult
-    }
-    const lc1 = this._lc1
-    if (lc1 && Object.is(lc1.availW, availW) && Object.is(lc1.availH, availH)) {
-      this._layoutResult.width = lc1.computedW
-      this._layoutResult.height = lc1.computedH
-      this._layoutResult.approx = lc1.approx
-      return this._layoutResult
+  getCachedLayout(
+    availW: number,
+    availH: number,
+    containingW: number = availW,
+    containingH: number = availH,
+    allocatedW: number = NaN,
+    allocatedH: number = NaN,
+    exact: boolean = false,
+  ): { width: number; height: number; approx: boolean; unknownWidths: number } | null {
+    const lc = this._lc
+    if (lc === undefined) return null
+    for (let i = 0; i < LAYOUT_CACHE_SLOTS; i++) {
+      const entry = lc[i]!
+      if (this.cacheEntryAnswers(entry, availW, availH, containingW, containingH, allocatedW, allocatedH, exact)) {
+        return this.cacheResult(entry)
+      }
     }
     return null
   }
 
+  private cacheEntryAnswers(
+    entry: LayoutCacheEntry,
+    availW: number,
+    availH: number,
+    containingW: number,
+    containingH: number,
+    allocatedW: number,
+    allocatedH: number,
+    exact: boolean,
+  ): boolean {
+    return (
+      entry.exact === exact &&
+      sameCacheKey(entry, availW, availH, containingW, containingH, allocatedW, allocatedH) &&
+      (!this._isDirty || entry.gen === layoutGeneration())
+    )
+  }
+
+  // Invalidate using -1 sentinel (not NaN — NaN is a legitimate "unconstrained" query
+  // value and Object.is(NaN, NaN) === true would cause false cache hits)
+  private invalidateLayoutEntries(): void {
+    const lc = this._lc
+    if (lc === undefined) return
+    for (let i = 0; i < LAYOUT_CACHE_SLOTS; i++) lc[i]!.availW = -1
+  }
+
+  // Returns stable _layoutResult object to avoid allocation on cache hit
+  private cacheResult(entry: LayoutCacheEntry): { width: number; height: number; approx: boolean; unknownWidths: number } {
+    this._layoutResult.width = entry.computedW
+    this._layoutResult.height = entry.computedH
+    this._layoutResult.approx = entry.approx
+    this._layoutResult.unknownWidths = entry.unknownWidths
+    return this._layoutResult
+  }
+
   /**
-   * Cache a computed layout result for the given available dimensions.
+   * Cache a computed layout result under its six constraints and its kind
+   * (`exact`, see getCachedLayout), stamped with the current pass. A write to a
+   * key and kind already held replaces that entry; a new one overwrites the
+   * ring's oldest slot.
    * Zero-allocation: lazily allocates cache entries once, then reuses.
    */
-  setCachedLayout(availW: number, availH: number, computedW: number, computedH: number, approx: boolean): void {
-    // Rotate entries: copy _lc0 values to _lc1, then update _lc0
-    if (this._lc0) {
-      // Lazily allocate _lc1 on first rotation
-      if (!this._lc1) {
-        this._lc1 = { availW: NaN, availH: NaN, computedW: 0, computedH: 0, approx: false }
+  setCachedLayout(
+    availW: number,
+    availH: number,
+    computedW: number,
+    computedH: number,
+    approx: boolean,
+    containingW: number = availW,
+    containingH: number = availH,
+    allocatedW: number = NaN,
+    allocatedH: number = NaN,
+    exact: boolean = false,
+    unknownWidths: number = 0,
+  ): void {
+    let lc = this._lc
+    if (lc === undefined) {
+      lc = []
+      for (let i = 0; i < LAYOUT_CACHE_SLOTS; i++) lc.push(emptyCacheEntry())
+      this._lc = lc
+    }
+    let entry: LayoutCacheEntry | undefined
+    for (let i = 0; i < LAYOUT_CACHE_SLOTS; i++) {
+      const held = lc[i]!
+      if (held.exact === exact && sameCacheKey(held, availW, availH, containingW, containingH, allocatedW, allocatedH)) {
+        entry = held
+        break
       }
-      this._lc1.availW = this._lc0.availW
-      this._lc1.availH = this._lc0.availH
-      this._lc1.computedW = this._lc0.computedW
-      this._lc1.computedH = this._lc0.computedH
-      this._lc1.approx = this._lc0.approx
     }
-    // Lazily allocate _lc0 on first use
-    if (!this._lc0) {
-      this._lc0 = { availW: 0, availH: 0, computedW: 0, computedH: 0, approx: false }
+    if (entry === undefined) {
+      entry = lc[this._lcNext]!
+      this._lcNext = (this._lcNext + 1) % LAYOUT_CACHE_SLOTS
     }
-    this._lc0.availW = availW
-    this._lc0.availH = availH
-    this._lc0.computedW = computedW
-    this._lc0.computedH = computedH
-    this._lc0.approx = approx
+    entry.availW = availW
+    entry.availH = availH
+    entry.containingW = containingW
+    entry.containingH = containingH
+    entry.allocatedW = allocatedW
+    entry.allocatedH = allocatedH
+    entry.computedW = computedW
+    entry.computedH = computedH
+    entry.approx = approx
+    entry.exact = exact
+    entry.unknownWidths = unknownWidths
+    entry.gen = layoutGeneration()
   }
 
   /**
    * Clear layout and intrinsic caches for this node and all descendants.
-   * Called at the start of each calculateLayout pass.
-   * Zero-allocation: invalidates entries (availW = NaN) rather than deallocating.
+   *
+   * `keepLayoutEntries` is the pass-start form (`computeLayout`): layout
+   * entries survive into the new pass, because markDirty already cleared every
+   * entry whose inputs changed, while the intrinsic lengths below are refreshed
+   * as before. Every other caller (a container-query resize, a direction
+   * change) clears both.
+   *
+   * Zero-allocation: invalidates entries (availW = -1) rather than deallocating.
    * Uses iterative traversal to avoid stack overflow on deep trees.
    */
-  resetLayoutCache(): void {
+  resetLayoutCache(keepLayoutEntries: boolean = false): void {
     traversalStack.length = 0
     traversalStack.push(this)
     while (traversalStack.length > 0) {
       const node = traversalStack.pop() as Node
-      // Invalidate using -1 sentinel (not NaN — NaN is a legitimate "unconstrained" query
-      // value and Object.is(NaN, NaN) === true would cause false cache hits)
-      if (node._lc0) node._lc0.availW = -1
-      if (node._lc1) node._lc1.availW = -1
+      if (!keepLayoutEntries) node.invalidateLayoutEntries()
       // Intrinsic lengths can depend on a query container that resized while
       // this node's own style stayed unchanged. Reuse them only in this pass.
       node._minContentRow = -1
@@ -1067,7 +1194,7 @@ export class Node {
       // Always clear caches - even if already dirty, a child's content change
       // may invalidate cached layout results that used the old child size
       current._m0 = current._m1 = current._m2 = current._m3 = undefined
-      current._lc0 = current._lc1 = undefined
+      current.invalidateLayoutEntries()
       // Min-content cache is also content-derived; same invalidation rules
       current._minContentRow = -1
       current._minContentCol = -1
@@ -1220,6 +1347,10 @@ export class Node {
       log.debug?.("layout skip (not dirty, constraints unchanged)")
       return
     }
+
+    // The layout cache is not keyed on direction (#26840): a root direction
+    // change clears it for the whole tree.
+    if (this._lastCalcDir !== direction) this.resetLayoutCache()
 
     // Track constraints for future skip check
     this._lastCalcW = availableWidth
@@ -2074,8 +2205,37 @@ export class Node {
   _setFrozenQuerySize(size: number): void {
     if (Object.is(this._frozenQuerySize, size)) return
     this._frozenQuerySize = size
-    // Intrinsic sizing can run before this container freezes in the same
-    // pass. Refresh descendants and any ancestor result derived from them.
+    this.refreshQueryDependents()
+  }
+
+  /**
+   * Internal: a MEASURE call's query size for its own descent (layout-zero.ts,
+   * #26840). Sets the field without the refresh `_setFrozenQuerySize` does,
+   * and returns the stored size for `_restoreFrozenQuerySize`.
+   *
+   * @internal
+   */
+  _swapFrozenQuerySize(size: number): number {
+    const stored = this._frozenQuerySize
+    this._frozenQuerySize = size
+    return stored
+  }
+
+  /**
+   * Internal: put back the size `_swapFrozenQuerySize` returned. Everything
+   * the MEASURE descent cached was derived from its own size, so it is
+   * refreshed as for a real resize.
+   *
+   * @internal
+   */
+  _restoreFrozenQuerySize(stored: number): void {
+    this._frozenQuerySize = stored
+    this.refreshQueryDependents()
+  }
+
+  // Intrinsic sizing can run before this container freezes in the same
+  // pass. Refresh descendants and any ancestor result derived from them.
+  private refreshQueryDependents(): void {
     this.resetLayoutCache()
     for (let ancestor = this._parent; ancestor !== null; ancestor = ancestor._parent) {
       ancestor._minContentRow = -1

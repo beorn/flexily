@@ -48,6 +48,23 @@ import {
   textMeasure,
   type BuildTreeResult,
 } from "../src/testing.js"
+import {
+  applySpecEdit,
+  buildSpecTree,
+  expectStepsMatchFresh,
+  specPaddings,
+  type SpecEdit,
+  type SpecNode,
+  type SpecState,
+  type Step,
+} from "./relayout-steps.js"
+import {
+  buildNestedColumns,
+  mountRow,
+  nestedColumnsSpec,
+  type NestedColumns,
+  type NestedColumnsSpec,
+} from "./nested-columns-fixture.js"
 
 // ============================================================================
 // Test-local helpers
@@ -1258,6 +1275,529 @@ describe("Fuzz: content change", () => {
           `Content change differs (changed nodes: ${changingNodes.join(",")}; ${diffs.length} diffs):\n${detail}`,
         )
       }
+    })
+  }
+})
+
+// ============================================================================
+// MEASURE-only sizing pass (#26840)
+// ============================================================================
+//
+// The sizing pass (layout-zero.ts sizeByLayout) answers from each node's layout
+// cache, which now lives across passes, and leaves no fingerprint, leaf
+// constraint, child box or container-query freeze behind. Each step below
+// edits the spec, applies the same edit to the live tree, lays it out
+// incrementally, and compares every box against a tree built fresh from the
+// spec.
+
+interface NestedColumnsState {
+  width: number
+  height: number
+  spec: NestedColumnsSpec
+}
+
+function expectNestedColumnsStepsMatchFresh(
+  spec: NestedColumnsSpec,
+  steps: Step<NestedColumnsState, NestedColumns>[],
+): void {
+  expectStepsMatchFresh({ width: 220, height: 50, spec }, (state) => buildNestedColumns(Node, state.spec, state.width), steps)
+}
+
+const resizeTo =
+  (width: number) =>
+  (state: NestedColumnsState, live: NestedColumns): void => {
+    state.width = width
+    live.root.setWidth(width)
+  }
+
+describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
+  it("Fx(4,10,2): leaf edits, a resize, a query-container resize and a mount each match fresh", () => {
+    const spec = nestedColumnsSpec(4, 10, 2)
+    spec.queryColumn = 1
+    spec.labelCqi = 12
+    expectNestedColumnsStepsMatchFresh(spec, [
+      {
+        name: "a prose wraps differently",
+        apply: ({ spec: s }, live) => {
+          s.proseLengths[3]![1] = 470
+          live.proses[3]![1]!.markDirty()
+        },
+      },
+      {
+        name: "the last label narrows",
+        apply: ({ spec: s }, live) => {
+          s.labelWidths[9] = 7
+          live.labels[9]!.markDirty()
+        },
+      },
+      {
+        name: "the first prose shrinks to one line",
+        apply: ({ spec: s }, live) => {
+          s.proseLengths[0]![0] = 40
+          live.proses[0]![0]!.markDirty()
+        },
+      },
+      {
+        name: "a middle label widens",
+        apply: ({ spec: s }, live) => {
+          s.labelWidths[5] = 55
+          live.labels[5]!.markDirty()
+        },
+      },
+      { name: "the root narrows 220 -> 180", apply: resizeTo(180) },
+      { name: "the query container widens 180 -> 200", apply: resizeTo(200) },
+      {
+        name: "a dirty row mounts mid-chain",
+        apply: ({ spec: s }, live) => {
+          s.mounts.push({ depth: 2, proseLength: 390 })
+          mountRow(Node, s, live, s.mounts.length - 1)
+        },
+      },
+      {
+        name: "a prose under the mount changes after it",
+        apply: ({ spec: s }, live) => {
+          s.proseLengths[7]![0] = 12
+          live.proses[7]![0]!.markDirty()
+        },
+      },
+    ])
+  })
+
+  // A clean row measured for the first time while its fingerprint is valid:
+  // the sibling's flexGrow arms the column's Phase 5b, and the row's MEASURE
+  // geometry differs from its layout (its percentage minHeight has no base
+  // without the column's height), so every child box it moved must come back.
+  it("a clean row first measured under a valid fingerprint keeps its children's boxes", () => {
+    const state = { width: 100, height: 30, grow: 0 }
+    const build = (st: typeof state) => {
+      const root = Node.create()
+      root.setWidth(st.width)
+      root.setHeight(st.height)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      const row = Node.create()
+      row.setFlexDirection(FLEX_DIRECTION_ROW)
+      row.setAlignItems(C.ALIGN_CENTER)
+      row.setMinHeightPercent(50)
+      const tag = Node.create()
+      tag.setWidth(10)
+      tag.setHeight(1)
+      const text = Node.create()
+      text.setMeasureFunc(textMeasure(300))
+      row.insertChild(tag, 0)
+      row.insertChild(text, 1)
+      const sibling = Node.create()
+      sibling.setHeight(1)
+      sibling.setFlexGrow(st.grow)
+      root.insertChild(row, 0)
+      root.insertChild(sibling, 1)
+      return { root, sibling }
+    }
+    expectStepsMatchFresh(state, build, [
+      {
+        name: "the sibling starts to grow",
+        apply: (st, live) => {
+          st.grow = 1
+          live.sibling.setFlexGrow(1)
+        },
+      },
+    ])
+  })
+
+  // measureNode estimates a column's flex basis by asking its flex-start row
+  // at the column's width. That row's exact MEASURE entry at the same key,
+  // written the pass before, answers a different question: the column lays
+  // the row out at its content width. A fresh pass computes the estimate
+  // (approximate, one line) and re-derives the basis in 5b; so must this one.
+  it("an exact entry never answers a flex-basis estimate (seed 6000)", () => {
+    const state = { width: 100, height: 40, grow: 0 }
+    const build = (st: typeof state) => {
+      const root = Node.create()
+      root.setWidth(st.width)
+      root.setHeight(st.height)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      const column = Node.create()
+      column.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      column.setFlexGrow(st.grow)
+      const filler = Node.create()
+      filler.setFlexGrow(1)
+      const row = Node.create()
+      row.setFlexDirection(FLEX_DIRECTION_ROW)
+      row.setAlignSelf(C.ALIGN_FLEX_START)
+      const text = Node.create()
+      text.setMeasureFunc(textMeasure(143))
+      row.insertChild(text, 0)
+      column.insertChild(filler, 0)
+      column.insertChild(row, 1)
+      const tail = Node.create()
+      tail.setFlexGrow(1)
+      root.insertChild(column, 0)
+      root.insertChild(tail, 1)
+      return { root, column }
+    }
+    expectStepsMatchFresh(state, build, [
+      {
+        name: "the column grows",
+        apply: (st, live) => {
+          st.grow = 1
+          live.column.setFlexGrow(1)
+        },
+      },
+      {
+        name: "the column stops growing",
+        apply: (st, live) => {
+          st.grow = 0
+          live.column.setFlexGrow(0)
+        },
+      },
+    ])
+  })
+
+  // An absolute check the differential cannot make: a sizing pass that takes
+  // measureNode's under-estimate as exact is wrong in the fresh tree too. Each
+  // Fx row holds two 300-cell proses beside a 30-cell label in 220 cells, so
+  // each prose wraps to ceil(300 / 190) = 2 lines and each row is 4 tall.
+  it("Fx(4,10,2) rows are as tall as their wrapped prose", () => {
+    const fx = buildNestedColumns(Node, nestedColumnsSpec(4, 10, 2))
+    fx.root.calculateLayout(220, 50, DIRECTION_LTR)
+    expect(fx.rows.map((row) => row.getComputedHeight())).toEqual(Array.from({ length: 10 }, () => 4))
+    fx.root.freeRecursive()
+  })
+
+  // Trees reduced from a randomized differential search (random trees, random
+  // edits, every box and computed padding compared with a fresh build): each
+  // is the smallest tree on which the named mutation of scripts/mutation-test.ts
+  // makes the incremental pass differ from fresh while the build does not.
+  const seed5987: Record<number, SpecNode> = {
+    0: { children: [1, 4] },
+    1: { row: true, children: [2, 3] },
+    2: { row: true, children: [5, 6] },
+    3: { row: true, shrink: 1, text: 293 },
+    4: { shrink: 1, text: 249 },
+    5: { row: true },
+    6: { query: true, widthPct: 86, children: [7] },
+    7: { widthCqi: 39 },
+  }
+
+  it.each<[string, number, Record<number, SpecNode>, SpecEdit[]]>([
+    [
+      // A MEASURE call that wrote the leaf's constraints leaves its 7% padding
+      // at the sizing width after its column's layout is a fingerprint hit.
+      "measure-writes-leaf-constraints (seed 231)",
+      120,
+      {
+        0: { paddingPct: 7, children: [2] },
+        2: { row: true, query: true, grow: 1, children: [3] },
+        3: { row: true, children: [4, 5] },
+        4: { children: [9] },
+        5: { children: [6] },
+        6: { row: true, widthCqi: 40, paddingPct: 7 },
+        9: { text: 91 },
+      },
+      [{ node: 0, grow: 1 }],
+    ],
+    [
+      // A MEASURE hit on the 76% column that did not replay its #26660 count
+      // skips the row's repeat that a miss takes.
+      "measure-hit-skips-unknown-width-replay (seed 4395)",
+      120,
+      {
+        0: { children: [1, 2] },
+        1: { row: true, grow: 1 },
+        2: { row: true, grow: 1, children: [4] },
+        4: { row: true, children: [8] },
+        8: { widthPct: 76, children: [9] },
+        9: { text: 146 },
+      },
+      [{ node: 2, grow: 0 }],
+    ],
+    [
+      "estimate-reads-exact (seed 9296)",
+      100,
+      {
+        0: { children: [1, 2] },
+        1: { grow: 1 },
+        2: { grow: 1, children: [4, 8] },
+        4: { row: true, query: true, widthCqi: 34, children: [6] },
+        6: { row: true, children: [7] },
+        7: { text: 106 },
+        8: { row: true, alignStart: true, widthCqi: 33, shrink: 1, text: 255 },
+      },
+      [
+        { node: 8, alignStart: false },
+        { node: 2, alignStart: true },
+      ],
+    ],
+    [
+      "measure-freezes-query-size (seed 9933)",
+      80,
+      {
+        0: { paddingPct: 2, children: [1, 3, 5] },
+        1: { shrink: 1, margin: 3, width: 21.5, children: [2, 10] },
+        2: { row: true, query: true, shrink: 1, children: [6] },
+        3: { widthPct: 42, children: [4, 7] },
+        4: { paddingPct: 9, text: 277 },
+        5: { children: [8] },
+        6: { widthCqi: 51, text: 222 },
+        7: { row: true, widthPct: 70, text: 115 },
+        8: { text: 40 },
+        10: { alignStart: true, shrink: 1, text: 50 },
+      },
+      [{ node: 10, alignStart: false }],
+    ],
+    [
+      // Before estimates and exact entries were kept apart, the fractional row's
+      // exact entry answered the column's estimate after the align-self edit.
+      "estimates and exact entries kept apart (seed 4568)",
+      100,
+      {
+        0: { children: [1] },
+        1: { grow: 1, children: [2, 3] },
+        2: { row: true, grow: 1, width: 15.5, children: [4, 7] },
+        3: { row: true, widthCqi: 61, text: 137 },
+        4: { row: true, width: 23.5 },
+        7: { text: 254 },
+      },
+      [{ node: 1, alignStart: true }],
+    ],
+    [
+      "measure-reads-approx (seed 293)",
+      80,
+      {
+        0: { children: [1, 2] },
+        1: { row: true, query: true, children: [3, 5] },
+        2: { row: true, grow: 1, text: 207 },
+        3: { children: [4] },
+        4: { row: true, text: 97 },
+        5: { row: true, widthCqi: 32, text: 266 },
+      },
+      [{ node: 0, rootWidth: 120 }],
+    ],
+    [
+      // A query-size refresh invalidates the cqi row's entries without dirtying
+      // it, so only the -1 sentinel keeps an unconstrained query from matching.
+      "cache-sentinel (seed 431)",
+      120,
+      {
+        0: { row: true, children: [1, 6] },
+        1: { children: [2] },
+        2: { row: true, widthCqi: 59 },
+        6: { row: true, grow: 1 },
+      },
+      [{ node: 0, rootWidth: 61 }],
+    ],
+  ])("reduced search case: %s", (_name, width, nodes, edits) => {
+    const state: SpecState = { width, height: 40, nodes: structuredClone(nodes) }
+    expectStepsMatchFresh(
+      state,
+      buildSpecTree,
+      edits.map((edit) => ({ name: JSON.stringify(edit), apply: applySpecEdit(edit) })),
+      specPaddings,
+    )
+  })
+
+  // Phase 9b re-stretches a child at the absolute origin Phase 8 passed it.
+  // Inside a MEASURE call that origin is not the fingerprint's (a MEASURE
+  // writes none), so 9b reads the Phase 8 record: the re-stretched row is
+  // measured at the column's allocated height, as the layout pass lays it out.
+  it("9b inside MEASURE re-stretches at Phase 8's origin, not the fingerprint's (seed 5987)", () => {
+    const tree = buildSpecTree({ width: 120, height: 40, nodes: structuredClone(seed5987) })
+    tree.root.calculateLayout(120, 40, DIRECTION_LTR)
+    // The row (node 2) re-stretched to the line's 5 cells inside node 1's MEASURE.
+    expect(tree.nodes[2]!.getCachedLayout(47, 5, 120, NaN, NaN, 5, true)).not.toBeNull()
+    tree.root.freeRecursive()
+  })
+
+  // Edge rounding makes a MEASURE answer depend on the fractional part of the
+  // origin, which is not in the key. The column is 11.5 tall (an 11-cell child
+  // under 0.5 padding): measured inside the row's MEASURE at origin 0.5 it
+  // rounds to 11, at origin 1 to 12, under the same all-NaN key. Its entry
+  // from 0.5 must not answer at 1, or the flex base of the outer column is a
+  // cell short and the growing sibling takes the cell.
+  it("cache-integer-origin: a MEASURE answer from a fractional origin is not reused at another", () => {
+    const build = (state: { width: number; height: number; rowPad: number }) => {
+      const root = Node.create()
+      root.setWidth(state.width)
+      root.setHeight(state.height)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      const outer = Node.create()
+      outer.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      outer.setFlexShrink(1)
+      const row = Node.create()
+      row.setFlexDirection(FLEX_DIRECTION_ROW)
+      row.setWidth(20)
+      row.setPadding(EDGE_TOP, state.rowPad)
+      const column = Node.create()
+      column.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      column.setAlignSelf(C.ALIGN_FLEX_START)
+      column.setPadding(EDGE_TOP, 0.5)
+      const leaf = Node.create()
+      leaf.setWidth(2)
+      leaf.setHeight(11)
+      // 30 cells in a 20-wide row: the outer column's flex base is approximate,
+      // so Phase 5b sizes it with a MEASURE call.
+      const text = Node.create()
+      text.setMeasureFunc(textMeasure(30))
+      const grower = Node.create()
+      grower.setHeight(1)
+      grower.setFlexGrow(1)
+      column.insertChild(leaf, 0)
+      row.insertChild(column, 0)
+      row.insertChild(text, 1)
+      outer.insertChild(row, 0)
+      root.insertChild(outer, 0)
+      root.insertChild(grower, 1)
+      return { root, row }
+    }
+    expectStepsMatchFresh({ width: 40, height: 30, rowPad: 0.5 }, build, [
+      {
+        name: "the row's padding moves the column from origin 0.5 to 1",
+        apply: (state, live) => {
+          state.rowPad = 1
+          live.row.setPadding(EDGE_TOP, 1)
+        },
+      },
+    ])
+  })
+
+  // A MEASURE call on a query container swaps in the float inline size it
+  // would freeze (15.6); the layout pass freezes the rounded one (16). The
+  // 12.9-wide item's 50cqi padding leaves 5.1 cells of text width under the
+  // first and 4.9 under the second, under one key (its parent's width is
+  // fixed). The entry the MEASURE descent wrote must not survive the restore,
+  // or the layout pass sizes the item's flex base from the swapped size.
+  it("cache-restore-refresh: entries a MEASURE call derived from its query size do not survive the restore", () => {
+    const build = (state: { width: number; height: number; cells: number }) => {
+      const root = Node.create()
+      root.setWidth(state.width)
+      root.setHeight(state.height)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      const query = Node.create()
+      query.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
+      query.setWidthCqi(13)
+      query.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      query.setFlexShrink(1)
+      // Auto height under a max: Phase 5b sizes the item's approximate base.
+      const column = Node.create()
+      column.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      column.setWidth(14)
+      column.setMaxHeight(5)
+      const item = Node.create()
+      item.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      item.setWidth(12.9)
+      item.setPadding(EDGE_LEFT, { value: 50, unit: C.UNIT_CQI })
+      item.setFlexShrink(1)
+      const text = Node.create()
+      text.setMeasureFunc((width, mode) => {
+        const cells = state.cells
+        if (mode === C.MEASURE_MODE_UNDEFINED || !Number.isFinite(width) || width >= cells) return { width: cells, height: 1 }
+        return { width, height: Math.ceil(cells / Math.max(1, Math.floor(width))) }
+      })
+      // 5 cells in a 1-wide row: the item's estimate is approximate.
+      const overflow = Node.create()
+      overflow.setFlexDirection(FLEX_DIRECTION_ROW)
+      overflow.setWidth(1)
+      overflow.insertChild(Node.create(), 0)
+      overflow.getChild(0)!.setWidth(5)
+      const sibling = Node.create()
+      sibling.setHeight(10)
+      sibling.setFlexShrink(1)
+      item.insertChild(text, 0)
+      item.insertChild(overflow, 1)
+      column.insertChild(item, 0)
+      column.insertChild(sibling, 1)
+      query.insertChild(column, 0)
+      root.insertChild(query, 0)
+      return { root, text }
+    }
+    expectStepsMatchFresh({ width: 120, height: 40, cells: 20 }, build, [
+      {
+        // Dirties the item under an unchanged frozen size, so it measures anew.
+        name: "the item's text shrinks to 19 cells",
+        apply: (state, live) => {
+          state.cells = 19
+          live.text.markDirty()
+        },
+      },
+    ])
+  })
+
+  // Query containers under the contract, without cqi: every seed matches fresh.
+  for (let seed = 1; seed <= 300; seed++) {
+    it(`seeded query containers without cqi ${seed}: random edits match fresh`, () => {
+      const rng = createRng(seed * 1061 + 17)
+      const pick = (lo: number, hi: number) => lo + Math.floor(rng() * (hi - lo + 1))
+      const count = pick(3, 11)
+      const nodes: Record<number, SpecNode> = {}
+      for (let i = 0; i < count; i++) {
+        const spec: SpecNode = {}
+        if (rng() < 0.5) spec.row = true
+        if (i > 0 && rng() < 0.3) spec.query = true
+        if (rng() < 0.4) spec.alignStart = true
+        if (i > 0 && rng() < 0.15) spec.widthPct = pick(20, 89)
+        else if (i > 0 && rng() < 0.15) spec.width = pick(10, 30) + 0.5
+        if (rng() < 0.2) spec.paddingPct = pick(1, 10)
+        if (rng() < 0.2) spec.margin = pick(1, 3)
+        if (rng() < 0.4) spec.grow = 1
+        if (rng() < 0.5) spec.shrink = 1
+        nodes[i] = spec
+      }
+      for (let i = 1; i < count; i++) (nodes[pick(0, i - 1)]!.children ??= []).push(i)
+      for (let i = 0; i < count; i++) if (!nodes[i]!.children && rng() < 0.6) nodes[i]!.text = pick(1, 300)
+      const edits: SpecEdit[] = []
+      for (let n = 0; n < 3; n++) {
+        const node = pick(0, count - 1)
+        const what = rng()
+        if (what < 0.3 && nodes[node]!.text !== undefined) edits.push({ node, text: pick(1, 300) })
+        else if (what < 0.55) edits.push({ node, grow: rng() < 0.5 ? 1 : 0 })
+        else if (what < 0.7) edits.push({ node: 0, rootWidth: pick(61, 120) })
+        else if (node > 0) edits.push({ node, alignStart: rng() < 0.5 })
+      }
+      const state: SpecState = { width: [100, 80, 61, 120][seed % 4]!, height: 40, nodes }
+      expectStepsMatchFresh(
+        state,
+        buildSpecTree,
+        edits.map((edit) => ({ name: JSON.stringify(edit), apply: applySpecEdit(edit) })),
+        specPaddings,
+      )
+    })
+  }
+
+  for (let seed = 1; seed <= 50; seed++) {
+    it(`seeded nested columns ${seed}: random leaf edits match fresh`, () => {
+      const rng = createRng(seed * 1051 + 29)
+      const pick = (lo: number, hi: number) => lo + Math.floor(rng() * (hi - lo + 1))
+      const depth = pick(1, 6)
+      const rows = pick(1, 12)
+      const spec = nestedColumnsSpec(depth, rows, pick(1, 4))
+      for (let k = 0; k < rows; k++) {
+        spec.labelWidths[k] = pick(1, 60)
+        for (let j = 0; j < spec.proseBoxes; j++) spec.proseLengths[k]![j] = pick(1, 600)
+      }
+      const steps: Step<NestedColumnsState, NestedColumns>[] = []
+      for (let n = 0; n < 4; n++) {
+        const k = pick(0, rows - 1)
+        if (rng() < 0.5) {
+          const labelWidth = pick(1, 60)
+          steps.push({
+            name: `label ${k} -> ${labelWidth}`,
+            apply: ({ spec: s }, live) => {
+              s.labelWidths[k] = labelWidth
+              live.labels[k]!.markDirty()
+            },
+          })
+        } else {
+          const j = pick(0, spec.proseBoxes - 1)
+          const length = pick(1, 600)
+          steps.push({
+            name: `prose ${k}.${j} -> ${length}`,
+            apply: ({ spec: s }, live) => {
+              s.proseLengths[k]![j] = length
+              live.proses[k]![j]!.markDirty()
+            },
+          })
+        }
+      }
+      expectNestedColumnsStepsMatchFresh(spec, steps)
     })
   }
 })

@@ -477,6 +477,15 @@ describe("Flexily Layout Engine", () => {
       expectLayout(root, { left: 0, top: 0, width: 80, height: 24 })
     })
 
+    it("rounds a lone leaf's fractional size to the nearest cell", () => {
+      const root = Node.create()
+      root.setWidth(10.6)
+      root.setHeight(3.7)
+      root.calculateLayout(100, 100, DIRECTION_LTR)
+
+      expectLayout(root, { width: 11, height: 4 })
+    })
+
     it("should set display:none node to zero size", () => {
       const root = Node.create()
       root.setWidth(80)

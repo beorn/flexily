@@ -31,18 +31,17 @@ export function markSubtreeLayoutSeen(node: Node): void {
  * Invalidate the constraint fingerprint of a node, every descendant, and every
  * ancestor (iterative to avoid stack overflow).
  *
- * Required after a SIZING pass that ran the full algorithm over a subtree
- * (`sizeByLayout` in layout-zero.ts). Such a pass lays the subtree out at
- * absolute (0,0) with offsets 0 and overwrites layout.left/top/width/height
- * throughout, so every fingerprint it leaves behind describes a geometry the
- * positioning pass must not reuse. The plain `measureNode` path writes no
- * fingerprints at all; this restores that property.
+ * One caller: layoutNode's Phase 3a, in LAYOUT mode, when a query container's
+ * frozen inline size changes. Every fingerprint in the subtree was taken under
+ * the old size, and cqi descendants must lay out again. A MEASURE call never
+ * gets here: it swaps the frozen size and restores it, and writes no
+ * fingerprint for this to clear (#26840).
  *
  * The ANCESTORS matter as much as the subtree: a node's position is written by
  * its parent's Phase 8, so a clean-and-valid ancestor that skips its own layout
- * strands every overwritten position below it at the sizing pass's value. The
- * ancestors above the layoutNode call that triggered this are mid-pass and will
- * rewrite their own fingerprints on the way out, so clearing them costs nothing.
+ * strands every changed position below it. The ancestors above the layoutNode
+ * call that triggered this are mid-pass and will rewrite their own fingerprints
+ * on the way out, so clearing them costs nothing.
  */
 export function invalidateFingerprintsAround(node: Node): void {
   traversalStack.length = 0

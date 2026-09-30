@@ -263,7 +263,12 @@ Returns a stable `_measureResult` object (mutated in place) to avoid allocation 
 
 ### Layout Cache (Per-Node)
 
-2-entry cache (`_lc0`, `_lc1`) for sizing passes. Stores `availW, availH -> computedW, computedH, approx`. Cleared at start of each `calculateLayout()` pass. Returns a stable `_layoutResult` object. Uses `-1` as invalidation sentinel (not `NaN`, because `Object.is(NaN, NaN)` is true and would cause false hits).
+A 4-slot ring (`_lc`, next write at `_lcNext`, `LAYOUT_CACHE_SLOTS`) of `LayoutCacheEntry`. The key is six fields — `availW, availH, containingW, containingH, allocatedW, allocatedH` — and the entry holds `width, height, approx, exact, unknownWidths, gen`. Returns a stable `_layoutResult` object. Four slots because one pass asks a node up to three keys; two thrashed.
+
+- **Two kinds, never answering each other.** An *exact* entry is written by a MEASURE call (see [measureNode vs layoutNode](#measurenode-vs-layoutnode)) and read only by MEASURE. An *estimate* is written and read by `measureNode` and the Phase 5/6c probes. `getCachedLayout(…, exact)` and `setCachedLayout(…, exact)` match on the kind as well as the key; a write of one kind never replaces the other. Mixing them let an exact answer stand in for an estimate and the reverse (#26840 seeds 6000 and 4568).
+- **Kept across passes.** The pass-start `resetLayoutCache(true)` keeps the ring and clears only min-content. A direction change in `calculateLayout()` clears everything.
+- **Stale entries are refused twice.** `markDirty()` and a query-size refresh invalidate a node's entries in place with the `-1` sentinel (not `NaN`: `Object.is(NaN, NaN)` is true, so an unconstrained query would match). A dirty node also answers only from an entry stamped with the current `layoutGeneration()`. The refresh does not dirty the node, so there the sentinel is the only guard (row "cache-sentinel (seed 431)").
+- **A hit replays what a miss would report**: the entry's `unknownWidths` count is added back for the #26660 re-layout.
 
 `approx` rides with the size because it is a property of THAT query, not of the node: `measureNode` sets it when its shrink-wrap shortcut met a row overflowing a definite main size at or below the node, and a hit must report the same verdict a miss would. Storing it on the node instead lets a neighbouring query's answer leak — the same node is measured at several constraints in one pass (Phase 5 at the cross size, Phase 7a at NaN/NaN), and the last writer would win. Phase 5b consumes it; see `baseApprox` in FlexInfo. What it marks is always a HEIGHT under-estimate, which is why Phase 5b acts on it in column-direction containers only and lets it bubble through rows untouched. Each clause of its predicate mirrors the engine condition that reads the summed base sizes — flex distribution, line breaking, justify-content, main-axis auto margins, and the shrink-wrap max path — rather than re-deriving when those are true.
 
@@ -273,7 +278,7 @@ Returns a stable `_measureResult` object (mutated in place) to avoid allocation 
 
 `markDirty()` propagates up to root:
 
-1. Clears measure cache (`_m0-_m3`) and layout cache (`_lc0-_lc1`) on every ancestor
+1. Clears the measure cache (`_m0-_m3`) and invalidates the layout-cache entries (`_lc`) on every ancestor
 2. Sets `_isDirty = true`
 3. Invalidates `flex.layoutValid`
 4. Stops early if an ancestor is already dirty (caches still cleared)
@@ -295,7 +300,7 @@ flex.lastDir = direction
 flex.layoutValid = true
 ```
 
-On next call, if `layoutValid && !isDirty && same constraints`, the entire subtree is skipped. Only position delta is propagated (if offset changed).
+On next call, if `layoutValid && !isDirty && same constraints`, the entire subtree is skipped. Only position delta is propagated (if offset changed). LAYOUT mode only: a MEASURE call neither reads nor writes the fingerprint.
 
 **`absX`/`absY` must be fingerprinted** because edge-based rounding depends on absolute position: `width = round(absX + nodeWidth) - round(absX)`. A fractional shift in absX (e.g., from a sibling's width change) changes the rounded result even when availW/availH/direction are unchanged.
 
@@ -335,6 +340,12 @@ This is Yoga's algorithm. Layout positions stored in `layout.left`/`layout.top` 
 ## measureNode vs layoutNode
 
 `measureNode()` (~260 lines) is a lightweight alternative to `layoutNode()` (~1900 lines). It computes `width` and `height` but NOT `left`/`top`. Used during Phase 5 for intrinsic sizing of auto-sized container children. Save/restore of `layout.width`/`layout.height` is required around `measureNode` calls because it overwrites those fields.
+
+`layoutNode()` itself runs in one of two modes, `LAYOUT` or `MEASURE` (Yoga's `performLayout=false`). Phase 5b's `sizeByLayout()` sizes an approximate base with a MEASURE call at origin (0, 0), and the mode passes down to every recursive call. The MEASURE contract:
+
+- It answers the node's size and leaves nothing behind. It writes no fingerprint and no leaf `lastAvail*`. Each child's box is saved at Phase 5 start (`measureSaveStack`) and restored at exit. A query container's frozen size is swapped in and restored (`_swapFrozenQuerySize`/`_restoreFrozenQuerySize`, which refreshes the dependents: row `cache-restore-refresh`), never persisted.
+- It reads and writes only exact cache entries, and only at an integer origin: edge rounding makes a size depend on the fractional part of `absX`/`absY` (row `cache-integer-origin`).
+- A layout phase never reads a fingerprint or cache field as an input. Phase 9b re-stretches at the origin Phase 8 recorded (`flex.passedAbsX/Y`), because inside a MEASURE call `lastAbsX/Y` belongs to an earlier LAYOUT pass (#26840 seed 5987).
 
 ## Integration: How Silvery Uses Flexily
 
