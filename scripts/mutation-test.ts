@@ -17,6 +17,7 @@ interface Mutation {
   file: string
   find: string // Exact string to find (must be unique in file)
   replace: string
+  also?: { find: string; replace: string }[] // Further edits in the same file, applied together
   description: string
   equivalent?: boolean // True = mutation disables redundant defense layer, expected to pass
   testFiles?: string[] // Test files to run (defaults to relayout-consistency only)
@@ -53,7 +54,7 @@ const mutations: Mutation[] = [
     replace: `      true // MUTATION: a dirty node answers from an entry of any pass`,
     description:
       "Let a dirty node answer from an entry an earlier pass wrote — stale sizes after content changes (#26840 F2)",
-    equivalent: true, // markDirty() invalidates the node's entries, so a dirty node only ever holds entries its current pass wrote; the generation check is the defence for a nested pass
+    equivalent: true, // markDirty() also invalidates the entries; stale-entry-survives-dirty removes both layers
   },
   {
     name: "skip-markDirty-propagation",
@@ -100,6 +101,7 @@ const mutations: Mutation[] = [
       // Min-content cache is also content-derived; same invalidation rules`,
     description:
       "Keep layout cache entries across markDirty — entries now live across passes, so a changed subtree answers with its old size (#26840)",
+    equivalent: true, // the pass-stamp check also refuses them; stale-entry-survives-dirty removes both layers
   },
   {
     name: "skip-save-restore-measureNode-phase5",
@@ -197,6 +199,35 @@ const mutations: Mutation[] = [
     replace: `      (entry.exact === exact || entry.exact) && // MUTATION: an exact entry answers an estimate`,
     description:
       "measureNode and the Phase 5/6c probes accept an exact MEASURE entry, where a fresh pass computes the estimate (#26840, seed 6000)",
+  },
+  {
+    name: "stale-entry-survives-dirty",
+    file: "src/node-zero.ts",
+    find: `      current._m0 = current._m1 = current._m2 = current._m3 = undefined
+      current.invalidateLayoutEntries()`,
+    replace: `      current._m0 = current._m1 = current._m2 = current._m3 = undefined // MUTATION: entries survive markDirty`,
+    also: [
+      {
+        find: `      (!this._isDirty || entry.gen === layoutGeneration())`,
+        replace: `      true // MUTATION: and a dirty node answers from any pass`,
+      },
+    ],
+    description:
+      "Both defences against a changed subtree answering with its old size removed together (#26840 F1+F2)",
+  },
+  {
+    name: "kinds-share-entries",
+    file: "src/node-zero.ts",
+    find: `      entry.exact === exact &&`,
+    replace: `      (entry.exact === exact || entry.exact) && // MUTATION: an exact entry answers an estimate`,
+    also: [
+      {
+        find: `      if (held.exact === exact && sameCacheKey(`,
+        replace: `      if (sameCacheKey( // MUTATION: an exact write replaces the estimate`,
+      },
+    ],
+    description:
+      "Estimates and exact entries share one namespace again, as before the search found seeds 6000 and 4568 (#26840)",
   },
   {
     name: "restretch-reads-fingerprint-origin",
@@ -318,6 +349,7 @@ async function main() {
   let unexpectedFail = 0
   const gaps: string[] = []
   const skipped: string[] = []
+  const errors: string[] = []
 
   console.log(`Mutation testing for Flexily code paths`)
   console.log(`Running ${mutations.length} mutations against test suite\n`)
@@ -326,23 +358,18 @@ async function main() {
     const filepath = resolve(dir, mutation.file)
     const original = readFileSync(filepath, "utf8")
 
-    if (!original.includes(mutation.find)) {
-      console.error(`SKIP "${mutation.name}" -- pattern not found in ${mutation.file}`)
-      skipped.push(mutation.name)
-      continue
-    }
-
-    // Verify uniqueness
-    const firstIdx = original.indexOf(mutation.find)
-    const secondIdx = original.indexOf(mutation.find, firstIdx + 1)
-    if (secondIdx !== -1) {
-      console.error(`SKIP "${mutation.name}" -- pattern appears multiple times in ${mutation.file}`)
+    // Every edit's pattern must occur exactly once in the file
+    const edits = [{ find: mutation.find, replace: mutation.replace }, ...(mutation.also ?? [])]
+    const badEdit = edits.find((edit) => original.split(edit.find).length !== 2)
+    if (badEdit) {
+      const found = original.split(badEdit.find).length - 1
+      console.error(`SKIP "${mutation.name}" -- a pattern occurs ${found} times in ${mutation.file}, not once`)
       skipped.push(mutation.name)
       continue
     }
 
     try {
-      const mutated = original.replace(mutation.find, mutation.replace)
+      const mutated = edits.reduce((text, edit) => text.replace(edit.find, edit.replace), original)
       writeFileSync(filepath, mutated)
 
       process.stdout.write(`  "${mutation.name}" ... `)
@@ -359,7 +386,22 @@ async function main() {
         stdout: "pipe",
         stderr: "pipe",
       })
-      const exitCode = await proc.exited
+      const [exitCode, stdout, stderr] = await Promise.all([
+        proc.exited,
+        new Response(proc.stdout).text(),
+        new Response(proc.stderr).text(),
+      ])
+      // A non-zero exit is a caught mutation only when tests ran and failed.
+      // A refused or crashed run (a drifted gitlink, a syntax error in the
+      // mutant) tested nothing and must never read as "caught".
+      const output = stdout + stderr
+      const testsFailed = /Tests\s+\d+ failed/.test(output)
+      if (exitCode !== 0 && !testsFailed) {
+        console.log(`ERROR (exit ${exitCode}, no test failed: nothing was tested)`)
+        console.error(output.split("\n").slice(-8).join("\n"))
+        errors.push(mutation.name)
+        continue
+      }
 
       if (exitCode === 0) {
         if (mutation.equivalent) {
@@ -392,6 +434,9 @@ async function main() {
   if (skipped.length > 0) {
     console.log(`Skipped: ${skipped.join(", ")}`)
   }
+  if (errors.length > 0) {
+    console.log(`Errors (ran no tests): ${errors.join(", ")}`)
+  }
   if (gaps.length > 0) {
     console.log(`Coverage gaps: ${gaps.join(", ")}`)
   }
@@ -399,7 +444,7 @@ async function main() {
     console.log(`Unexpected failures: ${unexpectedFail} mutations marked equivalent were caught by tests`)
   }
   // A skipped mutation is a stale pattern, not a pass: it tests nothing.
-  process.exit(gaps.length > 0 || skipped.length > 0 || unexpectedFail > 0 ? 1 : 0)
+  process.exit(gaps.length > 0 || skipped.length > 0 || errors.length > 0 || unexpectedFail > 0 ? 1 : 0)
 }
 
 main()

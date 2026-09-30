@@ -49,6 +49,16 @@ import {
   type BuildTreeResult,
 } from "../src/testing.js"
 import {
+  applySpecEdit,
+  buildSpecTree,
+  expectStepsMatchFresh,
+  specPaddings,
+  type SpecEdit,
+  type SpecNode,
+  type SpecState,
+  type Step,
+} from "./relayout-steps.js"
+import {
   buildNestedColumns,
   mountRow,
   nestedColumnsSpec,
@@ -1280,38 +1290,6 @@ describe("Fuzz: content change", () => {
 // incrementally, and compares every box against a tree built fresh from the
 // spec.
 
-interface Step<State, Tree> {
-  name: string
-  apply: (state: State, live: Tree) => void
-}
-
-// Lay the live tree out twice, then for each step: edit, lay out incrementally,
-// and compare every box (and any extra `facts`) against a fresh build.
-function expectStepsMatchFresh<State extends { width: number; height: number }, Tree extends { root: Node }>(
-  state: State,
-  build: (state: State) => Tree,
-  steps: Step<State, Tree>[],
-  facts: (tree: Tree) => unknown = () => null,
-): void {
-  const live = build(state)
-  live.root.calculateLayout(state.width, state.height, DIRECTION_LTR)
-  live.root.calculateLayout(state.width, state.height, DIRECTION_LTR)
-  for (const step of steps) {
-    step.apply(state, live)
-    live.root.calculateLayout(state.width, state.height, DIRECTION_LTR)
-    const fresh = build(state)
-    fresh.root.calculateLayout(state.width, state.height, DIRECTION_LTR)
-    const diffs = diffLayouts(getLayout(fresh.root), getLayout(live.root))
-    const freshFacts = facts(fresh)
-    fresh.root.freeRecursive()
-    if (diffs.length > 0) {
-      expect.unreachable(`step "${step.name}" differs from fresh (${diffs.length} diffs):\n  ${diffs.join("\n  ")}`)
-    }
-    expect(facts(live), `step "${step.name}"`).toEqual(freshFacts)
-  }
-  live.root.freeRecursive()
-}
-
 interface NestedColumnsState {
   width: number
   height: number
@@ -1489,93 +1467,6 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
   // edits, every box and computed padding compared with a fresh build): each
   // is the smallest tree on which the named mutation of scripts/mutation-test.ts
   // makes the incremental pass differ from fresh while the build does not.
-  interface SpecNode {
-    row?: true
-    query?: true
-    alignStart?: true
-    widthPct?: number
-    widthCqi?: number
-    width?: number
-    paddingPct?: number
-    grow?: number
-    shrink?: number
-    text?: number
-    margin?: number
-    children?: number[]
-  }
-  interface SpecEdit {
-    node: number
-    grow?: number
-    text?: number
-    alignStart?: boolean
-    rootWidth?: number
-  }
-  interface SpecState {
-    width: number
-    height: number
-    nodes: Record<number, SpecNode>
-  }
-  const buildSpecTree = (state: SpecState) => {
-    const nodes: Record<number, Node> = {}
-    for (const [key, spec] of Object.entries(state.nodes)) {
-      const node = Node.create()
-      node.setFlexDirection(spec.row ? FLEX_DIRECTION_ROW : FLEX_DIRECTION_COLUMN)
-      if (spec.query) {
-        node.setContainerType(C.CONTAINER_TYPE_INLINE_SIZE)
-        // The query-container contract: sized by content only under containSize.
-        node.setContainSize(spec.widthPct === undefined && spec.widthCqi === undefined && spec.width === undefined)
-      }
-      if (spec.alignStart) node.setAlignSelf(C.ALIGN_FLEX_START)
-      if (spec.widthPct !== undefined) node.setWidthPercent(spec.widthPct)
-      else if (spec.widthCqi !== undefined) node.setWidthCqi(spec.widthCqi)
-      else if (spec.width !== undefined) node.setWidth(spec.width)
-      if (spec.paddingPct !== undefined) node.setPaddingPercent(EDGE_LEFT, spec.paddingPct)
-      if (spec.margin !== undefined) node.setMargin(EDGE_TOP, spec.margin)
-      node.setFlexGrow(spec.grow ?? 0)
-      node.setFlexShrink(spec.shrink ?? 0)
-      if (spec.text !== undefined) {
-        const cells = () => state.nodes[Number(key)]!.text!
-        node.setMeasureFunc((w, mode) => {
-          const length = cells()
-          if (mode === C.MEASURE_MODE_UNDEFINED || !Number.isFinite(w) || w >= length) return { width: length, height: 1 }
-          return { width: w, height: Math.ceil(length / Math.max(1, Math.floor(w))) }
-        })
-      }
-      nodes[Number(key)] = node
-    }
-    for (const [key, spec] of Object.entries(state.nodes)) {
-      ;(spec.children ?? []).forEach((child, index) => nodes[Number(key)]!.insertChild(nodes[child]!, index))
-    }
-    const root = nodes[0]!
-    root.setWidth(state.width)
-    root.setHeight(state.height)
-    return { root, nodes }
-  }
-  const applySpecEdit =
-    (edit: SpecEdit) =>
-    (state: SpecState, live: ReturnType<typeof buildSpecTree>): void => {
-      const spec = state.nodes[edit.node]!
-      const node = live.nodes[edit.node]!
-      if (edit.grow !== undefined) {
-        spec.grow = edit.grow
-        node.setFlexGrow(edit.grow)
-      }
-      if (edit.text !== undefined) {
-        spec.text = edit.text
-        node.markDirty()
-      }
-      if (edit.alignStart !== undefined) {
-        spec.alignStart = edit.alignStart || undefined
-        node.setAlignSelf(edit.alignStart ? C.ALIGN_FLEX_START : C.ALIGN_AUTO)
-      }
-      if (edit.rootWidth !== undefined) {
-        state.width = edit.rootWidth
-        live.root.setWidth(edit.rootWidth)
-      }
-    }
-  const paddings = (tree: ReturnType<typeof buildSpecTree>) =>
-    Object.values(tree.nodes).map((node) => node.getComputedPadding(EDGE_LEFT))
-
   const seed5987: Record<number, SpecNode> = {
     0: { children: [1, 4] },
     1: { row: true, children: [2, 3] },
@@ -1687,7 +1578,7 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
       state,
       buildSpecTree,
       edits.map((edit) => ({ name: JSON.stringify(edit), apply: applySpecEdit(edit) })),
-      paddings,
+      specPaddings,
     )
   })
 
@@ -1701,51 +1592,6 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
     // The row (node 2) re-stretched to the line's 5 cells inside node 1's MEASURE.
     expect(tree.nodes[2]!.getCachedLayout(47, 5, 120, NaN, NaN, 5, true)).not.toBeNull()
     tree.root.freeRecursive()
-  })
-
-  // cqi resolves against the nearest container's STORED freeze, so an
-  // incremental pass reads the previous pass's freeze where a fresh pass reads
-  // none: incremental can differ from fresh. Main has the class too (about 87
-  // of 6,000 cqi trees). These three are where the build differs and main did
-  // not; erasing the stored freezes, and nothing else, makes each match fresh.
-  // Pinned on the P2 that owns the class; they flip when it lands.
-  it.fails.each<[string, number, Record<number, SpecNode>, SpecEdit[]]>([
-    [
-      "seed 5007",
-      120,
-      {
-        0: { children: [1] },
-        1: { row: true, shrink: 1, children: [2, 3] },
-        2: { children: [4] },
-        3: { query: true, shrink: 1, children: [5] },
-        4: { text: 201 },
-        5: { widthCqi: 29 },
-      },
-      [{ node: 0, rootWidth: 80 }],
-    ],
-    [
-      "seed 5250",
-      61,
-      {
-        0: { row: true, children: [1] },
-        1: { children: [3, 4] },
-        3: { children: [5] },
-        4: { row: true, shrink: 1 },
-        5: { row: true, width: 24.5, children: [8] },
-        8: { query: true, shrink: 1, children: [9] },
-        9: { widthCqi: 62, text: 179 },
-      },
-      [{ node: 0, rootWidth: 120 }],
-    ],
-    ["seed 5987", 120, seed5987, [{ node: 5, grow: 1 }]],
-  ])("cqi under a stored query freeze, pinned (%s)", (_name, width, nodes, edits) => {
-    const state: SpecState = { width, height: 40, nodes: structuredClone(nodes) }
-    expectStepsMatchFresh(
-      state,
-      buildSpecTree,
-      edits.map((edit) => ({ name: JSON.stringify(edit), apply: applySpecEdit(edit) })),
-      paddings,
-    )
   })
 
   // Query containers under the contract, without cqi: every seed matches fresh.
@@ -1784,7 +1630,7 @@ describe("Re-layout Consistency: MEASURE-only sizing pass (#26840)", () => {
         state,
         buildSpecTree,
         edits.map((edit) => ({ name: JSON.stringify(edit), apply: applySpecEdit(edit) })),
-        paddings,
+        specPaddings,
       )
     })
   }
