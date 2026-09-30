@@ -8,7 +8,14 @@
 import * as C from "../constants.js"
 import type { Node } from "./node.js"
 import type { Value } from "../types.js"
-import { resolveValue, applyMinMax, pctIndefinite, widthUsesContent } from "../utils.js"
+import {
+  resolveValue,
+  applyMinMax,
+  pctIndefinite,
+  swapUnknownBaseWidthCount,
+  unknownBaseWidthCount,
+  widthUsesContent,
+} from "../utils.js"
 import { log } from "../logger.js"
 
 import {
@@ -324,8 +331,13 @@ export function computeLayout(
   availableHeight: number,
   direction: number = C.DIRECTION_LTR,
 ): void {
-  // Pass absolute position (0,0) for root node - used for Yoga-compatible edge rounding
-  layoutNode(root, availableWidth, availableHeight, 0, 0, 0, 0, direction)
+  const outerUnknownBaseWidths = swapUnknownBaseWidthCount(0)
+  try {
+    // Pass absolute position (0,0) for root node - used for Yoga-compatible edge rounding
+    layoutNode(root, availableWidth, availableHeight, 0, 0, 0, 0, direction)
+  } finally {
+    swapUnknownBaseWidthCount(outerUnknownBaseWidths)
+  }
 }
 
 /**
@@ -1613,17 +1625,24 @@ function layoutNode(
       // absChildLeft/Top include the child's margins, so subtract them to get margin box start
       const childAbsX = absChildLeft - childMarginLeft
       const childAbsY = absChildTop - childMarginTop
-      layoutNode(
-        child,
-        passWidthToChild,
-        passHeightToChild,
-        childLeft,
-        childTop,
-        childAbsX,
-        childAbsY,
-        direction,
-        isRow && !shouldMeasure ? edgeBasedMainSize : NaN,
-      )
+      const unknownBaseWidthsBefore = unknownBaseWidthCount()
+      layoutNode(child, passWidthToChild, passHeightToChild, childLeft, childTop, childAbsX, childAbsY, direction)
+      // #26660: a row item whose layout sized a width percentage as content
+      // lays out once more with the width it just took, so that percentage
+      // resolves. The item's own width and position stay as they are.
+      if (isRow && !shouldMeasure && unknownBaseWidthCount() !== unknownBaseWidthsBefore) {
+        layoutNode(
+          child,
+          passWidthToChild,
+          passHeightToChild,
+          childLeft,
+          childTop,
+          childAbsX,
+          childAbsY,
+          direction,
+          child.layout.width,
+        )
+      }
 
       // Enforce box model constraint: child can't be smaller than its padding + border
       // (using childMinW/childMinH computed earlier for edge-based rounding)

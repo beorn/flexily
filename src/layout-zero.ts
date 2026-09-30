@@ -24,6 +24,8 @@ import {
   isLength,
   pctIndefinite,
   resolveValue,
+  swapUnknownBaseWidthCount,
+  unknownBaseWidthCount,
   widthUsesContent,
 } from "./utils.js"
 import { log } from "./logger.js"
@@ -96,6 +98,7 @@ export function computeLayout(
 ): void {
   // Save line state if re-entrant (nested calculateLayout from measureFunc)
   const saved = enterLayout()
+  const outerUnknownBaseWidths = swapUnknownBaseWidthCount(0)
   try {
     resetLayoutStats()
     getTrace()?.resetCounter()
@@ -106,6 +109,7 @@ export function computeLayout(
   } finally {
     // Restore line state for outer pass (no-op at depth 0)
     exitLayout(saved)
+    swapUnknownBaseWidthCount(outerUnknownBaseWidths)
   }
 }
 
@@ -2356,16 +2360,14 @@ function layoutNode(
           alignment === C.ALIGN_STRETCH &&
           (isRow || !pctIndefinite(crossDimForLayoutCall, NaN))) ||
         (hasCrossMinMax && !Number.isNaN(childCrossSize))
-      // An exact intrinsic width is already the flex algorithm's final box.
-      // Approximate measurements keep their old unconstrained layout path.
-      const allocatedMain =
-        !hasMeasureLeaf && (shouldOverrideMain || (isRow && !cflex.baseApprox)) ? edgeBasedMainSize : NaN
+      const allocatedMain = !hasMeasureLeaf && shouldOverrideMain ? edgeBasedMainSize : NaN
       const crossAbsStart = isRow ? absChildTop : absChildLeft
       const crossExtent = isRow ? Math.max(childHeight, childMinH) : Math.max(childWidth, childMinW)
       const edgeBasedCrossSize = Math.round(crossAbsStart + crossExtent) - Math.round(crossAbsStart)
       const allocatedCross = !hasMeasureLeaf && shouldOverrideCross ? edgeBasedCrossSize : NaN
       // Allocation and percentage-constraint context differ for a flex child.
       // In particular, an allocated row does not make its auto parent definite.
+      const unknownBaseWidthsBefore = unknownBaseWidthCount()
       layoutNode(
         child,
         passWidthToChild,
@@ -2380,6 +2382,30 @@ function layoutNode(
         isRow ? allocatedMain : allocatedCross,
         isRow ? allocatedCross : allocatedMain,
       )
+      // #26660: an uncommitted row item whose layout sized a width percentage
+      // as content lays out once more with the width it just took, so that
+      // percentage resolves. The item's own width and position stay as they are.
+      if (
+        isRow &&
+        !hasMeasureLeaf &&
+        Number.isNaN(allocatedMain) &&
+        unknownBaseWidthCount() !== unknownBaseWidthsBefore
+      ) {
+        layoutNode(
+          child,
+          passWidthToChild,
+          passHeightToChild,
+          childLeft,
+          childTop,
+          childAbsX,
+          childAbsY,
+          direction,
+          contentWidth,
+          contentHeight,
+          child.layout.width,
+          allocatedCross,
+        )
+      }
 
       // Enforce box model constraint: child can't be smaller than its padding + border
       // (using childMinW/childMinH computed earlier for edge-based rounding)

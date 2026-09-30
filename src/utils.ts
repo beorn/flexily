@@ -356,14 +356,33 @@ export function evaluateMathExpr(
   return val
 }
 
-/** True when a percentage or percentage-containing math constraint is indefinite. */
+// Width percentages met with an unknown base in this layout pass. A row reads
+// it around one item's layout and repeats that layout once when it rose (#26660).
+let unknownBaseWidths = 0
+
+/** The pass count of width percentages sized as content for an unknown base. */
+export function unknownBaseWidthCount(): number {
+  return unknownBaseWidths
+}
+
+/** Set the pass count and return the previous one; a pass starts at 0 and restores the outer count. */
+export function swapUnknownBaseWidthCount(value: number): number {
+  const previous = unknownBaseWidths
+  unknownBaseWidths = value
+  return previous
+}
+
 /** Preferred width needs content when its percentage base is not known yet.
  * Alignment eligibility and parent allocation are separate questions.
  */
 export function widthUsesContent(value: Value, available: number): boolean {
-  return !isLength(value.unit) || pctIndefinite(value, available)
+  if (!isLength(value.unit)) return true
+  if (!pctIndefinite(value, available)) return false
+  unknownBaseWidths++
+  return true
 }
 
+/** True when a percentage or percentage-containing math constraint is indefinite. */
 export function pctIndefinite(value: Value, available: number): boolean {
   return Number.isNaN(available) && containsPercent(value)
 }
