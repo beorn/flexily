@@ -1,9 +1,8 @@
 {
-  "modules": ["release", "format-check", "oxfmt", "links"],
+  "modules": ["release", "format-check", "oxfmt", "links", "verify"],
   "vars": {
     "testCommand": "bun run test",
     "bunVersion": "latest",
-    "verifyStep": "      - name: Verify publishable (tarball assertion)\n        run: bun scripts/verify-publishable.ts\n",
     "linksCronMinute": "0"
   }
 }

@@ -1,4 +1,4 @@
-# vendor-kit: format-check@402dc45548c0 — generated; edit packages/km-infra/vendor-kit/templates/format-check.yml in km, then re-sync
+# vendor-kit: format-check@402dc45548c0 — generated; edit km/packages/km-infra/vendor-kit/templates/format-check.yml in km, then re-sync
 name: format-check
 
 # Per-push formatter-idempotency gate — asserts the formatter produces a clean

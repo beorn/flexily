@@ -1,4 +1,4 @@
-# vendor-kit: release@6985627a705a — generated; edit km/packages/km-infra/vendor-kit/templates/release.yml in km, then re-sync
+# vendor-kit: release@c3d5e9e7c860 — generated; edit km/packages/km-infra/vendor-kit/templates/release.yml in km, then re-sync
 name: Release
 
 on:
@@ -92,11 +92,16 @@ jobs:
 
       - run: bun install --frozen-lockfile
       - run: bun run test
+      - run: mkdir "$RUNNER_TEMP/verified-tarballs"
       - name: Verify the repository and retain its exact tarballs
-        run: |
-          test -x ./node_modules/.bin/verify-publishable || { echo '::error::pinned verify-publishable binary missing'; exit 1; }
-          mkdir "$RUNNER_TEMP/verified-tarballs"
-          ./node_modules/.bin/verify-publishable --output-dir "$RUNNER_TEMP/verified-tarballs" > "$RUNNER_TEMP/verified.json"
+        id: verify
+        uses: beorn/verify-publishable@84544e987d89716b004f53afcc89d8627ca50a9e
+        with:
+          output-dir: ${{ runner.temp }}/verified-tarballs
+      - name: Keep the verifier's report beside the tarballs
+        env:
+          REPORT: ${{ steps.verify.outputs.report }}
+        run: cp "$REPORT" "$RUNNER_TEMP/verified.json"
 
       - name: Publish verified files through npm Trusted Publishing
         id: publish
