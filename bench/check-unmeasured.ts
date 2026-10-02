@@ -16,15 +16,14 @@ if (!path) {
   process.exit(2)
 }
 
-let report: RawBenchReport
+let unmeasured: ReturnType<typeof findUnmeasured>
 try {
-  report = JSON.parse(await Bun.file(path).text()) as RawBenchReport
+  const report = JSON.parse(await Bun.file(path).text()) as RawBenchReport
+  unmeasured = findUnmeasured(report)
 } catch (error) {
-  console.error(`NOT MEASURED: could not read benchmark report ${path}: ${String(error)}`)
+  console.error(`NOT MEASURED: could not read or validate benchmark report ${path}: ${String(error)}`)
   process.exit(2)
 }
-
-const unmeasured = findUnmeasured(report)
 
 if (unmeasured.length > 0) {
   console.error(`\n${unmeasured.length} benchmark case(s) recorded no samples:`)

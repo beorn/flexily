@@ -47,9 +47,15 @@ describe("benchmark unmeasured guard (#26457)", () => {
     expect(findUnmeasured(report)).toEqual([])
   })
 
-  it("finds nothing in an empty report", () => {
-    expect(findUnmeasured({})).toEqual([])
-  })
+  // @failure Empty inventories must not certify a benchmark as measured.
+  // @level l0
+  // @consumer bench/check-unmeasured.ts
+  it.each([{}, { files: [] }, { files: [{}] }, { files: [{ groups: [{ benchmarks: [] }] }] }])(
+    "rejects a report with no benchmark cases: %j",
+    (report) => {
+      expect(() => findUnmeasured(report)).toThrow(/no benchmark cases/)
+    },
+  )
 
   it("exits nonzero and names the case when a run yields no samples", () => {
     const reportPath = writeReport({

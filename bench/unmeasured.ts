@@ -42,9 +42,11 @@ export function isMeasured(benchmark: RawBenchmark): boolean {
 /** Every case in the report that recorded no samples, in report order. */
 export function findUnmeasured(report: RawBenchReport): UnmeasuredCase[] {
   const unmeasured: UnmeasuredCase[] = []
+  let caseCount = 0
   for (const file of report.files ?? []) {
     for (const group of file.groups ?? []) {
       for (const benchmark of group.benchmarks ?? []) {
+        caseCount++
         if (!isMeasured(benchmark)) {
           unmeasured.push({
             group: group.fullName ?? file.filepath ?? "<unknown group>",
@@ -54,5 +56,6 @@ export function findUnmeasured(report: RawBenchReport): UnmeasuredCase[] {
       }
     }
   }
+  if (caseCount === 0) throw new Error("benchmark report contains no benchmark cases")
   return unmeasured
 }
