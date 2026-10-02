@@ -48,6 +48,13 @@ beforeAll(async () => {
 const opts = { warmupIterations: 50, iterations: 500, time: 2000 }
 
 /**
+ * A no-change re-layout is sub-microsecond, so a time-boxed run (2000ms) collects
+ * tens of millions of samples — Vitest keeps every sample, which is a memory bomb
+ * that wedged a full-suite bench run. Bound the time budget hard for this group.
+ */
+const boundedOpts = { warmupIterations: 50, iterations: 1000, time: 50 }
+
+/**
  * Vitest bench does not run nested `describe`-level `beforeAll` hooks. Measured
  * 2026-10-02 on vitest 4.1.10: a root-level `beforeAll` runs, a nested one never
  * does. A suite that builds its tree in a nested hook therefore benchmarks
@@ -416,7 +423,7 @@ describe("No-change re-layout (fingerprint cache hit)", () => {
         const { flexilyTree } = pair()
         flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       },
-      opts,
+      boundedOpts,
     )
     bench(
       `Yoga: ${cols}×${cards} no-change`,
@@ -424,7 +431,7 @@ describe("No-change re-layout (fingerprint cache hit)", () => {
         const { yogaTree } = pair()
         yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
       },
-      opts,
+      boundedOpts,
     )
   }
 })

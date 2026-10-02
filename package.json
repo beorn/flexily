@@ -60,6 +60,7 @@
     "test:watch": "bun --bun vitest",
     "test:vp": "vp test",
     "bench": "vp test bench --run",
+    "bench:check": "bun --bun vitest bench --run --outputJson=.bench-report.json && bun bench/check-unmeasured.ts .bench-report.json",
     "typecheck": "tsc --noEmit",
     "ci": "bun run typecheck && bun run test",
     "docs:dev": "vitepress dev docs",
