@@ -47,6 +47,21 @@ beforeAll(async () => {
 
 const opts = { warmupIterations: 50, iterations: 500, time: 2000 }
 
+/**
+ * Vitest bench does not run nested `describe`-level `beforeAll` hooks. Measured
+ * 2026-10-02 on vitest 4.1.10: a root-level `beforeAll` runs, a nested one never
+ * does. A suite that builds its tree in a nested hook therefore benchmarks
+ * undefined state, records zero samples, and the run still exits 0 with a
+ * `NaNx faster` summary line — an empty result reading as a measurement.
+ *
+ * Build lazily on first use instead: the first (warmup) iteration pays the
+ * construction cost, measured iterations do not.
+ */
+function once<T>(build: () => T): () => T {
+  let value: T | undefined
+  return () => (value ??= build())
+}
+
 // ============================================================================
 // Shared text measure function (simulates wrapping text)
 // ============================================================================
@@ -271,45 +286,38 @@ describe("Incremental re-layout (single leaf dirty)", () => {
     [5, 20],
     [8, 30],
   ] as const) {
-    let flexilyTree: Flexily.Node
-    let flexilyLeaf: Flexily.Node
-    let yogaTree: ReturnType<typeof yoga.Node.create>
-    let yogaLeaf: ReturnType<typeof yoga.Node.create>
+    const midCol = Math.floor(cols / 2)
+    const midCard = Math.floor(cards / 2)
 
-    beforeAll(() => {
-      flexilyTree = flexilyTuiTree(cols, cards)
-      flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-      // Get a text leaf node in the middle column
-      const midCol = Math.floor(cols / 2)
-      const midCard = Math.floor(cards / 2)
-      flexilyLeaf = flexilyTree
-        .getChild(midCol)!
-        .getChild(midCard + 1)!
-        .getChild(0)!
-        .getChild(1)! // text node
-
-      yogaTree = yogaTuiTree(cols, cards)
-      yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-      yogaLeaf = yogaTree
-        .getChild(midCol)!
-        .getChild(midCard + 1)!
-        .getChild(0)!
-        .getChild(1)! // text node
+    const flexily = once(() => {
+      const tree = flexilyTuiTree(cols, cards)
+      tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
+      // Text leaf node in the middle column
+      const leaf = tree.getChild(midCol)!.getChild(midCard + 1)!.getChild(0)!.getChild(1)!
+      return { tree, leaf }
+    })
+    const yogaPair = once(() => {
+      const tree = yogaTuiTree(cols, cards)
+      tree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
+      const leaf = tree.getChild(midCol)!.getChild(midCard + 1)!.getChild(0)!.getChild(1)!
+      return { tree, leaf }
     })
 
     bench(
       `Flexily: ${cols}×${cards} leaf dirty`,
       () => {
-        flexilyLeaf.markDirty()
-        flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
+        const { tree, leaf } = flexily()
+        leaf.markDirty()
+        tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       },
       opts,
     )
     bench(
       `Yoga: ${cols}×${cards} leaf dirty`,
       () => {
-        yogaLeaf.markDirty()
-        yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
+        const { tree, leaf } = yogaPair()
+        leaf.markDirty()
+        tree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
       },
       opts,
     )
@@ -325,19 +333,18 @@ describe("Re-layout with width change", () => {
     [5, 10],
     [5, 20],
   ] as const) {
-    let flexilyTree: Flexily.Node
-    let yogaTree: ReturnType<typeof yoga.Node.create>
-
-    beforeAll(() => {
-      flexilyTree = flexilyTuiTree(cols, cards)
+    const pair = once(() => {
+      const flexilyTree = flexilyTuiTree(cols, cards)
       flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-      yogaTree = yogaTuiTree(cols, cards)
+      const yogaTree = yogaTuiTree(cols, cards)
       yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
+      return { flexilyTree, yogaTree }
     })
 
     bench(
       `Flexily: ${cols}×${cards} width 120→80`,
       () => {
+        const { flexilyTree } = pair()
         flexilyTree.setWidth(80)
         flexilyTree.calculateLayout(80, 40, Flexily.DIRECTION_LTR)
         flexilyTree.setWidth(120)
@@ -348,6 +355,7 @@ describe("Re-layout with width change", () => {
     bench(
       `Yoga: ${cols}×${cards} width 120→80`,
       () => {
+        const { yogaTree } = pair()
         yogaTree.setWidth(80)
         yogaTree.calculateLayout(80, 40, yoga.DIRECTION_LTR)
         yogaTree.setWidth(120)
@@ -394,19 +402,18 @@ describe("No-change re-layout (fingerprint cache hit)", () => {
     [5, 20],
     [8, 30],
   ] as const) {
-    let flexilyTree: Flexily.Node
-    let yogaTree: ReturnType<typeof yoga.Node.create>
-
-    beforeAll(() => {
-      flexilyTree = flexilyTuiTree(cols, cards)
+    const pair = once(() => {
+      const flexilyTree = flexilyTuiTree(cols, cards)
       flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-      yogaTree = yogaTuiTree(cols, cards)
+      const yogaTree = yogaTuiTree(cols, cards)
       yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
+      return { flexilyTree, yogaTree }
     })
 
     bench(
       `Flexily: ${cols}×${cards} no-change`,
       () => {
+        const { flexilyTree } = pair()
         flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       },
       opts,
@@ -414,6 +421,7 @@ describe("No-change re-layout (fingerprint cache hit)", () => {
     bench(
       `Yoga: ${cols}×${cards} no-change`,
       () => {
+        const { yogaTree } = pair()
         yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
       },
       opts,
