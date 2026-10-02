@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { execFileSync } from "node:child_process"
+import { execFileSync, spawnSync } from "node:child_process"
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -56,6 +56,31 @@ describe("benchmark unmeasured guard (#26457)", () => {
       expect(() => findUnmeasured(report)).toThrow(/no benchmark cases/)
     },
   )
+
+  // @failure Invalid report resources must not become a successful CLI measurement.
+  // @level l2
+  // @consumer bun run bench:check
+  // Pure inventory rows miss CLI exit/diagnostic wiring; existing CLI rows cover only valid inventories.
+  it.each([
+    ["empty inventory", "empty", "no benchmark cases"],
+    ["missing path", "missing", "ENOENT"],
+    ["unreadable directory", "directory", "Directories cannot be read like files"],
+  ] as const)("refuses %s with a named report cause", (_label, kind, cause) => {
+    const reportPath =
+      kind === "empty"
+        ? writeReport({})
+        : kind === "missing"
+          ? join(mkdtempSync(join(tmpdir(), "flexily-bench-guard-")), "missing.json")
+          : mkdtempSync(join(tmpdir(), "flexily-bench-guard-"))
+    const result = spawnSync(process.execPath, [join(here, "../bench/check-unmeasured.ts"), reportPath], {
+      encoding: "utf8",
+    })
+    expect(result.status).toBe(2)
+    expect(result.stdout).toBe("")
+    expect(result.stderr).toContain("NOT MEASURED")
+    expect(result.stderr).toContain(reportPath)
+    expect(result.stderr).toContain(cause)
+  })
 
   it("exits nonzero and names the case when a run yields no samples", () => {
     const reportPath = writeReport({
