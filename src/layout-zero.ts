@@ -2293,19 +2293,36 @@ function layoutNode(
       // Apply box model constraint to childMainSize before edge rounding
       const constrainedMainSize = Math.max(childMainSize, childMinMain)
 
+      // A child's main-axis box lives INSIDE the box this parent COMMITTED, so
+      // both edges of it are rounded against the parent's committed border
+      // origin — the same anchor its position is already derived from
+      // (`roundedAbsParentMainStart` below). Rounding the size from the child's
+      // own float edge instead (`round(floatStart + size) - round(floatStart)`)
+      // lets the fractional part of the parent's origin push the rounded end
+      // one cell past the parent's committed edge: `round` is half-up, so
+      // `round(floatStart) + integerBudget` can overshoot
+      // `round(floatStart + budget)`. The child then commits a cell its parent
+      // does not have, and an `overflow="hidden"` parent clips it — which for
+      // `wrap="truncate"` text is the cell holding the elision marker, turning
+      // an elision into a silent drop. Sharing one anchor also keeps adjacent
+      // siblings tiling exactly: a shared float edge rounds to the same cell
+      // from either side.
+      const parentBorderFloatMain = borderBoxStart(
+        isRow ? absX : absY,
+        isRow ? marginLeft : marginTop,
+        isRow ? parentPosOffsetX : parentPosOffsetY,
+      )
+      const absChildMainStart =
+        Math.round(parentBorderFloatMain) + ((isRow ? absChildLeft : absChildTop) - parentBorderFloatMain)
+      const roundedAbsParentMainStart = Math.round(parentBorderFloatMain)
+
       if (useEdgeBasedRounding) {
-        if (isRow) {
-          roundedAbsMainStart = Math.round(absChildLeft)
-          roundedAbsMainEnd = Math.round(absChildLeft + constrainedMainSize)
-          edgeBasedMainSize = roundedAbsMainEnd - roundedAbsMainStart
-        } else {
-          roundedAbsMainStart = Math.round(absChildTop)
-          roundedAbsMainEnd = Math.round(absChildTop + constrainedMainSize)
-          edgeBasedMainSize = roundedAbsMainEnd - roundedAbsMainStart
-        }
+        roundedAbsMainStart = Math.round(absChildMainStart)
+        roundedAbsMainEnd = Math.round(absChildMainStart + constrainedMainSize)
+        edgeBasedMainSize = roundedAbsMainEnd - roundedAbsMainStart
       } else {
         // For children without valid main size, use simple rounding
-        roundedAbsMainStart = isRow ? Math.round(absChildLeft) : Math.round(absChildTop)
+        roundedAbsMainStart = Math.round(absChildMainStart)
         edgeBasedMainSize = childMinMain // Use minimum size instead of 0
       }
 
@@ -2325,8 +2342,9 @@ function layoutNode(
       // node's position as the difference of rounded absolute edges.
       //
       // CROSS positions keep their existing local rounding, including Yoga's
-      // measureFunc-leaf floor quirk (`posRound`). Both committed sizes use
-      // absolute edges, matching Phase 10 even at fractional offsets.
+      // measureFunc-leaf floor quirk (`posRound`). The committed CROSS size
+      // rounds the child's own absolute cross edge; the committed MAIN size
+      // rounds the anchored edge above, so it shares the parent's origin.
       //
       // The main axis takes the telescoping form for EVERY child, measureFunc
       // leaves included. A shared edge must be rounded by exactly ONE function
@@ -2339,9 +2357,6 @@ function layoutNode(
       // truncated text is exactly the cell holding the elision marker, turning
       // an elision into a silent drop.
       const posRound = shouldMeasure ? Math.floor : Math.round
-      const roundedAbsParentMainStart = Math.round(
-        isRow ? absX + marginLeft + parentPosOffsetX : absY + marginTop + parentPosOffsetY,
-      )
       const mainChildPos = roundedAbsMainStart - roundedAbsParentMainStart
       const childLeft = isRow ? mainChildPos : posRound(fractionalLeft + posOffsetX)
       const childTop = isRow ? posRound(fractionalTop + posOffsetY) : mainChildPos

@@ -24,7 +24,7 @@
  * type picks, since the two nodes sharing an edge disagree about it.
  */
 import { describe, expect, it } from "vitest"
-import { DIRECTION_LTR, FLEX_DIRECTION_ROW, Node } from "../src/index.js"
+import { DIRECTION_LTR, FLEX_DIRECTION_COLUMN, FLEX_DIRECTION_ROW, Node, OVERFLOW_HIDDEN } from "../src/index.js"
 
 /** Natural widths, alternating leaf / box / leaf / box … */
 const NATURAL = [3, 1, 2, 1, 4, 1, 6, 1, 3, 1, 12]
@@ -106,5 +106,89 @@ describe("main-axis tiling across a container-width sweep", () => {
       const total = children.reduce((sum, child) => sum + child.getComputedWidth(), 0)
       expect(total, `widths at container ${width} sum to ${total}`).toBe(width)
     }
+  })
+})
+
+/**
+ * A child's committed main-axis box must stay inside the box its PARENT
+ * committed, because that parent is what clips it when it overflows.
+ *
+ * A wrapper apportions its content against the size it committed, so the child
+ * it measures never asks for more than that budget. The committed box is a
+ * different question: if the child's own float edge is rounded
+ * (`round(floatStart + size) - round(floatStart)`) while the parent's edge was
+ * rounded from the parent's float origin, the parent's fractional part can push
+ * the child's rounded end one cell past the parent's committed end. The parent
+ * then clips that cell, and for elided text the clipped cell is the one holding
+ * the "…" — the elision becomes a silent drop.
+ *
+ * The shape swept here is a breadcrumb: Box-wrapped truncating text, each
+ * segment in a `minWidth: 0, flexShrink: 1, overflow: hidden` wrapper with a
+ * one-cell separator between segments.
+ */
+const SEGMENTS = ["@hh", "km", "apps", "maddoc", "src", "file-app.tsx"]
+
+function buildBreadcrumb(rowWidth: number, containerWidth: number): { wrappers: Node[]; leaves: Node[] } {
+  const root = Node.create()
+  root.setWidth(containerWidth)
+  root.setHeight(1)
+  root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+
+  const row = Node.create()
+  row.setWidth(rowWidth)
+  row.setHeight(1)
+  row.setFlexDirection(FLEX_DIRECTION_ROW)
+  row.setOverflow(OVERFLOW_HIDDEN)
+  root.insertChild(row, 0)
+
+  const wrappers: Node[] = []
+  const leaves: Node[] = []
+  let index = 0
+  SEGMENTS.forEach((segment, i) => {
+    if (i > 0) {
+      const separator = Node.create()
+      separator.setHeight(1)
+      separator.setMeasureFunc((width) => ({ width: Math.min(1, width), height: 1 }))
+      row.insertChild(separator, index++)
+    }
+    const wrapper = Node.create()
+    wrapper.setHeight(1)
+    wrapper.setFlexShrink(1)
+    wrapper.setMinWidth(0)
+    wrapper.setOverflow(OVERFLOW_HIDDEN)
+    row.insertChild(wrapper, index++)
+    const leaf = Node.create()
+    leaf.setHeight(1)
+    leaf.setMeasureFunc((width) => ({ width: Math.min(segment.length, width), height: 1 }))
+    wrapper.insertChild(leaf, 0)
+    wrappers.push(wrapper)
+    leaves.push(leaf)
+  })
+  root.calculateLayout(containerWidth, 1, DIRECTION_LTR)
+  return { wrappers, leaves }
+}
+
+describe("a committed child box stays inside the parent that clips it", () => {
+  it("keeps every truncating segment inside its own wrapper at every swept width", () => {
+    const broken: string[] = []
+    for (let containerWidth = 4; containerWidth <= 80; containerWidth++) {
+      for (let rowWidth = 2; rowWidth <= 24; rowWidth++) {
+        const { wrappers, leaves } = buildBreadcrumb(rowWidth, containerWidth)
+        wrappers.forEach((wrapper, i) => {
+          const boxWidth = wrapper.getComputedWidth()
+          const leafLeft = leaves[i]!.getComputedLeft()
+          const leafRight = leafLeft + leaves[i]!.getComputedWidth()
+          if (leafRight > boxWidth) {
+            broken.push(
+              `row=${rowWidth} container=${containerWidth} ${SEGMENTS[i]}: box=0..${boxWidth}, leaf=${leafLeft}..${leafRight}`,
+            )
+          }
+        })
+      }
+    }
+    expect(
+      broken.slice(0, 20),
+      `a committed child box escaped its wrapper at ${broken.length} of the swept shapes:\n${broken.slice(0, 20).join("\n")}`,
+    ).toEqual([])
   })
 })
