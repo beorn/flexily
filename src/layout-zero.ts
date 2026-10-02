@@ -1846,6 +1846,13 @@ function layoutNode(
     let savedLineCrossOffsets: Float64Array | null = null
     let savedLineJustifyStarts: Float64Array | null = null
     let savedLineItemSpacings: Float64Array | null = null
+    // The single-line container is the common case and must not allocate, but
+    // its one cross offset is still read once per child — long after the first
+    // child's recursion has rewritten the module array. One line needs one
+    // number, so it lives in a scalar. (_lineJustifyStarts and
+    // _lineItemSpacings are read when a line is entered, before this pass
+    // recurses, so the single-line values need no snapshot.)
+    let savedLine0CrossOffset = 0
     if (numLines > 1) {
       savedLineCrossSizes = new Float64Array(numLines)
       savedLineCrossOffsets = new Float64Array(numLines)
@@ -1857,6 +1864,8 @@ function layoutNode(
         savedLineJustifyStarts[i] = _lineJustifyStarts[i]!
         savedLineItemSpacings[i] = _lineItemSpacings[i]!
       }
+    } else if (numLines === 1) {
+      savedLine0CrossOffset = _lineCrossOffsets[0]!
     }
 
     // -----------------------------------------------------------------------
@@ -1956,9 +1965,11 @@ function layoutNode(
       // Use saved arrays for multi-line to avoid corruption by recursive layoutNode
       const lineCrossOffset = savedLineCrossOffsets
         ? savedLineCrossOffsets[childLineIdx]!
-        : childLineIdx < MAX_FLEX_LINES
-          ? _lineCrossOffsets[childLineIdx]
-          : 0
+        : numLines === 1
+          ? savedLine0CrossOffset
+          : childLineIdx < MAX_FLEX_LINES
+            ? _lineCrossOffsets[childLineIdx]
+            : 0
 
       // For main-axis margins, use computed auto margin values
       // For cross-axis margins, use cached values (auto margins on cross axis handled separately)
