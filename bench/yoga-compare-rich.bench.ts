@@ -300,13 +300,21 @@ describe("Incremental re-layout (single leaf dirty)", () => {
       const tree = flexilyTuiTree(cols, cards)
       tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
       // Text leaf node in the middle column
-      const leaf = tree.getChild(midCol)!.getChild(midCard + 1)!.getChild(0)!.getChild(1)!
+      const leaf = tree
+        .getChild(midCol)!
+        .getChild(midCard + 1)!
+        .getChild(0)!
+        .getChild(1)!
       return { tree, leaf }
     })
     const yogaPair = once(() => {
       const tree = yogaTuiTree(cols, cards)
       tree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-      const leaf = tree.getChild(midCol)!.getChild(midCard + 1)!.getChild(0)!.getChild(1)!
+      const leaf = tree
+        .getChild(midCol)!
+        .getChild(midCard + 1)!
+        .getChild(0)!
+        .getChild(1)!
       return { tree, leaf }
     })
 
