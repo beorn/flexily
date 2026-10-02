@@ -25,6 +25,7 @@ import {
   DIRECTION_RTL,
   EDGE_ALL,
   EDGE_LEFT,
+  EDGE_RIGHT,
   EDGE_TOP,
   FLEX_DIRECTION_COLUMN,
   FLEX_DIRECTION_COLUMN_REVERSE,
@@ -357,6 +358,130 @@ describe("Re-layout Consistency: targeted scenarios", () => {
     fresh.root.freeRecursive()
 
     expectRelayoutMatchesFresh(buildTree, 60, 24)
+  })
+
+  // #26879: a LAYOUT fingerprint hit returns before the skipped descent can
+  // count the percentage width it would have sized as content, so the row above
+  // it does not see the #26660 rise and does not repeat the item's layout.
+  // Reduced 8-node yoga case from the issue: after edit 2 (n5's height) the new
+  // percent-width leaf keeps the un-repeated left. Directions and lengths are
+  // explicit: flexily's constants are COLUMN=0, COLUMN_REVERSE=1, ROW=2 (the
+  // default), so `dir: 0` is a column and `maxW: pt 19` is a point maximum.
+  it("LAYOUT fingerprint hit replays the unknown-width count", () => {
+    type Built = { root: Node; n5: Node; n12: Node }
+
+    const build = (withSubtree: boolean, h19: boolean): Built => {
+      const root = Node.create()
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      root.setWidth(60)
+      root.setHeight(24)
+
+      const n1 = Node.create()
+      n1.setFlexShrink(1)
+      root.insertChild(n1, 0)
+
+      const n2 = Node.create()
+      n2.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      n2.setPadding(EDGE_LEFT, 4)
+      n1.insertChild(n2, 0)
+
+      const n5 = Node.create()
+      n5.setMaxWidth(19)
+      if (h19) n5.setHeight(19)
+      n2.insertChild(n5, 0)
+
+      const n6 = Node.create()
+      n6.setWidth(53)
+      n5.insertChild(n6, 0)
+
+      const n9 = Node.create()
+      n9.setAlignSelf(C.ALIGN_FLEX_END)
+      n9.setWidth(60)
+      n2.insertChild(n9, 1)
+
+      const n10 = Node.create()
+      n10.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      n10.setHeight(17)
+      n10.setFlexGrow(1)
+      n5.insertChild(n10, 1)
+
+      const n12 = Node.create()
+      n10.insertChild(n12, 0)
+
+      if (withSubtree) {
+        const n1000 = Node.create()
+        n1000.setFlexDirection(FLEX_DIRECTION_COLUMN_REVERSE)
+        n1000.setFlexShrink(0)
+        n1000.setMargin(EDGE_TOP, 3)
+        n1000.setMarginAuto(EDGE_RIGHT)
+        n12.insertChild(n1000, 0)
+
+        const n1001 = Node.create()
+        n1001.setWidthPercent(16)
+        n1000.insertChild(n1001, 0)
+
+        const n1002 = Node.create()
+        n1002.setWidthAuto()
+        n1002.setMaxWidthPercent(64)
+        n1002.setMaxHeight(20)
+        n1002.setFlexGrow(1)
+        n1002.setFlexShrink(0)
+        n1000.insertChild(n1002, 1)
+      }
+
+      return { root, n5, n12 }
+    }
+
+    // The incremental sequence mirrors the differential search: each edit is
+    // followed by the layout, and by a repeat layout an unchanged frame costs
+    // nothing (that repeat is where the un-replayed count shows).
+    const diffVsFresh = (liveRoot: Node, withSubtree: boolean, h19: boolean): string[] => {
+      const fresh = build(withSubtree, h19)
+      fresh.root.calculateLayout(60, 24, DIRECTION_LTR)
+      const diffs = diffLayouts(getLayout(fresh.root), getLayout(liveRoot))
+      fresh.root.freeRecursive()
+      return diffs
+    }
+    const expectFresh = (liveRoot: Node, withSubtree: boolean, h19: boolean, at: string): void => {
+      const diffs = diffVsFresh(liveRoot, withSubtree, h19)
+      expect(diffs, `${at} differs from fresh:\n  ${diffs.join("\n  ")}`).toEqual([])
+    }
+
+    const live = build(false, false)
+    live.root.calculateLayout(60, 24, DIRECTION_LTR)
+    live.root.calculateLayout(60, 24, DIRECTION_LTR)
+    expectFresh(live.root, false, false, "initial layout")
+
+    // edit 1: append the three-node subtree under n12
+    const n1000 = Node.create()
+    n1000.setFlexDirection(FLEX_DIRECTION_COLUMN_REVERSE)
+    n1000.setFlexShrink(0)
+    n1000.setMargin(EDGE_TOP, 3)
+    n1000.setMarginAuto(EDGE_RIGHT)
+    live.n12.insertChild(n1000, 0)
+    const n1001 = Node.create()
+    n1001.setWidthPercent(16)
+    n1000.insertChild(n1001, 0)
+    const n1002 = Node.create()
+    n1002.setWidthAuto()
+    n1002.setMaxWidthPercent(64)
+    n1002.setMaxHeight(20)
+    n1002.setFlexGrow(1)
+    n1002.setFlexShrink(0)
+    n1000.insertChild(n1002, 1)
+    live.root.calculateLayout(60, 24, DIRECTION_LTR)
+    expectFresh(live.root, true, false, "after edit 1")
+    live.root.calculateLayout(60, 24, DIRECTION_LTR)
+    expectFresh(live.root, true, false, "after edit 1, repeat")
+
+    // edit 2: n5's height, after which the clean container's descent is skipped
+    live.n5.setHeight(19)
+    live.root.calculateLayout(60, 24, DIRECTION_LTR)
+    expectFresh(live.root, true, true, "after edit 2")
+    live.root.calculateLayout(60, 24, DIRECTION_LTR)
+    expectFresh(live.root, true, true, "after edit 2, repeat")
+
+    live.root.freeRecursive()
   })
 })
 

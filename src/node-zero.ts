@@ -318,6 +318,7 @@ export class Node {
     lastAbsX: NaN,
     lastAbsY: NaN,
     layoutValid: false,
+    lastUnknownWidths: 0,
     lastDir: 0,
   }
 

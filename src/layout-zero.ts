@@ -301,6 +301,9 @@ function layoutNode(
   ) {
     // Constraints unchanged - just update position based on offset delta
     _t?.fingerprintHit(_tn, availableWidth, availableHeight)
+    // #26879: the skipped descent would have counted its percentage widths as
+    // content; the row above decides whether to repeat from that count.
+    if (flex.lastUnknownWidths !== 0) swapUnknownBaseWidthCount(unknownBaseWidthCount() + flex.lastUnknownWidths)
     const deltaX = offsetX - flex.lastOffsetX
     const deltaY = offsetY - flex.lastOffsetY
     if (deltaX !== 0 || deltaY !== 0) {
@@ -3526,6 +3529,7 @@ function layoutNode(
   flex.lastAbsX = absX
   flex.lastAbsY = absY
   flex.lastDir = direction
+  flex.lastUnknownWidths = unknownBaseWidthCount() - unknownWidthsBefore
   flex.layoutValid = true
   _t?.layoutExit(_tn, layout.width, layout.height)
 }

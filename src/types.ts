@@ -202,6 +202,12 @@ export interface FlexInfo {
   lastAbsY: number
   /** Whether cached layout is valid (fingerprint matched, not dirty) */
   layoutValid: boolean
+  /**
+   * Percentage widths the last LAYOUT pass under this fingerprint counted as
+   * content (`unknownBaseWidthCount`). A fingerprint hit replays it, so a row
+   * above still sees the #26660 rise the skipped descent would have made.
+   */
+  lastUnknownWidths: number
   /** Last direction passed to layoutNode */
   lastDir: number
 }
