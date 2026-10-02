@@ -36,6 +36,7 @@ import {
   Node,
   POSITION_TYPE_ABSOLUTE,
   WRAP_WRAP,
+  WRAP_WRAP_REVERSE,
 } from "../src/index.js"
 import {
   assertLayoutSanity,
@@ -318,6 +319,44 @@ describe("Re-layout Consistency: targeted scenarios", () => {
     expect(child1.getComputedHeight()).toBe(3)
     expect(child2.getComputedHeight()).toBe(beforeChild2Height)
     expect(child3.getComputedHeight()).toBe(5)
+  })
+
+  // #26876: the line cross offset is saved into the module scratch only while
+  // numLines > 1, so a container laid out during Phase 8 overwrites the offset
+  // the next child of a single-line parent is about to read. wrap-reverse is
+  // what makes line 0's offset nonzero here (-54); both children share line 0
+  // and must report the same cross offset.
+  it("single line: wrap-reverse keeps the line's cross offset across a sibling's recursion", () => {
+    const buildTree = (): BuildTreeResult => {
+      const root = Node.create()
+      root.setWidth(60)
+      root.setHeight(24)
+      root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      root.setFlexWrap(WRAP_WRAP_REVERSE)
+
+      const wrapping = Node.create()
+      wrapping.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      root.insertChild(wrapping, 0)
+
+      const text = Node.create()
+      text.setMeasureFunc(textMeasure(114))
+      wrapping.insertChild(text, 0)
+
+      const empty = Node.create()
+      root.insertChild(empty, 1)
+
+      return { root, dirtyTargets: [empty] }
+    }
+
+    // Even a fresh pass corrupts the second child: the wrapping sibling's
+    // recursion rewrote the module scratch before the empty box read it.
+    const fresh = buildTree()
+    fresh.root.calculateLayout(60, 24, DIRECTION_LTR)
+    expect(fresh.root.getChild(0)!.getComputedLeft()).toBe(-54)
+    expect(fresh.root.getChild(1)!.getComputedLeft()).toBe(-54)
+    fresh.root.freeRecursive()
+
+    expectRelayoutMatchesFresh(buildTree, 60, 24)
   })
 })
 
