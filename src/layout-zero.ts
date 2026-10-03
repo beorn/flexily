@@ -1365,6 +1365,12 @@ function layoutNode(
   }
 
   log.debug?.("layoutNode: node.children=%d, relativeCount=%d", node.children.length, relativeCount)
+
+  // Snapshot of this node's flex-line cross sizes, taken before Phase 8
+  // recurses (a nested layoutNode overwrites the module-level line arrays).
+  // Declared outside the flex-line block because Phase 9c, which runs after
+  // that block closes, must know whether this container is multi-line.
+  let savedLineCrossSizes: Float64Array | null = null
   if (relativeCount > 0) {
     // -----------------------------------------------------------------------
     // PHASE 6a: Flex Line Breaking and Space Distribution
@@ -1845,7 +1851,6 @@ function layoutNode(
     // For multi-line layouts, we copy the values into small local arrays.
     // This allocation is rare (only for multi-line wrapping containers) and
     // tiny (4 arrays x numLines x 8 bytes).
-    let savedLineCrossSizes: Float64Array | null = null
     let savedLineCrossOffsets: Float64Array | null = null
     let savedLineJustifyStarts: Float64Array | null = null
     let savedLineItemSpacings: Float64Array | null = null
@@ -2599,7 +2604,18 @@ function layoutNode(
         !alignItemsIsBaseline &&
         alignment !== C.ALIGN_BASELINE &&
         baselineZoneHeight > 0
-      const effectiveCrossSize = useBaselineZone ? baselineZoneHeight : crossAxisSize
+      // Each child aligns inside its own flex LINE, not the container: in a
+      // wrapping container use the line's cross size, read from the snapshot
+      // taken before this pass recursed (the single-line container size is the
+      // line size). Aligning against crossAxisSize gave every line the
+      // container-sized offset on top of its own line offset (beorn/flexily#5).
+      const lineCrossSize =
+        numLines > 1
+          ? savedLineCrossSizes
+            ? savedLineCrossSizes[childLineIdx]!
+            : _lineCrossSizes[childLineIdx]!
+          : crossAxisSize
+      const effectiveCrossSize = useBaselineZone ? baselineZoneHeight : lineCrossSize
       const availableCrossSpace = effectiveCrossSize - finalCrossSize - crossMargin
 
       if (hasAutoStartMargin && hasAutoEndMargin) {
@@ -3012,7 +3028,10 @@ function layoutNode(
       // offsets for CENTER, FLEX_END, and auto margins computed NaN because
       // availableCrossSpace = NaN - childSize - margin = NaN.
       // Now that cross size is known from shrink-wrap, recompute those offsets.
-      if (Number.isNaN(crossAxisSize) && relativeCount > 0) {
+      // Single line only: a multi-line container already aligned each child
+      // against its own line's cross size in Phase 8, where that size is
+      // finite even though the container's cross size is auto (beorn/flexily#5).
+      if (Number.isNaN(crossAxisSize) && relativeCount > 0 && savedLineCrossSizes === null) {
         const finalCross9c = isRow ? nodeHeight - innerTop - innerBottom : nodeWidth - innerLeft - innerRight
         if (!Number.isNaN(finalCross9c) && finalCross9c > 0) {
           for (const child of node.children) {
@@ -3111,7 +3130,7 @@ function layoutNode(
                   childQueryInlineSize,
                   "margin",
                 )
-                child.layout.top = Math.round(cMarginT + crossOffset)
+                child.layout.top = Math.round(innerTop + cMarginT + crossOffset)
               } else if (crossOffset !== 0) {
                 child.layout.top += Math.round(crossOffset)
               }
@@ -3126,7 +3145,7 @@ function layoutNode(
                   childQueryInlineSize,
                   "margin",
                 )
-                child.layout.left = Math.round(cMarginL + crossOffset)
+                child.layout.left = Math.round(innerLeft + cMarginL + crossOffset)
               } else if (crossOffset !== 0) {
                 child.layout.left += Math.round(crossOffset)
               }
