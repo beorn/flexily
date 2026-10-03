@@ -11,3 +11,6 @@ bun.lockb
 
 # benchmark guard report (#26457)
 .bench-report.json
+
+# Standalone source-sibling CI artifacts
+.ci-siblings/

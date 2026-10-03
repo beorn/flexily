@@ -7,6 +7,10 @@ on:
       - "docs/**"
       - "src/**"
       - ".github/workflows/docs.yml"
+      - ".github/actions/source-siblings/**"
+      - "source-siblings.json"
+      - "package.json"
+      - "bun.lock"
   workflow_dispatch:
 
 permissions:
@@ -27,19 +31,24 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.4.2"
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
-      - name: Install dependencies
-        run: cd docs && bun install
+      - name: Install named source siblings
+        uses: ./.github/actions/source-siblings
 
       - name: Build docs
-        run: cd docs && bunx --bun vitepress build
+        run: bun run docs:build
 
       - name: Check for private-content leak
         run: bun scripts/check-private-leak.ts

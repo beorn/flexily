@@ -1,0 +1,18 @@
+{
+  "schema": "vendor-kit/source-siblings/v1",
+  "siblings": [
+    {
+      "name": "loggily",
+      "repository": "beorn/loggily",
+      "commit": "0ca16346b2e9fb03407746adcf48bf7cd9714708",
+      "pack": true
+    },
+    {
+      "name": "vitepress-enrich",
+      "repository": "beorn/bearly",
+      "commit": "6045a7f141dba812c4add6d7c52cafa5213ef537",
+      "directory": "packages/vitepress-enrich",
+      "pack": true
+    }
+  ]
+}
