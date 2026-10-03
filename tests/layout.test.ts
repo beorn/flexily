@@ -3230,4 +3230,82 @@ describe("Flexily Layout Engine", () => {
       expect(child.getComputedWidth()).toBe(70)
     })
   })
+
+  describe("a child aligned center/flex-end keeps the container inner inset when the cross size is auto (#27278)", () => {
+    function layout(options: { direction: number; align: number; height?: number; border?: boolean }) {
+      const root = Node.create()
+      root.setFlexDirection(options.direction)
+      root.setAlignItems(options.align)
+      root.setPadding(EDGE_ALL, 12)
+      if (options.border === true) {
+        root.setBorder(EDGE_TOP, 4)
+        root.setBorder(EDGE_LEFT, 4)
+      }
+      if (options.direction === FLEX_DIRECTION_ROW) root.setWidth(100)
+      if (options.height !== undefined) root.setHeight(options.height)
+
+      const child = Node.create()
+      child.setFlexShrink(0)
+      child.setWidth(32)
+      child.setHeight(32)
+      root.insertChild(child, 0)
+
+      root.calculateLayout(options.direction === FLEX_DIRECTION_ROW ? 100 : undefined, options.height, DIRECTION_LTR)
+      const laid = root.getChild(0)
+      if (laid === undefined) throw new Error("the repro child is missing")
+      return {
+        width: root.getComputedWidth(),
+        height: root.getComputedHeight(),
+        left: laid.getComputedLeft(),
+        top: laid.getComputedTop(),
+      }
+    }
+
+    // Expected values are Chrome 152's reported geometry for the equivalent CSS, supplied by the
+    // reporter of beorn/flexily#6 - measured, not derived from flexily.
+    it("centers a row child inside an auto height, keeping the top inset", () => {
+      expect(layout({ direction: FLEX_DIRECTION_ROW, align: ALIGN_CENTER })).toEqual({
+        width: 100,
+        height: 56,
+        left: 12,
+        top: 12,
+      })
+    })
+
+    it("flex-ends a row child inside an auto height, keeping the top inset", () => {
+      expect(layout({ direction: FLEX_DIRECTION_ROW, align: ALIGN_FLEX_END })).toEqual({
+        width: 100,
+        height: 56,
+        left: 12,
+        top: 12,
+      })
+    })
+
+    it("centers a bordered row child inside an auto height, keeping padding plus border", () => {
+      expect(layout({ direction: FLEX_DIRECTION_ROW, align: ALIGN_CENTER, border: true })).toEqual({
+        width: 100,
+        height: 60,
+        left: 16,
+        top: 16,
+      })
+    })
+
+    it("centers a column child inside an auto width, keeping the left inset", () => {
+      expect(layout({ direction: FLEX_DIRECTION_COLUMN, align: ALIGN_CENTER })).toEqual({
+        width: 56,
+        height: 56,
+        left: 12,
+        top: 12,
+      })
+    })
+
+    it("still centers a row child inside a definite height", () => {
+      expect(layout({ direction: FLEX_DIRECTION_ROW, align: ALIGN_CENTER, height: 56 })).toEqual({
+        width: 100,
+        height: 56,
+        left: 12,
+        top: 12,
+      })
+    })
+  })
 })

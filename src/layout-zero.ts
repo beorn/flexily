@@ -3111,7 +3111,7 @@ function layoutNode(
                   childQueryInlineSize,
                   "margin",
                 )
-                child.layout.top = Math.round(cMarginT + crossOffset)
+                child.layout.top = Math.round(innerTop + cMarginT + crossOffset)
               } else if (crossOffset !== 0) {
                 child.layout.top += Math.round(crossOffset)
               }
@@ -3126,7 +3126,7 @@ function layoutNode(
                   childQueryInlineSize,
                   "margin",
                 )
-                child.layout.left = Math.round(cMarginL + crossOffset)
+                child.layout.left = Math.round(innerLeft + cMarginL + crossOffset)
               } else if (crossOffset !== 0) {
                 child.layout.left += Math.round(crossOffset)
               }
