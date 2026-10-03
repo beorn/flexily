@@ -3232,6 +3232,16 @@ describe("Flexily Layout Engine", () => {
   })
 
   describe("a child aligned center/flex-end keeps the container inner inset when the cross size is auto (#27278)", () => {
+    /**
+     * @failure A child aligned center or flex-end drops the container's leading
+     * inner (padding+border) inset when the parent cross size is auto and is
+     * resolved by the deferred cross-alignment pass: it sits flush against the
+     * start boundary instead of inset from it (#27278, beorn/flexily#6).
+     * @level l0
+     * @consumer Silvery rows and columns whose alignItems is center or flex-end
+     * over an auto cross size (beorn/flexily#6).
+     * @testonly none
+     */
     function layout(options: { direction: number; align: number; height?: number; border?: boolean }) {
       const root = Node.create()
       root.setFlexDirection(options.direction)
