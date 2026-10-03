@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-02
+
 ### Fixed
 
+- **A child's committed main-axis box rounds against its parent's committed
+  border origin.** A measure-func leaf inside a fractionally positioned parent
+  could round its own float edge half a cell past the box its parent had
+  committed, and `overflow: hidden` then clipped the cell holding the `…`
+  elision marker: a truncating label painted a bare prefix with no marker.
+  Both main-axis edges now round against the same committed origin. Fixes the
+  narrow-column marker loss (`27131`).
 - Numeric maxima cap auto-sized boxes after intrinsic content measurement.
   Classic wrapped text in a row previously collapsed to one line; measured
   leaves now keep their wrapping width, including margins, with or without a cap.
