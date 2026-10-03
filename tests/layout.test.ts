@@ -131,9 +131,11 @@ describe("committed flex allocations", () => {
     // available-basis inset and the duplicate numeric offset at depth.
     expect(child.getComputedLeft()).toBe(auto ? 1 : 3)
     expect(inner.getComputedLeft()).toBe(0)
-    // With auto main sizing, Phase 8 leaves the intrinsic main size uncommitted
-    // (20 after measurement); a definite main budget commits the float edge (21).
-    expect(inner.getComputedWidth()).toBe(auto ? 20 : 21)
+    // The inner box rounds against the committed border origin its parent is
+    // placed at (3), not the parent's float origin (3.4): round(3 + 20.1) - 3
+    // = 20. Yoga 1.x (yoga-wasm-web) gives 20 for both variants; the 21 this
+    // test used to pin was the float-edge artifact round(3.4 + 20.1) - round(3.4).
+    expect(inner.getComputedWidth()).toBe(20)
     root.freeRecursive()
   })
 
