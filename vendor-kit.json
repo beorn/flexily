@@ -1,12 +1,5 @@
 {
-  "modules": [
-    "release",
-    "format-check",
-    "oxfmt",
-    "links",
-    "verify",
-    "source-siblings"
-  ],
+  "modules": ["release", "format-check", "oxfmt", "links", "verify", "source-siblings"],
   "vars": {
     "testCommand": "bun run test",
     "bunVersion": "latest",
