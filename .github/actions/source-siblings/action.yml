@@ -1,4 +1,4 @@
-# vendor-kit: source-siblings@964db320a79d — generated; edit km/packages/km-infra/vendor-kit/templates/source-siblings-action.yml in km, then re-sync
+# vendor-kit: source-siblings@53fbb89537ef — generated; edit km/packages/km-infra/vendor-kit/templates/source-siblings-action.yml in km, then re-sync
 name: Install named source siblings
 description: Test against public sibling commits without requiring a new npm release
 
@@ -42,10 +42,91 @@ runs:
       run: |
         set -euo pipefail
         node --input-type=module <<'NODE'
-        import { existsSync, mkdirSync, readFileSync, readdirSync, lstatSync, writeFileSync } from "node:fs"
+        import { existsSync, mkdirSync, readFileSync, readdirSync, lstatSync, statSync, writeFileSync } from "node:fs"
         import { createHash } from "node:crypto"
-        import { join, posix, resolve } from "node:path"
+        import { basename, dirname, join, posix, relative, resolve } from "node:path"
         import { spawnSync } from "node:child_process"
+
+        const workspaceIO = { existsSync, readFileSync, readdirSync, statSync, basename, dirname, join, relative }
+
+        function isRecord(value) {
+          return value !== null && typeof value === "object" && !Array.isArray(value);
+        }
+
+        function workspaceGlobs(repoDir) {
+          const pkgPath = workspaceIO.join(repoDir, "package.json");
+          if (!workspaceIO.existsSync(pkgPath))
+            return [];
+          const ws = JSON.parse(workspaceIO.readFileSync(pkgPath, "utf8")).workspaces;
+          if (Array.isArray(ws))
+            return ws.filter((w) => typeof w === "string");
+          if (isRecord(ws) && Array.isArray(ws.packages))
+            return ws.packages.filter((w) => typeof w === "string");
+          return [];
+        }
+
+        function workspaceGlobToRegExp(glob) {
+          const body = glob.replace(/\/+$/, "").split("/").map((seg) => seg === "**" ? ".*" : seg.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^/]*")).join("/");
+          return new RegExp(`^${body}$`);
+        }
+
+        function isWorkspaceMember(relPath, globs) {
+          const target = relPath.replace(/\/+$/, "");
+          let member = !1;
+          for (const glob of globs) {
+            const negated = glob.startsWith("!");
+            if (workspaceGlobToRegExp(negated ? glob.slice(1) : glob).test(target))
+              member = !negated;
+          }
+          return member;
+        }
+
+        function* walkFiles(dir, skipDirs = WALK_SKIP_DIRS, extensions = LINT_EXTENSIONS) {
+          for (const entry of workspaceIO.readdirSync(dir)) {
+            if (skipDirs.has(entry) || entry.startsWith(".git"))
+              continue;
+            const full = workspaceIO.join(dir, entry);
+            if (workspaceIO.statSync(full).isDirectory())
+              yield* walkFiles(full, skipDirs, extensions);
+            else if (extensions.some((ext) => entry.endsWith(ext)))
+              yield full;
+          }
+        }
+
+        function sourceWorkspacePackages(repoDir) {
+          const packages = [
+            {
+              file: "package.json",
+              pkg: JSON.parse(workspaceIO.readFileSync(workspaceIO.join(repoDir, "package.json"), "utf8"))
+            }
+          ], globs = workspaceGlobs(repoDir);
+          if (globs.length === 0)
+            return packages;
+          for (const path of walkFiles(repoDir, new Set(["node_modules", ".ci-siblings"]), ["package.json"])) {
+            const file = workspaceIO.relative(repoDir, path).replaceAll("\\", "/");
+            if (file === "package.json" || workspaceIO.basename(file) !== "package.json" || !isWorkspaceMember(workspaceIO.dirname(file), globs))
+              continue;
+            packages.push({ file, pkg: JSON.parse(workspaceIO.readFileSync(path, "utf8")) });
+          }
+          return packages;
+        }
+
+        function sourceSiblingDeclarations(packages, name) {
+          const declarations = [];
+          for (const { file, pkg } of packages)
+            for (const field of ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"]) {
+              const dependencies = pkg[field];
+              if (!isRecord(dependencies) || !Object.hasOwn(dependencies, name))
+                continue;
+              const range = dependencies[name];
+              if (typeof range !== "string" || range.trim().length === 0 || /^(workspace|file|link):/.test(range))
+                throw Error(`source-siblings: ${file} ${field} declares ${name}@${String(range)}; needs a published dependency range`, { cause: { file } });
+              declarations.push({ file, range });
+            }
+          if (declarations.length === 0)
+            throw Error(`source-siblings: ${name} needs a published dependency range in root or active workspace package.json; checked ${packages.map((pkg) => pkg.file).join(", ")}`, { cause: { file: "package.json" } });
+          return declarations;
+        }
 
         const root = process.cwd()
         const manifestName = process.env.SOURCE_SIBLINGS_MANIFEST
@@ -61,6 +142,7 @@ runs:
         const originalPackage = readFileSync(packagePath)
         const originalLock = readFileSync(join(root, "bun.lock"))
         const pkg = JSON.parse(originalPackage.toString("utf8"))
+        const sourcePackages = sourceWorkspacePackages(root)
         const checkoutRoot = join(root, ".ci-siblings")
         if (existsSync(checkoutRoot)) throw new Error("source-siblings: .ci-siblings already exists; refusing stale source")
         mkdirSync(checkoutRoot)
@@ -108,10 +190,7 @@ runs:
           ) {
             throw new Error(`source-siblings: ${name} has invalid directory ${JSON.stringify(directory)}; name a relative path inside ${repository}`)
           }
-          const declared = pkg.dependencies?.[name] ?? pkg.devDependencies?.[name] ?? pkg.peerDependencies?.[name] ?? pkg.optionalDependencies?.[name]
-          if (typeof declared !== "string" || declared.startsWith("workspace:") || declared.startsWith("file:")) {
-            throw new Error(`source-siblings: ${name} needs a published dependency range in package.json`)
-          }
+          sourceSiblingDeclarations(sourcePackages, name)
           names.add(name)
           const checkout = join(checkoutRoot, String(index))
           git(["clone", "--filter=blob:none", "--single-branch", "--branch", "main", "--no-checkout", `https://github.com/${repository}.git`, checkout])
@@ -149,14 +228,14 @@ runs:
             runPhase(name, "install", "bun", ["install", "--frozen-lockfile"], checkout)
             runPhase(name, "build", "bun", ["run", "build"], packageDir)
             // One agreed pin with tools/release/release-package-manager.ts, checked by its owning test.
-            runPhase(name, "pack", "bunx", ["pnpm@9.15.9", "pack", "--pack-destination", packDir], packageDir)
+            runPhase(name, "pack", "bunx", ["pnpm@11.20.0", "pack", "--pack-destination", packDir], packageDir)
             const artifacts = readdirSync(packDir).filter((entry) => entry.endsWith(".tgz"))
             if (artifacts.length !== 1 || !lstatSync(join(packDir, artifacts[0])).isFile()) {
               throw new Error(`source-siblings: ${name} pack needs exactly one regular .tgz in ${packDir}; found ${JSON.stringify(artifacts)}`)
             }
             const artifact = artifacts[0]
             const digest = createHash("sha256").update(readFileSync(join(packDir, artifact))).digest("hex")
-            pkg.overrides[name] = `file:./.ci-siblings/${index}-packed/${artifact}`
+            pkg.overrides[name] = `file:${join(packDir, artifact)}`
             console.log(`source-siblings: ${name}@${sourcePkg.version} from ${where}; artifact=${artifact}; sha256=${digest}`)
           } else {
             pkg.overrides[name] = subdirectory === "." ? `file:./.ci-siblings/${index}` : `file:./.ci-siblings/${index}/${subdirectory}`
