@@ -9,6 +9,10 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
+// Tinybench 2's defaults (what vitest 4 ran): time 500ms, iterations 10, warmupTime 100ms,
+// warmupIterations 5. vitest 5 ships tinybench 6 (1000/64/250/64) — pin the v4 values (29257).
+const BENCH_V4 = { time: 500, iterations: 10, warmupTime: 100, warmupIterations: 5 }
+
 let yoga: Yoga
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -135,69 +139,69 @@ const opts = { warmupIterations: 100, iterations: 1000, time: 2000 }
 
 describe("No-change re-layout (fingerprint cache)", () => {
   test("Flexily: 5×20 no-change", async ({ bench }) => {
-  await bench("Flexily: 5×20 no-change", () => {
+    await bench("Flexily: 5×20 no-change", () => {
       ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
   test("Yoga: 5×20 no-change", async ({ bench }) => {
-  await bench("Yoga: 5×20 no-change", () => {
+    await bench("Yoga: 5×20 no-change", () => {
       yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
   test("Flexily: 8×30 no-change", async ({ bench }) => {
-  await bench("Flexily: 8×30 no-change", () => {
+    await bench("Flexily: 8×30 no-change", () => {
       ftBig.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
   test("Yoga: 8×30 no-change", async ({ bench }) => {
-  await bench("Yoga: 8×30 no-change", () => {
+    await bench("Yoga: 8×30 no-change", () => {
       ytBig.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
 })
 
 describe("Single leaf dirty (incremental re-layout)", () => {
   test("Flexily: 5×20 leaf dirty", async ({ bench }) => {
-  await bench("Flexily: 5×20 leaf dirty", () => {
+    await bench("Flexily: 5×20 leaf dirty", () => {
       ftLeaf.markDirty()
       ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
   test("Yoga: 5×20 leaf dirty", async ({ bench }) => {
-  await bench("Yoga: 5×20 leaf dirty", () => {
+    await bench("Yoga: 5×20 leaf dirty", () => {
       ytLeaf.markDirty()
       yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
   test("Flexily: 8×30 leaf dirty", async ({ bench }) => {
-  await bench("Flexily: 8×30 leaf dirty", () => {
+    await bench("Flexily: 8×30 leaf dirty", () => {
       ftBigLeaf.markDirty()
       ftBig.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
   test("Yoga: 8×30 leaf dirty", async ({ bench }) => {
-  await bench("Yoga: 8×30 leaf dirty", () => {
+    await bench("Yoga: 8×30 leaf dirty", () => {
       ytBigLeaf.markDirty()
       ytBig.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
 })
 
 describe("Width change cycle (120→80→120)", () => {
   test("Flexily: 5×20 resize cycle", async ({ bench }) => {
-  await bench("Flexily: 5×20 resize cycle", () => {
+    await bench("Flexily: 5×20 resize cycle", () => {
       ft.setWidth(80)
       ft.calculateLayout(80, 40, Flexily.DIRECTION_LTR)
       ft.setWidth(120)
       ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
   test("Yoga: 5×20 resize cycle", async ({ bench }) => {
-  await bench("Yoga: 5×20 resize cycle", () => {
+    await bench("Yoga: 5×20 resize cycle", () => {
       yt.setWidth(80)
       yt.calculateLayout(80, 40, yoga.DIRECTION_LTR)
       yt.setWidth(120)
       yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }).run(opts)
-})
+    }).run({ ...BENCH_V4, ...opts })
+  })
 })

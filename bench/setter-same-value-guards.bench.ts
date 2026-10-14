@@ -16,6 +16,10 @@ import {
   UNIT_CQI,
 } from "../src/index.js"
 
+// Tinybench 2's defaults (what vitest 4 ran): time 500ms, iterations 10, warmupTime 100ms,
+// warmupIterations 5. vitest 5 ships tinybench 6 (1000/64/250/64) — pin the v4 values (29257).
+const BENCH_V4 = { time: 500, iterations: 10, warmupTime: 100, warmupIterations: 5 }
+
 const WIDTH = 160
 const HEIGHT = 60
 const NODE_COUNT = 500
@@ -88,15 +92,15 @@ describe("Flexily setter same-value guards", () => {
   })
 
   test("reapply identical styles to clean 500-node tree + calculateLayout", async ({ bench }) => {
-  await bench("reapply identical styles to clean 500-node tree + calculateLayout", () => {
+    await bench("reapply identical styles to clean 500-node tree + calculateLayout", () => {
       applyIdenticalStyles()
       root.calculateLayout(WIDTH, HEIGHT, DIRECTION_LTR)
-    }).run(benchOptions)
-})
+    }).run({ ...BENCH_V4, ...benchOptions })
+  })
 
   test("calculateLayout on unchanged clean 500-node tree", async ({ bench }) => {
-  await bench("calculateLayout on unchanged clean 500-node tree", () => {
+    await bench("calculateLayout on unchanged clean 500-node tree", () => {
       root.calculateLayout(WIDTH, HEIGHT, DIRECTION_LTR)
-    }).run(benchOptions)
-})
+    }).run({ ...BENCH_V4, ...benchOptions })
+  })
 })

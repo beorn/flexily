@@ -15,6 +15,10 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
+// Tinybench 2's defaults (what vitest 4 ran): time 500ms, iterations 10, warmupTime 100ms,
+// warmupIterations 5. vitest 5 ships tinybench 6 (1000/64/250/64) — pin the v4 values (29257).
+const BENCH_V4 = { time: 500, iterations: 10, warmupTime: 100, warmupIterations: 5 }
+
 // ============================================================================
 // Yoga Setup
 // ============================================================================
@@ -170,38 +174,38 @@ function yogaKanbanTree(cardsPerColumn: number) {
 describe("Flexily vs Yoga - Flat Hierarchy", () => {
   for (const nodeCount of [100, 500, 1000]) {
     test(`Flexily: ${nodeCount} nodes - create + layout`, async ({ bench }) => {
-  await bench(`Flexily: ${nodeCount} nodes - create + layout`, () => {
-      const tree = flexilyFlatTree(nodeCount)
-      tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
-    }).run()
-})
+      await bench(`Flexily: ${nodeCount} nodes - create + layout`, () => {
+        const tree = flexilyFlatTree(nodeCount)
+        tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test(`Yoga: ${nodeCount} nodes - create + layout`, async ({ bench }) => {
-  await bench(`Yoga: ${nodeCount} nodes - create + layout`, () => {
-      const tree = yogaFlatTree(nodeCount)
-      tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
-      tree.freeRecursive()
-    }).run()
-})
+      await bench(`Yoga: ${nodeCount} nodes - create + layout`, () => {
+        const tree = yogaFlatTree(nodeCount)
+        tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
+        tree.freeRecursive()
+      }).run(BENCH_V4)
+    })
   }
 })
 
 describe("Flexily vs Yoga - Deep Hierarchy", () => {
   for (const depth of [1, 2, 5, 10, 15, 20, 50, 100]) {
     test(`Flexily: ${depth} levels deep - create + layout`, async ({ bench }) => {
-  await bench(`Flexily: ${depth} levels deep - create + layout`, () => {
-      const tree = flexilyDeepTree(depth)
-      tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
-    }).run()
-})
+      await bench(`Flexily: ${depth} levels deep - create + layout`, () => {
+        const tree = flexilyDeepTree(depth)
+        tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test(`Yoga: ${depth} levels deep - create + layout`, async ({ bench }) => {
-  await bench(`Yoga: ${depth} levels deep - create + layout`, () => {
-      const tree = yogaDeepTree(depth)
-      tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
-      tree.freeRecursive()
-    }).run()
-})
+      await bench(`Yoga: ${depth} levels deep - create + layout`, () => {
+        const tree = yogaDeepTree(depth)
+        tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
+        tree.freeRecursive()
+      }).run(BENCH_V4)
+    })
   }
 })
 
@@ -210,19 +214,19 @@ describe("Flexily vs Yoga - Kanban (TUI Pattern)", () => {
     const totalNodes = 3 + 3 * (1 + cardsPerCol)
 
     test(`Flexily: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, async ({ bench }) => {
-  await bench(`Flexily: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
-      const tree = flexilyKanbanTree(cardsPerCol)
-      tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }).run()
-})
+      await bench(`Flexily: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
+        const tree = flexilyKanbanTree(cardsPerCol)
+        tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test(`Yoga: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, async ({ bench }) => {
-  await bench(`Yoga: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
-      const tree = yogaKanbanTree(cardsPerCol)
-      tree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-      tree.freeRecursive()
-    }).run()
-})
+      await bench(`Yoga: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
+        const tree = yogaKanbanTree(cardsPerCol)
+        tree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
+        tree.freeRecursive()
+      }).run(BENCH_V4)
+    })
   }
 })
 
@@ -240,18 +244,18 @@ describe("Flexily vs Yoga - Layout Only (no allocation)", () => {
   })
 
   test("Flexily: Kanban 3×50 - layout only", async ({ bench }) => {
-  await bench("Flexily: Kanban 3×50 - layout only", () => {
-    flexilyTree.markDirty()
-    flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-  }).run()
-})
+    await bench("Flexily: Kanban 3×50 - layout only", () => {
+      flexilyTree.markDirty()
+      flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
+    }).run(BENCH_V4)
+  })
 
   test("Yoga: Kanban 3×50 - layout only", async ({ bench }) => {
-  await bench("Yoga: Kanban 3×50 - layout only", () => {
-    yogaTree.markDirty()
-    yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-  }).run()
-})
+    await bench("Yoga: Kanban 3×50 - layout only", () => {
+      yogaTree.markDirty()
+      yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
+    }).run(BENCH_V4)
+  })
 })
 
 // ============================================================================
@@ -351,19 +355,19 @@ function yogaTreeWithMeasure(nodeCount: number) {
 describe("Flexily vs Yoga - With Measure Functions", () => {
   for (const nodeCount of [200, 500, 1000, 1500]) {
     test(`Flexily: ~${nodeCount} nodes with measure - create + layout`, async ({ bench }) => {
-  await bench(`Flexily: ~${nodeCount} nodes with measure - create + layout`, () => {
-      const tree = flexilyTreeWithMeasure(nodeCount)
-      tree.calculateLayout(250, 120, Flexily.DIRECTION_LTR)
-    }).run()
-})
+      await bench(`Flexily: ~${nodeCount} nodes with measure - create + layout`, () => {
+        const tree = flexilyTreeWithMeasure(nodeCount)
+        tree.calculateLayout(250, 120, Flexily.DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test(`Yoga: ~${nodeCount} nodes with measure - create + layout`, async ({ bench }) => {
-  await bench(`Yoga: ~${nodeCount} nodes with measure - create + layout`, () => {
-      const tree = yogaTreeWithMeasure(nodeCount)
-      tree.calculateLayout(250, 120, yoga.DIRECTION_LTR)
-      tree.freeRecursive()
-    }).run()
-})
+      await bench(`Yoga: ~${nodeCount} nodes with measure - create + layout`, () => {
+        const tree = yogaTreeWithMeasure(nodeCount)
+        tree.calculateLayout(250, 120, yoga.DIRECTION_LTR)
+        tree.freeRecursive()
+      }).run(BENCH_V4)
+    })
   }
 })
 
@@ -392,18 +396,18 @@ describe("Flexily vs Yoga - Incremental Update", () => {
   })
 
   test("Flexily: Single leaf dirty - relayout", async ({ bench }) => {
-  await bench("Flexily: Single leaf dirty - relayout", () => {
-    flexilyLeaf.markDirty()
-    flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-  }).run()
-})
+    await bench("Flexily: Single leaf dirty - relayout", () => {
+      flexilyLeaf.markDirty()
+      flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
+    }).run(BENCH_V4)
+  })
 
   test("Yoga: Single leaf dirty - relayout", async ({ bench }) => {
-  await bench("Yoga: Single leaf dirty - relayout", () => {
-    yogaLeaf.markDirty()
-    yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-  }).run()
-})
+    await bench("Yoga: Single leaf dirty - relayout", () => {
+      yogaLeaf.markDirty()
+      yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
+    }).run(BENCH_V4)
+  })
 })
 
 // ============================================================================
@@ -481,18 +485,18 @@ describe("Flexily vs Yoga - Large Scale TUI", () => {
 
   for (const nodeCount of [500, 1000, 1500, 2000]) {
     test(`Flexily: Large TUI ~${nodeCount} nodes`, async ({ bench }) => {
-  await bench(`Flexily: Large TUI ~${nodeCount} nodes`, () => {
-      const tree = createLargeTUI("flexily", nodeCount) as Flexily.Node
-      tree.calculateLayout(250, 120, Flexily.DIRECTION_LTR)
-    }).run()
-})
+      await bench(`Flexily: Large TUI ~${nodeCount} nodes`, () => {
+        const tree = createLargeTUI("flexily", nodeCount) as Flexily.Node
+        tree.calculateLayout(250, 120, Flexily.DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test(`Yoga: Large TUI ~${nodeCount} nodes`, async ({ bench }) => {
-  await bench(`Yoga: Large TUI ~${nodeCount} nodes`, () => {
-      const tree = createLargeTUI("yoga", nodeCount) as ReturnType<typeof yoga.Node.create>
-      tree.calculateLayout(250, 120, yoga.DIRECTION_LTR)
-      tree.freeRecursive()
-    }).run()
-})
+      await bench(`Yoga: Large TUI ~${nodeCount} nodes`, () => {
+        const tree = createLargeTUI("yoga", nodeCount) as ReturnType<typeof yoga.Node.create>
+        tree.calculateLayout(250, 120, yoga.DIRECTION_LTR)
+        tree.freeRecursive()
+      }).run(BENCH_V4)
+    })
   }
 })

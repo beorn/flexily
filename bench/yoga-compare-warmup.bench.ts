@@ -14,6 +14,10 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
+// Tinybench 2's defaults (what vitest 4 ran): time 500ms, iterations 10, warmupTime 100ms,
+// warmupIterations 5. vitest 5 ships tinybench 6 (1000/64/250/64) — pin the v4 values (29257).
+const BENCH_V4 = { time: 500, iterations: 10, warmupTime: 100, warmupIterations: 5 }
+
 // ============================================================================
 // Yoga Setup
 // ============================================================================
@@ -136,19 +140,19 @@ const benchOptions = {
 describe("Flexily vs Yoga - Flat (warmed up)", () => {
   for (const nodeCount of [100, 500, 1000, 2000, 5000]) {
     test(`Flexily: ${nodeCount} nodes`, async ({ bench }) => {
-  await bench(`Flexily: ${nodeCount} nodes`, () => {
+      await bench(`Flexily: ${nodeCount} nodes`, () => {
         const tree = flexilyFlatTree(nodeCount)
         tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
-      }).run(benchOptions)
-})
+      }).run({ ...BENCH_V4, ...benchOptions })
+    })
 
     test(`Yoga: ${nodeCount} nodes`, async ({ bench }) => {
-  await bench(`Yoga: ${nodeCount} nodes`, () => {
+      await bench(`Yoga: ${nodeCount} nodes`, () => {
         const tree = yogaFlatTree(nodeCount)
         tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
         tree.freeRecursive()
-      }).run(benchOptions)
-})
+      }).run({ ...BENCH_V4, ...benchOptions })
+    })
   }
 })
 
@@ -159,18 +163,18 @@ describe("Flexily vs Yoga - Flat (warmed up)", () => {
 describe("Flexily vs Yoga - Deep (warmed up)", () => {
   for (const depth of [1, 2, 5, 10, 15, 20, 50, 100]) {
     test(`Flexily: ${depth} levels`, async ({ bench }) => {
-  await bench(`Flexily: ${depth} levels`, () => {
+      await bench(`Flexily: ${depth} levels`, () => {
         const tree = flexilyDeepTree(depth)
         tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
-      }).run(benchOptions)
-})
+      }).run({ ...BENCH_V4, ...benchOptions })
+    })
 
     test(`Yoga: ${depth} levels`, async ({ bench }) => {
-  await bench(`Yoga: ${depth} levels`, () => {
+      await bench(`Yoga: ${depth} levels`, () => {
         const tree = yogaDeepTree(depth)
         tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
         tree.freeRecursive()
-      }).run(benchOptions)
-})
+      }).run({ ...BENCH_V4, ...benchOptions })
+    })
   }
 })

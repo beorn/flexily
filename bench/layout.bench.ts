@@ -22,6 +22,10 @@ import {
   GUTTER_ALL,
 } from "../src/index.js"
 
+// Tinybench 2's defaults (what vitest 4 ran): time 500ms, iterations 10, warmupTime 100ms,
+// warmupIterations 5. vitest 5 ships tinybench 6 (1000/64/250/64) — pin the v4 values (29257).
+const BENCH_V4 = { time: 500, iterations: 10, warmupTime: 100, warmupIterations: 5 }
+
 // ============================================================================
 // Test Case Generators (Yoga-compatible structures)
 // ============================================================================
@@ -171,32 +175,32 @@ describe("Flexily Layout Benchmarks", () => {
     })
 
     test("100 nodes - layout only", async ({ bench }) => {
-  await bench("100 nodes - layout only", () => {
-      tree100.markDirty()
-      tree100.calculateLayout(1000, 1000, DIRECTION_LTR)
-    }).run()
-})
+      await bench("100 nodes - layout only", () => {
+        tree100.markDirty()
+        tree100.calculateLayout(1000, 1000, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("500 nodes - layout only", async ({ bench }) => {
-  await bench("500 nodes - layout only", () => {
-      tree500.markDirty()
-      tree500.calculateLayout(1000, 1000, DIRECTION_LTR)
-    }).run()
-})
+      await bench("500 nodes - layout only", () => {
+        tree500.markDirty()
+        tree500.calculateLayout(1000, 1000, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("1000 nodes - layout only", async ({ bench }) => {
-  await bench("1000 nodes - layout only", () => {
-      tree1000.markDirty()
-      tree1000.calculateLayout(1000, 1000, DIRECTION_LTR)
-    }).run()
-})
+      await bench("1000 nodes - layout only", () => {
+        tree1000.markDirty()
+        tree1000.calculateLayout(1000, 1000, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("100 nodes - create + layout", async ({ bench }) => {
-  await bench("100 nodes - create + layout", () => {
-      const tree = createFlatTree(100)
-      tree.calculateLayout(1000, 1000, DIRECTION_LTR)
-    }).run()
-})
+      await bench("100 nodes - create + layout", () => {
+        const tree = createFlatTree(100)
+        tree.calculateLayout(1000, 1000, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
   })
 
   describe("Deep Hierarchy (nested containers)", () => {
@@ -211,25 +215,25 @@ describe("Flexily Layout Benchmarks", () => {
     })
 
     test("50 levels deep - layout only", async ({ bench }) => {
-  await bench("50 levels deep - layout only", () => {
-      tree50.markDirty()
-      tree50.calculateLayout(1000, 1000, DIRECTION_LTR)
-    }).run()
-})
+      await bench("50 levels deep - layout only", () => {
+        tree50.markDirty()
+        tree50.calculateLayout(1000, 1000, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("100 levels deep - layout only", async ({ bench }) => {
-  await bench("100 levels deep - layout only", () => {
-      tree100.markDirty()
-      tree100.calculateLayout(1000, 1000, DIRECTION_LTR)
-    }).run()
-})
+      await bench("100 levels deep - layout only", () => {
+        tree100.markDirty()
+        tree100.calculateLayout(1000, 1000, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("200 levels deep - layout only", async ({ bench }) => {
-  await bench("200 levels deep - layout only", () => {
-      tree200.markDirty()
-      tree200.calculateLayout(1000, 1000, DIRECTION_LTR)
-    }).run()
-})
+      await bench("200 levels deep - layout only", () => {
+        tree200.markDirty()
+        tree200.calculateLayout(1000, 1000, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
   })
 
   describe("Terminal TUI Patterns", () => {
@@ -246,39 +250,39 @@ describe("Flexily Layout Benchmarks", () => {
     })
 
     test("Kanban 3x10 (30 cards) - layout only", async ({ bench }) => {
-  await bench("Kanban 3x10 (30 cards) - layout only", () => {
-      kanban10.markDirty()
-      kanban10.calculateLayout(120, 40, DIRECTION_LTR)
-    }).run()
-})
+      await bench("Kanban 3x10 (30 cards) - layout only", () => {
+        kanban10.markDirty()
+        kanban10.calculateLayout(120, 40, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("Kanban 3x50 (150 cards) - layout only", async ({ bench }) => {
-  await bench("Kanban 3x50 (150 cards) - layout only", () => {
-      kanban50.markDirty()
-      kanban50.calculateLayout(120, 40, DIRECTION_LTR)
-    }).run()
-})
+      await bench("Kanban 3x50 (150 cards) - layout only", () => {
+        kanban50.markDirty()
+        kanban50.calculateLayout(120, 40, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("Kanban 3x100 (300 cards) - layout only", async ({ bench }) => {
-  await bench("Kanban 3x100 (300 cards) - layout only", () => {
-      kanban100.markDirty()
-      kanban100.calculateLayout(120, 40, DIRECTION_LTR)
-    }).run()
-})
+      await bench("Kanban 3x100 (300 cards) - layout only", () => {
+        kanban100.markDirty()
+        kanban100.calculateLayout(120, 40, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("Dashboard layout - layout only", async ({ bench }) => {
-  await bench("Dashboard layout - layout only", () => {
-      dashboard.markDirty()
-      dashboard.calculateLayout(120, 40, DIRECTION_LTR)
-    }).run()
-})
+      await bench("Dashboard layout - layout only", () => {
+        dashboard.markDirty()
+        dashboard.calculateLayout(120, 40, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("Kanban 3x50 - create + layout", async ({ bench }) => {
-  await bench("Kanban 3x50 - create + layout", () => {
-      const tree = createKanbanTree(50)
-      tree.calculateLayout(120, 40, DIRECTION_LTR)
-    }).run()
-})
+      await bench("Kanban 3x50 - create + layout", () => {
+        const tree = createKanbanTree(50)
+        tree.calculateLayout(120, 40, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
   })
 
   describe("Incremental Layout (dirty tracking)", () => {
@@ -290,22 +294,22 @@ describe("Flexily Layout Benchmarks", () => {
     })
 
     test("Re-layout unchanged tree (should skip)", async ({ bench }) => {
-  await bench("Re-layout unchanged tree (should skip)", () => {
-      // Tree is clean, should be fast
-      tree.calculateLayout(120, 40, DIRECTION_LTR)
-    }).run()
-})
+      await bench("Re-layout unchanged tree (should skip)", () => {
+        // Tree is clean, should be fast
+        tree.calculateLayout(120, 40, DIRECTION_LTR)
+      }).run(BENCH_V4)
+    })
 
     test("Re-layout after single property change", async ({ bench }) => {
-  await bench("Re-layout after single property change", () => {
-      // Mark a single node dirty
-      const col = tree.getChild(0)
-      if (col) {
-        col.setWidth(35) // Change triggers dirty
-        tree.calculateLayout(120, 40, DIRECTION_LTR)
-        col.setWidth(40) // Reset for next iteration
-      }
-    }).run()
-})
+      await bench("Re-layout after single property change", () => {
+        // Mark a single node dirty
+        const col = tree.getChild(0)
+        if (col) {
+          col.setWidth(35) // Change triggers dirty
+          tree.calculateLayout(120, 40, DIRECTION_LTR)
+          col.setWidth(40) // Reset for next iteration
+        }
+      }).run(BENCH_V4)
+    })
   })
 })

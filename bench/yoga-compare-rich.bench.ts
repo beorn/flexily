@@ -19,6 +19,10 @@ import { readFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 
+// Tinybench 2's defaults (what vitest 4 ran): time 500ms, iterations 10, warmupTime 100ms,
+// warmupIterations 5. vitest 5 ships tinybench 6 (1000/64/250/64) — pin the v4 values (29257).
+const BENCH_V4 = { time: 500, iterations: 10, warmupTime: 100, warmupIterations: 5 }
+
 // ============================================================================
 // Setup
 // ============================================================================
@@ -264,18 +268,18 @@ describe("TUI Board (create + layout)", () => {
   ] as const) {
     const total = cols * (1 + cards * 4) + 1 // root + cols*(header + cards*(border+row+icon+text))
     test(`Flexily: ${cols}×${cards} (~${total} nodes)`, async ({ bench }) => {
-  await bench(`Flexily: ${cols}×${cards} (~${total} nodes)`, () => {
+      await bench(`Flexily: ${cols}×${cards} (~${total} nodes)`, () => {
         const tree = flexilyTuiTree(cols, cards)
         tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-      }).run(opts)
-})
+      }).run({ ...BENCH_V4, ...opts })
+    })
     test(`Yoga: ${cols}×${cards} (~${total} nodes)`, async ({ bench }) => {
-  await bench(`Yoga: ${cols}×${cards} (~${total} nodes)`, () => {
+      await bench(`Yoga: ${cols}×${cards} (~${total} nodes)`, () => {
         const tree = yogaTuiTree(cols, cards)
         tree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
         tree.freeRecursive()
-      }).run(opts)
-})
+      }).run({ ...BENCH_V4, ...opts })
+    })
   }
 })
 
@@ -315,19 +319,19 @@ describe("Incremental re-layout (single leaf dirty)", () => {
     })
 
     test(`Flexily: ${cols}×${cards} leaf dirty`, async ({ bench }) => {
-  await bench(`Flexily: ${cols}×${cards} leaf dirty`, () => {
+      await bench(`Flexily: ${cols}×${cards} leaf dirty`, () => {
         const { tree, leaf } = flexily()
         leaf.markDirty()
         tree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-      }).run(opts)
-})
+      }).run({ ...BENCH_V4, ...opts })
+    })
     test(`Yoga: ${cols}×${cards} leaf dirty`, async ({ bench }) => {
-  await bench(`Yoga: ${cols}×${cards} leaf dirty`, () => {
+      await bench(`Yoga: ${cols}×${cards} leaf dirty`, () => {
         const { tree, leaf } = yogaPair()
         leaf.markDirty()
         tree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-      }).run(opts)
-})
+      }).run({ ...BENCH_V4, ...opts })
+    })
   }
 })
 
@@ -349,23 +353,23 @@ describe("Re-layout with width change", () => {
     })
 
     test(`Flexily: ${cols}×${cards} width 120→80`, async ({ bench }) => {
-  await bench(`Flexily: ${cols}×${cards} width 120→80`, () => {
+      await bench(`Flexily: ${cols}×${cards} width 120→80`, () => {
         const { flexilyTree } = pair()
         flexilyTree.setWidth(80)
         flexilyTree.calculateLayout(80, 40, Flexily.DIRECTION_LTR)
         flexilyTree.setWidth(120)
         flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-      }).run(opts)
-})
+      }).run({ ...BENCH_V4, ...opts })
+    })
     test(`Yoga: ${cols}×${cards} width 120→80`, async ({ bench }) => {
-  await bench(`Yoga: ${cols}×${cards} width 120→80`, () => {
+      await bench(`Yoga: ${cols}×${cards} width 120→80`, () => {
         const { yogaTree } = pair()
         yogaTree.setWidth(80)
         yogaTree.calculateLayout(80, 40, yoga.DIRECTION_LTR)
         yogaTree.setWidth(120)
         yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-      }).run(opts)
-})
+      }).run({ ...BENCH_V4, ...opts })
+    })
   }
 })
 
@@ -376,18 +380,18 @@ describe("Re-layout with width change", () => {
 describe("Property-rich trees (shrink, align, justify, wrap)", () => {
   for (const nodeCount of [100, 300, 600]) {
     test(`Flexily: ~${nodeCount} nodes`, async ({ bench }) => {
-  await bench(`Flexily: ~${nodeCount} nodes`, () => {
+      await bench(`Flexily: ~${nodeCount} nodes`, () => {
         const tree = flexilyPropertyRichTree(nodeCount)
         tree.calculateLayout(200, 100, Flexily.DIRECTION_LTR)
-      }).run(opts)
-})
+      }).run({ ...BENCH_V4, ...opts })
+    })
     test(`Yoga: ~${nodeCount} nodes`, async ({ bench }) => {
-  await bench(`Yoga: ~${nodeCount} nodes`, () => {
+      await bench(`Yoga: ~${nodeCount} nodes`, () => {
         const tree = yogaPropertyRichTree(nodeCount)
         tree.calculateLayout(200, 100, yoga.DIRECTION_LTR)
         tree.freeRecursive()
-      }).run(opts)
-})
+      }).run({ ...BENCH_V4, ...opts })
+    })
   }
 })
 
@@ -410,16 +414,16 @@ describe("No-change re-layout (fingerprint cache hit)", () => {
     })
 
     test(`Flexily: ${cols}×${cards} no-change`, async ({ bench }) => {
-  await bench(`Flexily: ${cols}×${cards} no-change`, () => {
+      await bench(`Flexily: ${cols}×${cards} no-change`, () => {
         const { flexilyTree } = pair()
         flexilyTree.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-      }).run(boundedOpts)
-})
+      }).run({ ...BENCH_V4, ...boundedOpts })
+    })
     test(`Yoga: ${cols}×${cards} no-change`, async ({ bench }) => {
-  await bench(`Yoga: ${cols}×${cards} no-change`, () => {
+      await bench(`Yoga: ${cols}×${cards} no-change`, () => {
         const { yogaTree } = pair()
         yogaTree.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-      }).run(boundedOpts)
-})
+      }).run({ ...BENCH_V4, ...boundedOpts })
+    })
   }
 })
