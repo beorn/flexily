@@ -69,7 +69,7 @@
     "check-private": "bun scripts/check-private-leak.ts"
   },
   "devDependencies": {
-    "@types/node": "25.9.9",
+    "@types/node": "26.6.5",
     "loggily": "0.10.2",
     "oxfmt": "0.38.0",
     "tsdown": "0.22.13",
