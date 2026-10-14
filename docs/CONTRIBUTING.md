@@ -87,7 +87,7 @@ See `docs/` for detailed documentation on the algorithm, API, performance, and t
 - **Yoga API compatibility** — same constants, same method names
 - **Two algorithms**: zero (production, zero-alloc) and classic (debugging, allocating)
 
-For the full development workflow and detailed guidance, see [CLAUDE.md](https://github.com/beorn/flexily/blob/main/CLAUDE.md).
+For the full development workflow and detailed guidance, see [AGENTS.md](https://github.com/beorn/flexily/blob/main/AGENTS.md).
 
 ## License
 

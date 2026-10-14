@@ -138,7 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Release workflow**: 0.7.0 was published with broken `exports` (pointed to `src/*.ts` source, not `dist/*.mjs`) and an empty tarball (no `dist/` files). Root cause: `.github/workflows/release.yml` ran `npm publish` without first building (`bun run build`), so `dist/` didn't exist; and `npm publish` did not apply `publishConfig.exports` overrides on this run (loggily had been getting away with the same shape, but it's not contractually guaranteed). Fixed in two parts: (1) added `bun run build` step before publish, (2) switched to `pnpm publish --access public --no-git-checks` per the canonical convention in `vendor/CLAUDE.md` "npm Publishing" — pnpm reliably applies `publishConfig.exports`. flexily 0.7.1 is the first artifact under the corrected pipeline.
+- **Release workflow**: 0.7.0 was published with broken `exports` (pointed to `src/*.ts` source, not `dist/*.mjs`) and an empty tarball (no `dist/` files). Root cause: `.github/workflows/release.yml` ran `npm publish` without first building (`bun run build`), so `dist/` didn't exist; and `npm publish` did not apply `publishConfig.exports` overrides on this run (loggily had been getting away with the same shape, but it's not contractually guaranteed). Fixed in two parts: (1) added `bun run build` step before publish, (2) switched to `pnpm publish --access public --no-git-checks` per the canonical convention in `vendor/AGENTS.md` "npm Publishing" — pnpm reliably applies `publishConfig.exports`. flexily 0.7.1 is the first artifact under the corrected pipeline.
 - No source / behavior changes from 0.7.0 — pure release-pipeline fix.
 
 ## [0.7.0] - 2026-05-09
