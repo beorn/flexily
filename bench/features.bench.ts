@@ -47,7 +47,7 @@ describe("Feature: FlexGrow", () => {
 
       root.calculateLayout(1000, 100)
       root.free()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 
   test("yoga - flexGrow distribution", async ({ bench }) => {
@@ -66,7 +66,7 @@ describe("Feature: FlexGrow", () => {
 
       root.calculateLayout(1000, 100)
       root.freeRecursive()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 })
 
@@ -92,7 +92,7 @@ describe("Feature: FlexShrink", () => {
 
       root.calculateLayout(500, 100)
       root.free()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 
   test("yoga - flexShrink overflow", async ({ bench }) => {
@@ -112,7 +112,7 @@ describe("Feature: FlexShrink", () => {
 
       root.calculateLayout(500, 100)
       root.freeRecursive()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 })
 
@@ -137,7 +137,7 @@ describe("Feature: FlexWrap", () => {
 
       root.calculateLayout(200, undefined)
       root.free()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 
   test("yoga - wrap with many items", async ({ bench }) => {
@@ -156,7 +156,7 @@ describe("Feature: FlexWrap", () => {
 
       root.calculateLayout(200, undefined)
       root.freeRecursive()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 })
 
@@ -182,7 +182,7 @@ describe("Feature: Gap", () => {
 
       root.calculateLayout(1000, 100)
       root.free()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 
   test("yoga - gap between items", async ({ bench }) => {
@@ -202,7 +202,7 @@ describe("Feature: Gap", () => {
 
       root.calculateLayout(1000, 100)
       root.freeRecursive()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 })
 
@@ -229,7 +229,7 @@ describe("Feature: AbsolutePositioning", () => {
 
       root.calculateLayout(500, 500)
       root.free()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 
   test("yoga - absolute children", async ({ bench }) => {
@@ -250,7 +250,7 @@ describe("Feature: AbsolutePositioning", () => {
 
       root.calculateLayout(500, 500)
       root.freeRecursive()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 })
 
@@ -285,7 +285,7 @@ describe("Feature: NestedLayouts", () => {
 
       root.calculateLayout(500, 500)
       root.free()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 
   test("yoga - deep nesting (10 levels)", async ({ bench }) => {
@@ -313,7 +313,7 @@ describe("Feature: NestedLayouts", () => {
 
       root.calculateLayout(500, 500)
       root.freeRecursive()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 })
 
@@ -339,7 +339,7 @@ describe("Feature: PercentValues", () => {
 
       root.calculateLayout(1000, 500)
       root.free()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 
   test("yoga - percent dimensions", async ({ bench }) => {
@@ -359,7 +359,7 @@ describe("Feature: PercentValues", () => {
 
       root.calculateLayout(1000, 500)
       root.freeRecursive()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 })
 
@@ -386,7 +386,7 @@ describe("Feature: AlignContent", () => {
 
       root.calculateLayout(200, 400)
       root.free()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 
   test("yoga - alignContent space-between", async ({ bench }) => {
@@ -407,7 +407,7 @@ describe("Feature: AlignContent", () => {
 
       root.calculateLayout(200, 400)
       root.freeRecursive()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 })
 
@@ -430,7 +430,7 @@ describe("Feature: MeasureFunc", () => {
 
       root.calculateLayout(500, undefined)
       root.free()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 
   test("yoga - measure functions", async ({ bench }) => {
@@ -447,6 +447,6 @@ describe("Feature: MeasureFunc", () => {
 
       root.calculateLayout(500, undefined)
       root.freeRecursive()
-    }, BENCH_OPTS).run()
+    }).run(BENCH_OPTS)
 })
 })

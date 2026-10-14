@@ -137,22 +137,22 @@ describe("No-change re-layout (fingerprint cache)", () => {
   test("Flexily: 5×20 no-change", async ({ bench }) => {
   await bench("Flexily: 5×20 no-change", () => {
       ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
   test("Yoga: 5×20 no-change", async ({ bench }) => {
   await bench("Yoga: 5×20 no-change", () => {
       yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
   test("Flexily: 8×30 no-change", async ({ bench }) => {
   await bench("Flexily: 8×30 no-change", () => {
       ftBig.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
   test("Yoga: 8×30 no-change", async ({ bench }) => {
   await bench("Yoga: 8×30 no-change", () => {
       ytBig.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
 })
 
@@ -161,25 +161,25 @@ describe("Single leaf dirty (incremental re-layout)", () => {
   await bench("Flexily: 5×20 leaf dirty", () => {
       ftLeaf.markDirty()
       ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
   test("Yoga: 5×20 leaf dirty", async ({ bench }) => {
   await bench("Yoga: 5×20 leaf dirty", () => {
       ytLeaf.markDirty()
       yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
   test("Flexily: 8×30 leaf dirty", async ({ bench }) => {
   await bench("Flexily: 8×30 leaf dirty", () => {
       ftBigLeaf.markDirty()
       ftBig.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
   test("Yoga: 8×30 leaf dirty", async ({ bench }) => {
   await bench("Yoga: 8×30 leaf dirty", () => {
       ytBigLeaf.markDirty()
       ytBig.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
 })
 
@@ -190,7 +190,7 @@ describe("Width change cycle (120→80→120)", () => {
       ft.calculateLayout(80, 40, Flexily.DIRECTION_LTR)
       ft.setWidth(120)
       ft.calculateLayout(120, 40, Flexily.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
   test("Yoga: 5×20 resize cycle", async ({ bench }) => {
   await bench("Yoga: 5×20 resize cycle", () => {
@@ -198,6 +198,6 @@ describe("Width change cycle (120→80→120)", () => {
       yt.calculateLayout(80, 40, yoga.DIRECTION_LTR)
       yt.setWidth(120)
       yt.calculateLayout(120, 40, yoga.DIRECTION_LTR)
-    }, opts).run()
+    }).run(opts)
 })
 })

@@ -139,7 +139,7 @@ describe("Flexily vs Yoga - Flat (warmed up)", () => {
   await bench(`Flexily: ${nodeCount} nodes`, () => {
         const tree = flexilyFlatTree(nodeCount)
         tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
-      }, benchOptions).run()
+      }).run(benchOptions)
 })
 
     test(`Yoga: ${nodeCount} nodes`, async ({ bench }) => {
@@ -147,7 +147,7 @@ describe("Flexily vs Yoga - Flat (warmed up)", () => {
         const tree = yogaFlatTree(nodeCount)
         tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
         tree.freeRecursive()
-      }, benchOptions).run()
+      }).run(benchOptions)
 })
   }
 })
@@ -162,7 +162,7 @@ describe("Flexily vs Yoga - Deep (warmed up)", () => {
   await bench(`Flexily: ${depth} levels`, () => {
         const tree = flexilyDeepTree(depth)
         tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
-      }, benchOptions).run()
+      }).run(benchOptions)
 })
 
     test(`Yoga: ${depth} levels`, async ({ bench }) => {
@@ -170,7 +170,7 @@ describe("Flexily vs Yoga - Deep (warmed up)", () => {
         const tree = yogaDeepTree(depth)
         tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
         tree.freeRecursive()
-      }, benchOptions).run()
+      }).run(benchOptions)
 })
   }
 })

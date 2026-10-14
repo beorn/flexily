@@ -91,12 +91,12 @@ describe("Flexily setter same-value guards", () => {
   await bench("reapply identical styles to clean 500-node tree + calculateLayout", () => {
       applyIdenticalStyles()
       root.calculateLayout(WIDTH, HEIGHT, DIRECTION_LTR)
-    }, benchOptions).run()
+    }).run(benchOptions)
 })
 
   test("calculateLayout on unchanged clean 500-node tree", async ({ bench }) => {
   await bench("calculateLayout on unchanged clean 500-node tree", () => {
       root.calculateLayout(WIDTH, HEIGHT, DIRECTION_LTR)
-    }, benchOptions).run()
+    }).run(benchOptions)
 })
 })
