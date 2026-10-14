@@ -4,7 +4,7 @@
  * Run: bun bench bench/setter-same-value-guards.bench.ts
  */
 
-import { beforeAll, bench, describe } from "vitest"
+import { beforeAll, test, describe } from "vitest"
 import {
   ALIGN_CENTER,
   DIRECTION_LTR,
@@ -87,20 +87,16 @@ describe("Flexily setter same-value guards", () => {
     root.calculateLayout(WIDTH, HEIGHT, DIRECTION_LTR)
   })
 
-  bench(
-    "reapply identical styles to clean 500-node tree + calculateLayout",
-    () => {
+  test("reapply identical styles to clean 500-node tree + calculateLayout", async ({ bench }) => {
+  await bench("reapply identical styles to clean 500-node tree + calculateLayout", () => {
       applyIdenticalStyles()
       root.calculateLayout(WIDTH, HEIGHT, DIRECTION_LTR)
-    },
-    benchOptions,
-  )
+    }, benchOptions).run()
+})
 
-  bench(
-    "calculateLayout on unchanged clean 500-node tree",
-    () => {
+  test("calculateLayout on unchanged clean 500-node tree", async ({ bench }) => {
+  await bench("calculateLayout on unchanged clean 500-node tree", () => {
       root.calculateLayout(WIDTH, HEIGHT, DIRECTION_LTR)
-    },
-    benchOptions,
-  )
+    }, benchOptions).run()
+})
 })

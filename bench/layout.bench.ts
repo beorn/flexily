@@ -11,7 +11,7 @@
  * Hardware: [Document your machine here when reporting results]
  */
 
-import { bench, describe, beforeAll } from "vitest"
+import { test, describe, beforeAll } from "vitest"
 import {
   Node,
   FLEX_DIRECTION_ROW,
@@ -170,25 +170,33 @@ describe("Flexily Layout Benchmarks", () => {
       tree1000 = createFlatTree(1000)
     })
 
-    bench("100 nodes - layout only", () => {
+    test("100 nodes - layout only", async ({ bench }) => {
+  await bench("100 nodes - layout only", () => {
       tree100.markDirty()
       tree100.calculateLayout(1000, 1000, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("500 nodes - layout only", () => {
+    test("500 nodes - layout only", async ({ bench }) => {
+  await bench("500 nodes - layout only", () => {
       tree500.markDirty()
       tree500.calculateLayout(1000, 1000, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("1000 nodes - layout only", () => {
+    test("1000 nodes - layout only", async ({ bench }) => {
+  await bench("1000 nodes - layout only", () => {
       tree1000.markDirty()
       tree1000.calculateLayout(1000, 1000, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("100 nodes - create + layout", () => {
+    test("100 nodes - create + layout", async ({ bench }) => {
+  await bench("100 nodes - create + layout", () => {
       const tree = createFlatTree(100)
       tree.calculateLayout(1000, 1000, DIRECTION_LTR)
-    })
+    }).run()
+})
   })
 
   describe("Deep Hierarchy (nested containers)", () => {
@@ -202,20 +210,26 @@ describe("Flexily Layout Benchmarks", () => {
       tree200 = createDeepTree(200)
     })
 
-    bench("50 levels deep - layout only", () => {
+    test("50 levels deep - layout only", async ({ bench }) => {
+  await bench("50 levels deep - layout only", () => {
       tree50.markDirty()
       tree50.calculateLayout(1000, 1000, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("100 levels deep - layout only", () => {
+    test("100 levels deep - layout only", async ({ bench }) => {
+  await bench("100 levels deep - layout only", () => {
       tree100.markDirty()
       tree100.calculateLayout(1000, 1000, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("200 levels deep - layout only", () => {
+    test("200 levels deep - layout only", async ({ bench }) => {
+  await bench("200 levels deep - layout only", () => {
       tree200.markDirty()
       tree200.calculateLayout(1000, 1000, DIRECTION_LTR)
-    })
+    }).run()
+})
   })
 
   describe("Terminal TUI Patterns", () => {
@@ -231,30 +245,40 @@ describe("Flexily Layout Benchmarks", () => {
       dashboard = createDashboardTree()
     })
 
-    bench("Kanban 3x10 (30 cards) - layout only", () => {
+    test("Kanban 3x10 (30 cards) - layout only", async ({ bench }) => {
+  await bench("Kanban 3x10 (30 cards) - layout only", () => {
       kanban10.markDirty()
       kanban10.calculateLayout(120, 40, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("Kanban 3x50 (150 cards) - layout only", () => {
+    test("Kanban 3x50 (150 cards) - layout only", async ({ bench }) => {
+  await bench("Kanban 3x50 (150 cards) - layout only", () => {
       kanban50.markDirty()
       kanban50.calculateLayout(120, 40, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("Kanban 3x100 (300 cards) - layout only", () => {
+    test("Kanban 3x100 (300 cards) - layout only", async ({ bench }) => {
+  await bench("Kanban 3x100 (300 cards) - layout only", () => {
       kanban100.markDirty()
       kanban100.calculateLayout(120, 40, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("Dashboard layout - layout only", () => {
+    test("Dashboard layout - layout only", async ({ bench }) => {
+  await bench("Dashboard layout - layout only", () => {
       dashboard.markDirty()
       dashboard.calculateLayout(120, 40, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("Kanban 3x50 - create + layout", () => {
+    test("Kanban 3x50 - create + layout", async ({ bench }) => {
+  await bench("Kanban 3x50 - create + layout", () => {
       const tree = createKanbanTree(50)
       tree.calculateLayout(120, 40, DIRECTION_LTR)
-    })
+    }).run()
+})
   })
 
   describe("Incremental Layout (dirty tracking)", () => {
@@ -265,12 +289,15 @@ describe("Flexily Layout Benchmarks", () => {
       tree.calculateLayout(120, 40, DIRECTION_LTR)
     })
 
-    bench("Re-layout unchanged tree (should skip)", () => {
+    test("Re-layout unchanged tree (should skip)", async ({ bench }) => {
+  await bench("Re-layout unchanged tree (should skip)", () => {
       // Tree is clean, should be fast
       tree.calculateLayout(120, 40, DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench("Re-layout after single property change", () => {
+    test("Re-layout after single property change", async ({ bench }) => {
+  await bench("Re-layout after single property change", () => {
       // Mark a single node dirty
       const col = tree.getChild(0)
       if (col) {
@@ -278,6 +305,7 @@ describe("Flexily Layout Benchmarks", () => {
         tree.calculateLayout(120, 40, DIRECTION_LTR)
         col.setWidth(40) // Reset for next iteration
       }
-    })
+    }).run()
+})
   })
 })

@@ -11,6 +11,8 @@ export default defineConfig({
     },
   },
   test: {
+    // vitest 5 defaults clearMocks to true (v4 was false); pin v4 behaviour (29257).
+    clearMocks: false,
     // Timing assertions must measure layout without concurrent test workers.
     // Keep correctness files parallel, then run the unchanged timing file alone.
     projects: [

@@ -8,7 +8,7 @@
  * Run: bun bench bench/classic-vs-zero.bench.ts
  */
 
-import { bench, describe, beforeAll } from "vitest"
+import { test, describe, beforeAll } from "vitest"
 import * as Classic from "../src/index-classic.js"
 import * as Zero from "../src/index.js"
 
@@ -105,15 +105,19 @@ function createKanbanTree(engine: "classic" | "zero", cardsPerColumn: number): C
 
 describe("Classic vs Zero - Flat Hierarchy", () => {
   for (const nodeCount of [100, 500, 1000]) {
-    bench(`Classic: ${nodeCount} nodes - create + layout`, () => {
+    test(`Classic: ${nodeCount} nodes - create + layout`, async ({ bench }) => {
+  await bench(`Classic: ${nodeCount} nodes - create + layout`, () => {
       const tree = createFlatTree("classic", nodeCount)
       tree.calculateLayout(1000, 1000, Classic.DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench(`Zero: ${nodeCount} nodes - create + layout`, () => {
+    test(`Zero: ${nodeCount} nodes - create + layout`, async ({ bench }) => {
+  await bench(`Zero: ${nodeCount} nodes - create + layout`, () => {
       const tree = createFlatTree("zero", nodeCount)
       tree.calculateLayout(1000, 1000, Zero.DIRECTION_LTR)
-    })
+    }).run()
+})
   }
 })
 
@@ -123,15 +127,19 @@ describe("Classic vs Zero - Flat Hierarchy", () => {
 
 describe("Classic vs Zero - Deep Hierarchy", () => {
   for (const depth of [20, 50, 100]) {
-    bench(`Classic: ${depth} levels deep - create + layout`, () => {
+    test(`Classic: ${depth} levels deep - create + layout`, async ({ bench }) => {
+  await bench(`Classic: ${depth} levels deep - create + layout`, () => {
       const tree = createDeepTree("classic", depth)
       tree.calculateLayout(1000, 1000, Classic.DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench(`Zero: ${depth} levels deep - create + layout`, () => {
+    test(`Zero: ${depth} levels deep - create + layout`, async ({ bench }) => {
+  await bench(`Zero: ${depth} levels deep - create + layout`, () => {
       const tree = createDeepTree("zero", depth)
       tree.calculateLayout(1000, 1000, Zero.DIRECTION_LTR)
-    })
+    }).run()
+})
   }
 })
 
@@ -143,15 +151,19 @@ describe("Classic vs Zero - Kanban TUI", () => {
   for (const cardsPerCol of [10, 50, 100]) {
     const totalNodes = 3 + 3 * (1 + cardsPerCol)
 
-    bench(`Classic: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
+    test(`Classic: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, async ({ bench }) => {
+  await bench(`Classic: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
       const tree = createKanbanTree("classic", cardsPerCol)
       tree.calculateLayout(120, 40, Classic.DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench(`Zero: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
+    test(`Zero: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, async ({ bench }) => {
+  await bench(`Zero: Kanban 3×${cardsPerCol} (~${totalNodes} nodes)`, () => {
       const tree = createKanbanTree("zero", cardsPerCol)
       tree.calculateLayout(120, 40, Zero.DIRECTION_LTR)
-    })
+    }).run()
+})
   }
 })
 
@@ -168,15 +180,19 @@ describe("Classic vs Zero - Layout Only (no allocation)", () => {
     zeroTree = createKanbanTree("zero", 50) as unknown as Zero.Node
   })
 
-  bench("Classic: Kanban 3×50 - layout only", () => {
+  test("Classic: Kanban 3×50 - layout only", async ({ bench }) => {
+  await bench("Classic: Kanban 3×50 - layout only", () => {
     classicTree.markDirty()
     classicTree.calculateLayout(120, 40, Classic.DIRECTION_LTR)
-  })
+  }).run()
+})
 
-  bench("Zero: Kanban 3×50 - layout only", () => {
+  test("Zero: Kanban 3×50 - layout only", async ({ bench }) => {
+  await bench("Zero: Kanban 3×50 - layout only", () => {
     zeroTree.markDirty()
     zeroTree.calculateLayout(120, 40, Zero.DIRECTION_LTR)
-  })
+  }).run()
+})
 })
 
 // ============================================================================
@@ -200,15 +216,19 @@ describe("Classic vs Zero - Incremental Update", () => {
     zeroTree.calculateLayout(120, 40, Zero.DIRECTION_LTR)
   })
 
-  bench("Classic: Single leaf dirty - relayout", () => {
+  test("Classic: Single leaf dirty - relayout", async ({ bench }) => {
+  await bench("Classic: Single leaf dirty - relayout", () => {
     classicLeaf.markDirty()
     classicTree.calculateLayout(120, 40, Classic.DIRECTION_LTR)
-  })
+  }).run()
+})
 
-  bench("Zero: Single leaf dirty - relayout", () => {
+  test("Zero: Single leaf dirty - relayout", async ({ bench }) => {
+  await bench("Zero: Single leaf dirty - relayout", () => {
     zeroLeaf.markDirty()
     zeroTree.calculateLayout(120, 40, Zero.DIRECTION_LTR)
-  })
+  }).run()
+})
 })
 
 // ============================================================================
@@ -260,14 +280,18 @@ describe("Classic vs Zero - Large Scale TUI", () => {
   }
 
   for (const nodeCount of [500, 1000, 1500, 2000]) {
-    bench(`Classic: Large TUI ~${nodeCount} nodes`, () => {
+    test(`Classic: Large TUI ~${nodeCount} nodes`, async ({ bench }) => {
+  await bench(`Classic: Large TUI ~${nodeCount} nodes`, () => {
       const tree = createLargeTUI("classic", nodeCount)
       tree.calculateLayout(250, 120, Classic.DIRECTION_LTR)
-    })
+    }).run()
+})
 
-    bench(`Zero: Large TUI ~${nodeCount} nodes`, () => {
+    test(`Zero: Large TUI ~${nodeCount} nodes`, async ({ bench }) => {
+  await bench(`Zero: Large TUI ~${nodeCount} nodes`, () => {
       const tree = createLargeTUI("zero", nodeCount)
       tree.calculateLayout(250, 120, Zero.DIRECTION_LTR)
-    })
+    }).run()
+})
   }
 })

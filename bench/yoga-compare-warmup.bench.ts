@@ -7,7 +7,7 @@
  * Run: bun bench bench/yoga-compare-warmup.bench.ts
  */
 
-import { bench, describe, beforeAll } from "vitest"
+import { test, describe, beforeAll } from "vitest"
 import * as Flexily from "../src/index.js"
 import initYoga, { type Yoga } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
@@ -135,24 +135,20 @@ const benchOptions = {
 
 describe("Flexily vs Yoga - Flat (warmed up)", () => {
   for (const nodeCount of [100, 500, 1000, 2000, 5000]) {
-    bench(
-      `Flexily: ${nodeCount} nodes`,
-      () => {
+    test(`Flexily: ${nodeCount} nodes`, async ({ bench }) => {
+  await bench(`Flexily: ${nodeCount} nodes`, () => {
         const tree = flexilyFlatTree(nodeCount)
         tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
-      },
-      benchOptions,
-    )
+      }, benchOptions).run()
+})
 
-    bench(
-      `Yoga: ${nodeCount} nodes`,
-      () => {
+    test(`Yoga: ${nodeCount} nodes`, async ({ bench }) => {
+  await bench(`Yoga: ${nodeCount} nodes`, () => {
         const tree = yogaFlatTree(nodeCount)
         tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
         tree.freeRecursive()
-      },
-      benchOptions,
-    )
+      }, benchOptions).run()
+})
   }
 })
 
@@ -162,23 +158,19 @@ describe("Flexily vs Yoga - Flat (warmed up)", () => {
 
 describe("Flexily vs Yoga - Deep (warmed up)", () => {
   for (const depth of [1, 2, 5, 10, 15, 20, 50, 100]) {
-    bench(
-      `Flexily: ${depth} levels`,
-      () => {
+    test(`Flexily: ${depth} levels`, async ({ bench }) => {
+  await bench(`Flexily: ${depth} levels`, () => {
         const tree = flexilyDeepTree(depth)
         tree.calculateLayout(1000, 1000, Flexily.DIRECTION_LTR)
-      },
-      benchOptions,
-    )
+      }, benchOptions).run()
+})
 
-    bench(
-      `Yoga: ${depth} levels`,
-      () => {
+    test(`Yoga: ${depth} levels`, async ({ bench }) => {
+  await bench(`Yoga: ${depth} levels`, () => {
         const tree = yogaDeepTree(depth)
         tree.calculateLayout(1000, 1000, yoga.DIRECTION_LTR)
         tree.freeRecursive()
-      },
-      benchOptions,
-    )
+      }, benchOptions).run()
+})
   }
 })

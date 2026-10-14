@@ -5,7 +5,7 @@
  * Run: bun bench vendor/flexily/bench/features.bench.ts
  */
 
-import { bench, describe, beforeAll } from "vitest"
+import { test, describe, beforeAll } from "vitest"
 import { Node } from "../src/index.js"
 import initYoga, { type Yoga, type Node as YogaNode } from "yoga-wasm-web"
 import { readFileSync } from "node:fs"
@@ -31,9 +31,8 @@ const N = 100 // items per test
 // ============================================================================
 
 describe("Feature: FlexGrow", () => {
-  bench(
-    "flexily - flexGrow distribution",
-    () => {
+  test("flexily - flexGrow distribution", async ({ bench }) => {
+  await bench("flexily - flexGrow distribution", () => {
       const root = Node.create()
       root.setWidth(1000)
       root.setHeight(100)
@@ -48,13 +47,11 @@ describe("Feature: FlexGrow", () => {
 
       root.calculateLayout(1000, 100)
       root.free()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 
-  bench(
-    "yoga - flexGrow distribution",
-    () => {
+  test("yoga - flexGrow distribution", async ({ bench }) => {
+  await bench("yoga - flexGrow distribution", () => {
       const root = yoga.Node.create()
       root.setWidth(1000)
       root.setHeight(100)
@@ -69,9 +66,8 @@ describe("Feature: FlexGrow", () => {
 
       root.calculateLayout(1000, 100)
       root.freeRecursive()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 })
 
 // ============================================================================
@@ -79,9 +75,8 @@ describe("Feature: FlexGrow", () => {
 // ============================================================================
 
 describe("Feature: FlexShrink", () => {
-  bench(
-    "flexily - flexShrink overflow",
-    () => {
+  test("flexily - flexShrink overflow", async ({ bench }) => {
+  await bench("flexily - flexShrink overflow", () => {
       const root = Node.create()
       root.setWidth(500) // Container smaller than content
       root.setHeight(100)
@@ -97,13 +92,11 @@ describe("Feature: FlexShrink", () => {
 
       root.calculateLayout(500, 100)
       root.free()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 
-  bench(
-    "yoga - flexShrink overflow",
-    () => {
+  test("yoga - flexShrink overflow", async ({ bench }) => {
+  await bench("yoga - flexShrink overflow", () => {
       const root = yoga.Node.create()
       root.setWidth(500)
       root.setHeight(100)
@@ -119,9 +112,8 @@ describe("Feature: FlexShrink", () => {
 
       root.calculateLayout(500, 100)
       root.freeRecursive()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 })
 
 // ============================================================================
@@ -129,9 +121,8 @@ describe("Feature: FlexShrink", () => {
 // ============================================================================
 
 describe("Feature: FlexWrap", () => {
-  bench(
-    "flexily - wrap with many items",
-    () => {
+  test("flexily - wrap with many items", async ({ bench }) => {
+  await bench("flexily - wrap with many items", () => {
       const root = Node.create()
       root.setWidth(200)
       root.setFlexDirection(C.FLEX_DIRECTION_ROW)
@@ -146,13 +137,11 @@ describe("Feature: FlexWrap", () => {
 
       root.calculateLayout(200, undefined)
       root.free()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 
-  bench(
-    "yoga - wrap with many items",
-    () => {
+  test("yoga - wrap with many items", async ({ bench }) => {
+  await bench("yoga - wrap with many items", () => {
       const root = yoga.Node.create()
       root.setWidth(200)
       root.setFlexDirection(yoga.FLEX_DIRECTION_ROW)
@@ -167,9 +156,8 @@ describe("Feature: FlexWrap", () => {
 
       root.calculateLayout(200, undefined)
       root.freeRecursive()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 })
 
 // ============================================================================
@@ -177,9 +165,8 @@ describe("Feature: FlexWrap", () => {
 // ============================================================================
 
 describe("Feature: Gap", () => {
-  bench(
-    "flexily - gap between items",
-    () => {
+  test("flexily - gap between items", async ({ bench }) => {
+  await bench("flexily - gap between items", () => {
       const root = Node.create()
       root.setWidth(1000)
       root.setHeight(100)
@@ -195,13 +182,11 @@ describe("Feature: Gap", () => {
 
       root.calculateLayout(1000, 100)
       root.free()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 
-  bench(
-    "yoga - gap between items",
-    () => {
+  test("yoga - gap between items", async ({ bench }) => {
+  await bench("yoga - gap between items", () => {
       const root = yoga.Node.create()
       root.setWidth(1000)
       root.setHeight(100)
@@ -217,9 +202,8 @@ describe("Feature: Gap", () => {
 
       root.calculateLayout(1000, 100)
       root.freeRecursive()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 })
 
 // ============================================================================
@@ -227,9 +211,8 @@ describe("Feature: Gap", () => {
 // ============================================================================
 
 describe("Feature: AbsolutePositioning", () => {
-  bench(
-    "flexily - absolute children",
-    () => {
+  test("flexily - absolute children", async ({ bench }) => {
+  await bench("flexily - absolute children", () => {
       const root = Node.create()
       root.setWidth(500)
       root.setHeight(500)
@@ -246,13 +229,11 @@ describe("Feature: AbsolutePositioning", () => {
 
       root.calculateLayout(500, 500)
       root.free()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 
-  bench(
-    "yoga - absolute children",
-    () => {
+  test("yoga - absolute children", async ({ bench }) => {
+  await bench("yoga - absolute children", () => {
       const root = yoga.Node.create()
       root.setWidth(500)
       root.setHeight(500)
@@ -269,9 +250,8 @@ describe("Feature: AbsolutePositioning", () => {
 
       root.calculateLayout(500, 500)
       root.freeRecursive()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 })
 
 // ============================================================================
@@ -279,9 +259,8 @@ describe("Feature: AbsolutePositioning", () => {
 // ============================================================================
 
 describe("Feature: NestedLayouts", () => {
-  bench(
-    "flexily - deep nesting (10 levels)",
-    () => {
+  test("flexily - deep nesting (10 levels)", async ({ bench }) => {
+  await bench("flexily - deep nesting (10 levels)", () => {
       const root = Node.create()
       root.setWidth(500)
       root.setHeight(500)
@@ -306,13 +285,11 @@ describe("Feature: NestedLayouts", () => {
 
       root.calculateLayout(500, 500)
       root.free()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 
-  bench(
-    "yoga - deep nesting (10 levels)",
-    () => {
+  test("yoga - deep nesting (10 levels)", async ({ bench }) => {
+  await bench("yoga - deep nesting (10 levels)", () => {
       const root = yoga.Node.create()
       root.setWidth(500)
       root.setHeight(500)
@@ -336,9 +313,8 @@ describe("Feature: NestedLayouts", () => {
 
       root.calculateLayout(500, 500)
       root.freeRecursive()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 })
 
 // ============================================================================
@@ -346,9 +322,8 @@ describe("Feature: NestedLayouts", () => {
 // ============================================================================
 
 describe("Feature: PercentValues", () => {
-  bench(
-    "flexily - percent dimensions",
-    () => {
+  test("flexily - percent dimensions", async ({ bench }) => {
+  await bench("flexily - percent dimensions", () => {
       const root = Node.create()
       root.setWidth(1000)
       root.setHeight(500)
@@ -364,13 +339,11 @@ describe("Feature: PercentValues", () => {
 
       root.calculateLayout(1000, 500)
       root.free()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 
-  bench(
-    "yoga - percent dimensions",
-    () => {
+  test("yoga - percent dimensions", async ({ bench }) => {
+  await bench("yoga - percent dimensions", () => {
       const root = yoga.Node.create()
       root.setWidth(1000)
       root.setHeight(500)
@@ -386,9 +359,8 @@ describe("Feature: PercentValues", () => {
 
       root.calculateLayout(1000, 500)
       root.freeRecursive()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 })
 
 // ============================================================================
@@ -396,9 +368,8 @@ describe("Feature: PercentValues", () => {
 // ============================================================================
 
 describe("Feature: AlignContent", () => {
-  bench(
-    "flexily - alignContent space-between",
-    () => {
+  test("flexily - alignContent space-between", async ({ bench }) => {
+  await bench("flexily - alignContent space-between", () => {
       const root = Node.create()
       root.setWidth(200)
       root.setHeight(400)
@@ -415,13 +386,11 @@ describe("Feature: AlignContent", () => {
 
       root.calculateLayout(200, 400)
       root.free()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 
-  bench(
-    "yoga - alignContent space-between",
-    () => {
+  test("yoga - alignContent space-between", async ({ bench }) => {
+  await bench("yoga - alignContent space-between", () => {
       const root = yoga.Node.create()
       root.setWidth(200)
       root.setHeight(400)
@@ -438,9 +407,8 @@ describe("Feature: AlignContent", () => {
 
       root.calculateLayout(200, 400)
       root.freeRecursive()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 })
 
 // ============================================================================
@@ -448,9 +416,8 @@ describe("Feature: AlignContent", () => {
 // ============================================================================
 
 describe("Feature: MeasureFunc", () => {
-  bench(
-    "flexily - measure functions",
-    () => {
+  test("flexily - measure functions", async ({ bench }) => {
+  await bench("flexily - measure functions", () => {
       const root = Node.create()
       root.setWidth(500)
       root.setFlexDirection(C.FLEX_DIRECTION_COLUMN)
@@ -463,13 +430,11 @@ describe("Feature: MeasureFunc", () => {
 
       root.calculateLayout(500, undefined)
       root.free()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 
-  bench(
-    "yoga - measure functions",
-    () => {
+  test("yoga - measure functions", async ({ bench }) => {
+  await bench("yoga - measure functions", () => {
       const root = yoga.Node.create()
       root.setWidth(500)
       root.setFlexDirection(yoga.FLEX_DIRECTION_COLUMN)
@@ -482,7 +447,6 @@ describe("Feature: MeasureFunc", () => {
 
       root.calculateLayout(500, undefined)
       root.freeRecursive()
-    },
-    BENCH_OPTS,
-  )
+    }, BENCH_OPTS).run()
+})
 })
