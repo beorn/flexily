@@ -142,10 +142,12 @@ const mutations: Mutation[] = [
     name: "skip-layoutValid-set",
     file: "src/layout-zero.ts",
     find: `  flex.lastDir = direction
+  flex.lastUnknownWidths = unknownBaseWidthCount() - unknownWidthsBefore
   flex.layoutValid = true
   _t?.layoutExit(_tn, layout.width, layout.height)
 }`,
     replace: `  flex.lastDir = direction
+  flex.lastUnknownWidths = unknownBaseWidthCount() - unknownWidthsBefore
   // MUTATION: don't mark layout as valid — forces recompute every time
   // flex.layoutValid = true
   _t?.layoutExit(_tn, layout.width, layout.height)
