@@ -666,7 +666,7 @@ export class Node {
 
     Node.measureCalls++
 
-    // Check 4-entry cache (most recent first)
+    // Check 4-entry cache (most recently accessed first); promote hits without allocation.
     // Returns stable _measureResult object to avoid allocation on cache hit
     const m0 = this._m0
     if (m0 && m0.w === w && m0.wm === wm && m0.h === h && m0.hm === hm) {
@@ -679,6 +679,8 @@ export class Node {
     const m1 = this._m1
     if (m1 && m1.w === w && m1.wm === wm && m1.h === h && m1.hm === hm) {
       Node.measureCacheHits++
+      this._m1 = m0
+      this._m0 = m1
       this._measureResult.width = m1.rw
       this._measureResult.height = m1.rh
       getTrace()?.measureCacheHit(0, w, h, m1.rw, m1.rh)
@@ -687,6 +689,9 @@ export class Node {
     const m2 = this._m2
     if (m2 && m2.w === w && m2.wm === wm && m2.h === h && m2.hm === hm) {
       Node.measureCacheHits++
+      this._m2 = m1
+      this._m1 = m0
+      this._m0 = m2
       this._measureResult.width = m2.rw
       this._measureResult.height = m2.rh
       getTrace()?.measureCacheHit(0, w, h, m2.rw, m2.rh)
@@ -695,6 +700,10 @@ export class Node {
     const m3 = this._m3
     if (m3 && m3.w === w && m3.wm === wm && m3.h === h && m3.hm === hm) {
       Node.measureCacheHits++
+      this._m3 = m2
+      this._m2 = m1
+      this._m1 = m0
+      this._m0 = m3
       this._measureResult.width = m3.rw
       this._measureResult.height = m3.rh
       getTrace()?.measureCacheHit(0, w, h, m3.rw, m3.rh)

@@ -19,9 +19,48 @@ import {
   FLEX_DIRECTION_COLUMN,
   FLEX_DIRECTION_ROW,
   GUTTER_ALL,
+  MEASURE_MODE_EXACTLY,
   Node,
   WRAP_WRAP,
 } from "../src/index.js"
+
+describe("Measure cache recency", () => {
+  /**
+   * @failure A frequently used constraint is evicted, repeating text measurement.
+   * @level l0
+   * @consumer Node.cachedMeasure callers in layout and intrinsic sizing.
+   * Geometry alone stays correct under FIFO, so assert callback work as well.
+   */
+  it("retains hot measurements without growing the cache and clears them when dirty", () => {
+    const node = Node.create()
+    let calls = 0
+    node.setMeasureFunc((width, _widthMode, height) => {
+      calls++
+      return { width, height }
+    })
+    const measure = (width: number) => {
+      const result = node.cachedMeasure(width, MEASURE_MODE_EXACTLY, 10, MEASURE_MODE_EXACTLY)
+      expect(result).toEqual({ width, height: 10 })
+      return result
+    }
+    try {
+      const result = measure(1)
+      for (const width of [2, 3, 4]) measure(width)
+      for (const width of [3, 2, 1]) measure(width)
+      measure(5)
+      expect(measure(1)).toBe(result)
+      expect(calls).toBe(5)
+
+      measure(4)
+      expect(calls).toBe(6)
+      node.markDirty()
+      expect(measure(1)).toBe(result)
+      expect(calls).toBe(7)
+    } finally {
+      node.free()
+    }
+  })
+})
 
 // ============================================================================
 // Helper: Get full layout tree for comparison
