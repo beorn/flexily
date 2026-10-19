@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Percentage padding and margins resolve against the containing block's
+  width on every edge.** A definite-width box previously resolved its vertical
+  padding and margins against its own width, so the same `25%` produced 5 per
+  side at width 20 and 10 per side at width 40 inside one 40-column parent.
+  CSS2 §8.4 makes all four edges a share of the containing-block width, and the
+  layout phase's own comment already said so. `getComputedPadding` and
+  `getComputedMargin` now report that same basis, so measurement and layout
+  agree after a layout pass (#30346).
+
 ### Added
 
 - **`Node.resolveIntrinsicSpacing(value, queryInlineSize)`.** Resolves a parsed
