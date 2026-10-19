@@ -5,7 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [Unreleased]
+
+### Added
+
+- **`Node.resolveIntrinsicSpacing(value, queryInlineSize)`.** Resolves a parsed
+  spacing `Value` for intrinsic (fit-content / snug-content) measurement by
+  applying CSS Sizing 3's cyclic-percentage rule: percentage parts contribute
+  zero, `ch` already carries the adapter's scale, and container-query parts
+  resolve against the given inline size (NaN, and no frozen size, resolve to
+  zero). Never mutates the node. Added for the Silvery measure phase, which
+  previously refused a string padding or gap before layout.
 
 ## [0.8.4] - 2026-10-19
 

@@ -1469,6 +1469,17 @@ export class Node {
    * @param edge - EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, or EDGE_BOTTOM
    * @returns Padding value in points
    */
+  /**
+   * Resolve a parsed spacing Value for intrinsic (fit-content / snug-content)
+   * measurement: CSS Sizing 3 cyclic-percentage rule, so percentage parts
+   * contribute zero, ch already carries the adapter's scale, and cq parts
+   * resolve against `queryInlineSize` (NaN resolves to zero, the engine's own
+   * convention when no container-query size is frozen). Never mutates the node.
+   */
+  resolveIntrinsicSpacing(value: Value, queryInlineSize: number): number {
+    return resolveValue(value, Number.NaN, queryInlineSize)
+  }
+
   getComputedPadding(edge: number): number {
     edge = getEdgeIndex(edge)
     return resolveEdgeValue(
