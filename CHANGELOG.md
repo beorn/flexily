@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-10-19
+
+### Added
+
+- **Position offsets accept parsed lengths and container-query units.** The
+  public setter is now `Node.setPosition(edge, value: number | Value)`. Plain
+  numbers behave exactly as before — `NaN` still clears the offset, with the
+  same same-value guard and dirty marking. A parsed `Value` is checked against
+  the edge's axis with the same `assertEdgeLength` used by padding and margin,
+  then resolved with the frozen container-query inline size on the absolute,
+  relative and static paths. `left="max(1ch, 25%)"` and `10cqi` offsets now
+  lay out like their numeric equivalents (`26238`).
+
 ## [0.8.3] - 2026-10-02
 
 ### Fixed
