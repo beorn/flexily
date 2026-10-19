@@ -61,3 +61,33 @@ it("keeps the laid-out height at content plus the containing-block percentage", 
   expect(child.layout.height).toBe(21)
   root.freeRecursive()
 })
+
+it("re-resolves the percentage when the containing block resizes", () => {
+  const root = Node.create()
+  root.setWidth(40)
+  root.setFlexDirection(FLEX_DIRECTION_COLUMN)
+
+  const child = Node.create()
+  child.setWidth(20)
+  child.setPaddingPercent(EDGE_TOP, 25)
+  child.setPaddingPercent(EDGE_BOTTOM, 25)
+
+  const content = Node.create()
+  content.setHeight(1)
+
+  child.insertChild(content, 0)
+  root.insertChild(child, 0)
+
+  root.calculateLayout(40, NaN, DIRECTION_LTR)
+  expect(child.getComputedPadding(EDGE_TOP)).toBe(10)
+  expect(child.layout.height).toBe(21)
+
+  // Same tree, wider containing block: 25% of 80 is 20 per side, and the
+  // computed padding must follow the new layout rather than replay the old one.
+  root.setWidth(80)
+  root.calculateLayout(80, NaN, DIRECTION_LTR)
+  expect(child.getComputedPadding(EDGE_TOP)).toBe(20)
+  expect(child.layout.height).toBe(41)
+
+  root.freeRecursive()
+})
