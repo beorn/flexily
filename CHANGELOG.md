@@ -20,6 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   relative and static paths. `left="max(1ch, 25%)"` and `10cqi` offsets now
   lay out like their numeric equivalents (`26238`).
 
+### Changed
+
+- **The optional `loggily` peer range is now `^0.13.0`**, and the development
+  dependency moved to `0.13.0`. The source sibling this release builds against
+  (`a30a6d5`) is held only by loggily 0.13.0, which is attested and tagged at
+  `55bdc5a`; the previous `^0.10.0 || ^0.11.0` claimed compatibility with
+  versions that do not carry that commit. `loggily` stays optional and is
+  reached through a dynamic `createLogger` import, so nothing changes at
+  runtime — a consumer on an older loggily sees a peer warning, not an error
+  (`26238`).
+
 ## [0.8.3] - 2026-10-02
 
 ### Fixed
