@@ -1,6 +1,14 @@
 /**
  * #26238 — position offsets accept the parsed length grammar and resolve with
  * the same container-query context as dimensions and spacing.
+ *
+ * @failure  A position offset that takes a length string resolves against the
+ *           wrong container-query size, ignores the axis rule, or stops
+ *           clearing on NaN, so absolute and relative placement drifts from
+ *           its numeric equivalent instead of failing loudly.
+ * @level    l0 (flexily engine, no renderer)
+ * @consumer silvery Box positioning through the flexily adapter (#26238)
+ * @testonly none
  */
 import { describe, expect, it } from "vitest"
 import {
