@@ -2079,7 +2079,14 @@ export class Node {
    * @param edge - EDGE_LEFT, EDGE_TOP, EDGE_RIGHT, EDGE_BOTTOM, EDGE_HORIZONTAL, EDGE_VERTICAL, or EDGE_ALL
    * @param value - Position offset in points
    */
-  setPosition(edge: number, value: number): void {
+  setPosition(edge: number, value: number | Value): void {
+    if (typeof value !== "number") {
+      assertEdgeLength(value, edge, "position")
+      if (edgeValueMatches(this._style.position, edge, value, C.UNIT_POINT)) return
+      setEdgeValue(this._style.position, edge, value, C.UNIT_POINT)
+      this.markDirty()
+      return
+    }
     // NaN means "auto" (unset) in Yoga API
     if (Number.isNaN(value)) {
       if (edgeValueMatches(this._style.position, edge, 0, C.UNIT_UNDEFINED)) {

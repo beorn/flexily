@@ -161,12 +161,18 @@ function commitsMainAxis(child: Node, isRow: boolean, parentMainIsAuto: boolean,
 
 // Relative insets use the containing box, including when available is an
 // allocated size or NaN. Keep precedence identical at parent and child.
-function relativeInset(node: Node, horizontal: boolean, containing: number, direction: number): number {
+function relativeInset(
+  node: Node,
+  horizontal: boolean,
+  containing: number,
+  direction: number,
+  queryInlineSize: number,
+): number {
   if (node.style.positionType !== C.POSITION_TYPE_RELATIVE) return 0
   const leading = horizontal ? resolvePositionEdge(node.style.position, 0, direction) : node.style.position[1]
   const trailing = horizontal ? resolvePositionEdge(node.style.position, 2, direction) : node.style.position[3]
-  if (leading.unit !== C.UNIT_UNDEFINED) return resolveValue(leading, containing)
-  if (trailing.unit !== C.UNIT_UNDEFINED) return -resolveValue(trailing, containing)
+  if (leading.unit !== C.UNIT_UNDEFINED) return resolveValue(leading, containing, queryInlineSize)
+  if (trailing.unit !== C.UNIT_UNDEFINED) return -resolveValue(trailing, containing, queryInlineSize)
   return 0
 }
 
@@ -591,8 +597,8 @@ function layoutNode(
 
   // Compute position offsets early (needed for children's absolute position calculation)
   // This ensures children's absolute positions include parent's position offset
-  const parentPosOffsetX = relativeInset(node, true, containingWidth, direction)
-  const parentPosOffsetY = relativeInset(node, false, containingHeight, direction)
+  const parentPosOffsetX = relativeInset(node, true, containingWidth, direction, ownQueryInlineSize)
+  const parentPosOffsetY = relativeInset(node, false, containingHeight, direction, ownQueryInlineSize)
 
   // =========================================================================
   // PHASE 4: Handle Leaf Nodes (nodes without children)
@@ -2205,8 +2211,8 @@ function layoutNode(
       // Compute position offsets for RELATIVE positioned children
       // CSS spec: position:static ignores insets; only position:relative applies them.
       // These must be included in the absolute position BEFORE rounding (Yoga-compatible)
-      const posOffsetX = relativeInset(child, true, contentWidth, direction)
-      const posOffsetY = relativeInset(child, false, contentHeight, direction)
+      const posOffsetX = relativeInset(child, true, contentWidth, direction, childQueryInlineSize)
+      const posOffsetY = relativeInset(child, false, contentHeight, direction, childQueryInlineSize)
 
       // Compute ABSOLUTE float positions for edge rounding (including position offsets)
       // absX/absY are the parent's absolute position from document root
@@ -2981,8 +2987,8 @@ function layoutNode(
         const cAbsX = isContainer ? child.flex.passedAbsX : absX + innerLeft + savedLeft - cMarginL
         const cAbsY = isContainer ? child.flex.passedAbsY : absY + innerTop + savedTop - cMarginT
         const crossAbsStart = isRow
-          ? borderBoxStart(cAbsY, cMarginT, relativeInset(child, false, contentHeight, direction))
-          : borderBoxStart(cAbsX, cMarginL, relativeInset(child, true, contentWidth, direction))
+          ? borderBoxStart(cAbsY, cMarginT, relativeInset(child, false, contentHeight, direction, childQueryInlineSize))
+          : borderBoxStart(cAbsX, cMarginL, relativeInset(child, true, contentWidth, direction, childQueryInlineSize))
         const edgeBasedCrossSize = Math.round(crossAbsStart + stretchedCross) - Math.round(crossAbsStart)
         const currentCross = isRow ? child.layout.height : child.layout.width
         if (edgeBasedCrossSize <= currentCross) continue
@@ -3297,10 +3303,10 @@ function layoutNode(
     const hasBottom = bottomPos.unit !== C.UNIT_UNDEFINED
 
     // Yoga resolves percentage position offsets against the content box dimensions
-    const leftOffset = resolveValue(leftPos, absContentBoxW)
-    const topOffset = resolveValue(topPos, absContentBoxH)
-    const rightOffset = resolveValue(rightPos, absContentBoxW)
-    const bottomOffset = resolveValue(bottomPos, absContentBoxH)
+    const leftOffset = resolveValue(leftPos, absContentBoxW, childQueryInlineSize)
+    const topOffset = resolveValue(topPos, absContentBoxH, childQueryInlineSize)
+    const rightOffset = resolveValue(rightPos, absContentBoxW, childQueryInlineSize)
+    const bottomOffset = resolveValue(bottomPos, absContentBoxH, childQueryInlineSize)
 
     // Calculate available size for absolute child using padding box
     const contentW = absPaddingBoxW
