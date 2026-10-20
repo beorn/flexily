@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
+  ALIGN_AUTO,
   ALIGN_BASELINE,
   ALIGN_CENTER,
   ALIGN_FLEX_END,
@@ -2581,6 +2582,47 @@ describe("Flexily Layout Engine", () => {
         expect(column.getComputedWidth()).toBe(36)
         expect(column.getComputedHeight()).toBe(2)
         expect(text.getComputedHeight()).toBe(2)
+        root.freeRecursive()
+      })
+
+      // Classic leaves an auto-cross stretch and its percentage child at zero
+      // height (#26423): the parent's cross size is still indefinite when the
+      // child is laid out, and nothing re-stretches it once the sibling fixes
+      // that size. Classic is debugging-only, so @chief ruled 2026-10-20
+      // (option b) to pin the divergence rather than make production's engine
+      // converge here.
+      ;(_engine === "classic" ? it.fails : it)("stretches an auto-cross container and its percentage child", () => {
+        const make = () => EngineNode.create()
+        const root = make()
+        root.setWidth(72)
+        root.setFlexDirection(FLEX_DIRECTION_ROW)
+        root.setAlignItems(ALIGN_STRETCH)
+
+        const child = make()
+        child.setFlexDirection(FLEX_DIRECTION_COLUMN)
+        child.setAlignItems(ALIGN_AUTO)
+
+        const text = make()
+        text.setHeightPercent(100)
+        text.setMeasureFunc((width, widthMode, height, heightMode) => ({
+          width: heightMode !== MEASURE_MODE_UNDEFINED && height >= 100 ? 10 : 50,
+          height: 20,
+        }))
+        insert(child, text)
+
+        const sibling = make()
+        sibling.setWidth(20)
+        sibling.setHeight(100)
+
+        insert(root, child, 0)
+        insert(root, sibling, 1)
+        root.calculateLayout(72, NaN, DIRECTION_LTR)
+
+        expect(root.getComputedHeight()).toBe(100)
+        expect(child.getComputedWidth()).toBe(50)
+        expect(child.getComputedHeight()).toBe(100)
+        expect(text.getComputedWidth()).toBe(10)
+        expect(text.getComputedHeight()).toBe(100)
         root.freeRecursive()
       })
     })
