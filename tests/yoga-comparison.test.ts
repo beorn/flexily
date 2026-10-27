@@ -1731,6 +1731,111 @@ describe("Yoga Comparison: EdgeCases", () => {
     })
     expect(match).toBe(true)
   })
+
+  it("flexily#4: percent-width measured leaf in definite-height row stretches cross-axis to match Yoga", () => {
+    const wrap120 = (w: number, wm: number) => {
+      const textLen = 120
+      const avail = wm === 0 || !Number.isFinite(w) || w <= 0 ? textLen : w
+      return { width: Math.min(textLen, avail), height: Math.ceil(textLen / Math.max(1, avail)) }
+    }
+
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setWidth(80)
+    fRoot.setHeight(24)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+    const fChild = Flexily.Node.create(YOGA_OPTS)
+    fChild.setWidthPercent(50)
+    fChild.setMeasureFunc((w, wm) => wrap120(w, wm))
+    fRoot.insertChild(fChild, 0)
+    fRoot.calculateLayout(80, 24, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setWidth(80)
+    yRoot.setHeight(24)
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_ROW)
+    const yChild = yoga.Node.create()
+    yChild.setWidthPercent(50)
+    yChild.setMeasureFunc((w, wm) => wrap120(w, wm))
+    yRoot.insertChild(yChild, 0)
+    yRoot.calculateLayout(80, 24, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    expect(flexilyLayout).toEqual(yogaLayout)
+  })
+
+  it("flexily#4: percent-width measured leaf in flex-start row resolves percent before measuring", () => {
+    const wrap120 = (w: number, wm: number) => {
+      const textLen = 120
+      const avail = wm === 0 || !Number.isFinite(w) || w <= 0 ? textLen : w
+      return { width: Math.min(textLen, avail), height: Math.ceil(textLen / Math.max(1, avail)) }
+    }
+
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setWidth(80)
+    fRoot.setHeight(24)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+    fRoot.setAlignItems(Flexily.ALIGN_FLEX_START)
+    const fChild = Flexily.Node.create(YOGA_OPTS)
+    fChild.setWidthPercent(50)
+    fChild.setMeasureFunc((w, wm) => wrap120(w, wm))
+    fRoot.insertChild(fChild, 0)
+    fRoot.calculateLayout(80, 24, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setWidth(80)
+    yRoot.setHeight(24)
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_ROW)
+    yRoot.setAlignItems(yoga.ALIGN_FLEX_START)
+    const yChild = yoga.Node.create()
+    yChild.setWidthPercent(50)
+    yChild.setMeasureFunc((w, wm) => wrap120(w, wm))
+    yRoot.insertChild(yChild, 0)
+    yRoot.calculateLayout(80, 24, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    expect(flexilyLayout).toEqual(yogaLayout)
+  })
+
+  it("flexily#4: percent-width measured leaf with flexGrow in row re-measures at flex-grown width", () => {
+    const wrap120 = (w: number, wm: number) => {
+      const textLen = 120
+      const avail = wm === 0 || !Number.isFinite(w) || w <= 0 ? textLen : w
+      return { width: Math.min(textLen, avail), height: Math.ceil(textLen / Math.max(1, avail)) }
+    }
+
+    const fRoot = Flexily.Node.create(YOGA_OPTS)
+    fRoot.setWidth(100)
+    fRoot.setHeight(24)
+    fRoot.setFlexDirection(Flexily.FLEX_DIRECTION_ROW)
+    fRoot.setAlignItems(Flexily.ALIGN_FLEX_START)
+    const fChild = Flexily.Node.create(YOGA_OPTS)
+    fChild.setWidthPercent(30)
+    fChild.setFlexGrow(1)
+    fChild.setMeasureFunc((w, wm) => wrap120(w, wm))
+    fRoot.insertChild(fChild, 0)
+    fRoot.calculateLayout(100, 24, Flexily.DIRECTION_LTR)
+    const flexilyLayout = getFlexilyLayout(fRoot)
+
+    const yRoot = yoga.Node.create()
+    yRoot.setWidth(100)
+    yRoot.setHeight(24)
+    yRoot.setFlexDirection(yoga.FLEX_DIRECTION_ROW)
+    yRoot.setAlignItems(yoga.ALIGN_FLEX_START)
+    const yChild = yoga.Node.create()
+    yChild.setWidthPercent(30)
+    yChild.setFlexGrow(1)
+    yChild.setMeasureFunc((w, wm) => wrap120(w, wm))
+    yRoot.insertChild(yChild, 0)
+    yRoot.calculateLayout(100, 24, yoga.DIRECTION_LTR)
+    const yogaLayout = getYogaLayout(yRoot)
+    yRoot.freeRecursive()
+
+    expect(flexilyLayout).toEqual(yogaLayout)
+  })
 })
 
 // ============================================================================

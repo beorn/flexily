@@ -620,10 +620,11 @@ function layoutNode(
   if (node.hasMeasureFunc() && node.children.length === 0) {
     // For unconstrained dimensions (NaN), treat as auto-sizing.
     // Fit-content also auto-sizes on width (AT_MOST mode with available constraint).
-    const widthIsAuto = widthUsesContent(style.width, availableWidth) || Number.isNaN(nodeWidth)
-    const widthIsFitContent = isFitContentWidth
+    const widthIsAuto = !hasAllocatedWidth && (widthUsesContent(style.width, availableWidth) || Number.isNaN(nodeWidth))
+    const widthIsFitContent = !hasAllocatedWidth && isFitContentWidth
     const heightIsAuto =
-      style.height.unit === C.UNIT_AUTO || style.height.unit === C.UNIT_UNDEFINED || Number.isNaN(nodeHeight)
+      !hasAllocatedHeight &&
+      (style.height.unit === C.UNIT_AUTO || style.height.unit === C.UNIT_UNDEFINED || Number.isNaN(nodeHeight))
     const widthMode = widthIsAuto || widthIsFitContent ? C.MEASURE_MODE_AT_MOST : C.MEASURE_MODE_EXACTLY
     const heightMode = heightIsAuto ? C.MEASURE_MODE_UNDEFINED : C.MEASURE_MODE_EXACTLY
 
@@ -839,6 +840,10 @@ function layoutNode(
         // justify-content calculation).
         const crossMargin = isRow ? cflex.marginT + cflex.marginB : cflex.marginL + cflex.marginR
         const availCross = crossAxisSize - crossMargin
+        const childHasDefiniteCrossWidth = !isRow && !widthUsesContent(childStyle.width, crossAxisSize)
+        const resolvedChildCrossWidth = childHasDefiniteCrossWidth
+          ? resolveValue(childStyle.width, crossAxisSize, childQueryInlineSize)
+          : NaN
         // Measure function takes PHYSICAL (width, height), not logical (main, cross).
         // For row: main=width, cross=height. For column: main=height, cross=width.
         const wantMaxContent = childStyle.flexGrow > 0
@@ -848,9 +853,11 @@ function layoutNode(
             : Number.isNaN(mainAxisSize)
               ? Infinity
               : mainAxisSize
-          : Number.isNaN(availCross)
-            ? Infinity
-            : availCross
+          : childHasDefiniteCrossWidth
+            ? resolvedChildCrossWidth
+            : Number.isNaN(availCross)
+              ? Infinity
+              : availCross
         const mH = isRow
           ? Number.isNaN(availCross)
             ? Infinity
@@ -864,9 +871,11 @@ function layoutNode(
           ? wantMaxContent
             ? C.MEASURE_MODE_UNDEFINED
             : C.MEASURE_MODE_AT_MOST
-          : Number.isNaN(availCross)
-            ? C.MEASURE_MODE_UNDEFINED
-            : C.MEASURE_MODE_AT_MOST
+          : childHasDefiniteCrossWidth
+            ? C.MEASURE_MODE_EXACTLY
+            : Number.isNaN(availCross)
+              ? C.MEASURE_MODE_UNDEFINED
+              : C.MEASURE_MODE_AT_MOST
         const mHMode = isRow
           ? C.MEASURE_MODE_UNDEFINED
           : wantMaxContent
@@ -2157,12 +2166,12 @@ function layoutNode(
             ? isRow
               ? mainAxisSize - mainPos! // Remaining space after previous children
               : crossAxisSize - crossMargin
-            : childStyle.width.value
+            : resolveValue(childStyle.width, isRow ? mainAxisSize : crossAxisSize, childQueryInlineSize)
           const rawAvailH = heightAuto
             ? isRow
               ? crossAxisSize - crossMargin
               : mainAxisSize - mainPos! // Remaining space for COLUMN
-            : childStyle.height.value
+            : resolveValue(childStyle.height, isRow ? crossAxisSize : mainAxisSize, childQueryInlineSize)
           const availW = Number.isNaN(rawAvailW) ? Infinity : rawAvailW
           const availH = Number.isNaN(rawAvailH) ? Infinity : rawAvailH
 
@@ -2173,7 +2182,15 @@ function layoutNode(
           if (widthAuto) {
             childWidth = measured.width
           }
-          if (heightAuto) {
+          const rowCrossStretchedPercentLeaf =
+            isRow &&
+            !widthAuto &&
+            pctIndefinite(childStyle.width, NaN) &&
+            !Number.isNaN(childCrossSize) &&
+            alignment === C.ALIGN_STRETCH &&
+            crossDim.unit !== C.UNIT_FIT_CONTENT &&
+            crossDim.unit !== C.UNIT_SNUG_CONTENT
+          if (heightAuto && !rowCrossStretchedPercentLeaf) {
             childHeight = measured.height
           }
         }
@@ -2476,7 +2493,10 @@ function layoutNode(
           alignment === C.ALIGN_STRETCH &&
           (isRow || !pctIndefinite(crossDimForLayoutCall, NaN))) ||
         (hasCrossMinMax && !Number.isNaN(childCrossSize))
-      const allocatedMain = !hasMeasureLeaf && shouldOverrideMain ? edgeBasedMainSize : NaN
+      const allocatedMain =
+        (!hasMeasureLeaf || flexGrowHasDefiniteMainBudget || flexDistChanged) && shouldOverrideMain
+          ? edgeBasedMainSize
+          : NaN
       const crossAbsStart = isRow ? absChildTop : absChildLeft
       const crossExtent = isRow ? Math.max(childHeight, childMinH) : Math.max(childWidth, childMinW)
       const edgeBasedCrossSize = Math.round(crossAbsStart + crossExtent) - Math.round(crossAbsStart)

@@ -602,9 +602,11 @@ function layoutNode(
   if (node.hasMeasureFunc() && node.children.length === 0) {
     const measureFunc = node.measureFunc!
     // For unconstrained dimensions (NaN), treat as auto-sizing
-    const widthIsAuto = widthUsesContent(style.width, availableWidth) || Number.isNaN(nodeWidth)
+    const widthIsAuto =
+      Number.isNaN(usedWidth) && (widthUsesContent(style.width, availableWidth) || Number.isNaN(nodeWidth))
     const heightIsAuto =
-      style.height.unit === C.UNIT_AUTO || style.height.unit === C.UNIT_UNDEFINED || Number.isNaN(nodeHeight)
+      Number.isNaN(usedHeight) &&
+      (style.height.unit === C.UNIT_AUTO || style.height.unit === C.UNIT_UNDEFINED || Number.isNaN(nodeHeight))
     const widthMode = widthIsAuto ? C.MEASURE_MODE_AT_MOST : C.MEASURE_MODE_EXACTLY
     const heightMode = heightIsAuto ? C.MEASURE_MODE_UNDEFINED : C.MEASURE_MODE_EXACTLY
 
@@ -759,12 +761,15 @@ function layoutNode(
               ) +
               resolveEdgeValue(childStyle.margin, 2, style.flexDirection, contentWidth, direction, undefined, "margin")
           const availCross = crossAxisSize - crossMargin
-          const measured = child.measureFunc!(
-            mainAxisSize,
-            C.MEASURE_MODE_AT_MOST,
-            availCross,
-            C.MEASURE_MODE_UNDEFINED,
-          )
+          const childHasDefiniteCrossWidth = !isRow && !widthUsesContent(childStyle.width, crossAxisSize)
+          const measured = childHasDefiniteCrossWidth
+            ? child.measureFunc!(
+                resolveValue(childStyle.width, crossAxisSize),
+                C.MEASURE_MODE_EXACTLY,
+                Number.isNaN(mainAxisSize) ? Infinity : mainAxisSize,
+                Number.isNaN(mainAxisSize) ? C.MEASURE_MODE_UNDEFINED : C.MEASURE_MODE_AT_MOST,
+              )
+            : child.measureFunc!(mainAxisSize, C.MEASURE_MODE_AT_MOST, availCross, C.MEASURE_MODE_UNDEFINED)
           baseSize = isRow ? measured.width : measured.height
         } else if (child.children.length > 0) {
           // For auto-sized children WITH children but no measureFunc,
@@ -1411,12 +1416,12 @@ function layoutNode(
             ? isRow
               ? mainAxisSize - mainPos // Remaining space after previous children
               : crossAxisSize - crossMargin
-            : childStyle.width.value
+            : resolveValue(childStyle.width, isRow ? mainAxisSize : crossAxisSize)
           const rawAvailH = heightAuto
             ? isRow
               ? crossAxisSize - crossMargin
               : mainAxisSize - mainPos // Remaining space for COLUMN
-            : childStyle.height.value
+            : resolveValue(childStyle.height, isRow ? crossAxisSize : mainAxisSize)
           const availW = Number.isNaN(rawAvailW) ? Infinity : rawAvailW
           const availH = Number.isNaN(rawAvailH) ? Infinity : rawAvailH
 
@@ -1426,7 +1431,13 @@ function layoutNode(
           if (widthAuto) {
             childWidth = measured.width
           }
-          if (heightAuto) {
+          const rowCrossStretchedPercentLeaf =
+            isRow &&
+            !widthAuto &&
+            childStyle.width.unit === C.UNIT_PERCENT &&
+            !Number.isNaN(childCrossSize) &&
+            alignment === C.ALIGN_STRETCH
+          if (heightAuto && !rowCrossStretchedPercentLeaf) {
             childHeight = measured.height
           }
         }
@@ -1626,7 +1637,19 @@ function layoutNode(
       const childAbsX = absChildLeft - childMarginLeft
       const childAbsY = absChildTop - childMarginTop
       const unknownBaseWidthsBefore = unknownBaseWidthCount()
-      layoutNode(child, passWidthToChild, passHeightToChild, childLeft, childTop, childAbsX, childAbsY, direction)
+      const hasMeasureLeaf = child.hasMeasureFunc() && child.children.length === 0
+      const childUsedWidth = isRow && hasMeasureLeaf && hasFlexGrow && parentHasDefiniteMain ? edgeBasedMainSize : NaN
+      layoutNode(
+        child,
+        passWidthToChild,
+        passHeightToChild,
+        childLeft,
+        childTop,
+        childAbsX,
+        childAbsY,
+        direction,
+        childUsedWidth,
+      )
       // #26660: a row item whose layout sized a width percentage as content
       // lays out once more with the width it just took, so that percentage
       // resolves. The item's own width and position stay as they are.

@@ -3008,6 +3008,67 @@ describe("Flexily Layout Engine", () => {
       expect(firstCall.h).toBe(Infinity)
       expectLayout(text, { width: 25, height: 2 })
     })
+
+    it("should resolve percent width and definite cross-axis width before measuring in row and column (flexily#4)", () => {
+      // 1. Row with alignItems: flex-start and widthPercent(50) on 80-wide container -> measures at 40 (not raw 50)
+      const rowWidths: number[] = []
+      const rowRoot = Node.create()
+      rowRoot.setWidth(80)
+      rowRoot.setHeight(24)
+      rowRoot.setFlexDirection(FLEX_DIRECTION_ROW)
+      rowRoot.setAlignItems(ALIGN_FLEX_START)
+      const rowText = Node.create()
+      rowText.setWidthPercent(50)
+      rowText.setMeasureFunc((w, wm) => {
+        rowWidths.push(w)
+        const textLen = 120
+        const avail = wm === MEASURE_MODE_UNDEFINED || !Number.isFinite(w) || w <= 0 ? textLen : w
+        return { width: Math.min(textLen, avail), height: Math.ceil(textLen / Math.max(1, avail)) }
+      })
+      rowRoot.insertChild(rowText, 0)
+      rowRoot.calculateLayout(80, 24, DIRECTION_LTR)
+      expect(rowWidths).not.toContain(50)
+      expect(rowWidths[rowWidths.length - 1]).toBe(40)
+      expectLayout(rowText, { width: 40, height: 3 })
+
+      // 2. Column with widthPercent(50) on 80-wide container -> Phase 5 pre-measure uses 40 (EXACTLY), never 80
+      const colPctCalls: Array<{ w: number; wm: number }> = []
+      const colPctRoot = Node.create()
+      colPctRoot.setWidth(80)
+      colPctRoot.setHeight(24)
+      colPctRoot.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      const colPctText = Node.create()
+      colPctText.setWidthPercent(50)
+      colPctText.setMeasureFunc((w, wm) => {
+        colPctCalls.push({ w, wm })
+        const textLen = 120
+        const avail = wm === MEASURE_MODE_UNDEFINED || !Number.isFinite(w) || w <= 0 ? textLen : w
+        return { width: Math.min(textLen, avail), height: Math.ceil(textLen / Math.max(1, avail)) }
+      })
+      colPctRoot.insertChild(colPctText, 0)
+      colPctRoot.calculateLayout(80, 24, DIRECTION_LTR)
+      expect(colPctCalls.every((c) => c.w === 40 && c.wm === MEASURE_MODE_EXACTLY)).toBe(true)
+      expectLayout(colPctText, { width: 40, height: 3 })
+
+      // 3. Column with explicit width(40) on 80-wide container -> Phase 5 pre-measure uses 40 (EXACTLY), never 80
+      const colPtCalls: Array<{ w: number; wm: number }> = []
+      const colPtRoot = Node.create()
+      colPtRoot.setWidth(80)
+      colPtRoot.setHeight(24)
+      colPtRoot.setFlexDirection(FLEX_DIRECTION_COLUMN)
+      const colPtText = Node.create()
+      colPtText.setWidth(40)
+      colPtText.setMeasureFunc((w, wm) => {
+        colPtCalls.push({ w, wm })
+        const textLen = 120
+        const avail = wm === MEASURE_MODE_UNDEFINED || !Number.isFinite(w) || w <= 0 ? textLen : w
+        return { width: Math.min(textLen, avail), height: Math.ceil(textLen / Math.max(1, avail)) }
+      })
+      colPtRoot.insertChild(colPtText, 0)
+      colPtRoot.calculateLayout(80, 24, DIRECTION_LTR)
+      expect(colPtCalls.every((c) => c.w === 40 && c.wm === MEASURE_MODE_EXACTLY)).toBe(true)
+      expectLayout(colPtText, { width: 40, height: 3 })
+    })
   })
 
   // ===========================================================================
