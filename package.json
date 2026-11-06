@@ -37,7 +37,6 @@
     "./testing": "./src/testing.ts"
   },
   "publishConfig": {
-    "access": "public",
     "exports": {
       ".": {
         "types": "./dist/index.d.mts",
@@ -51,7 +50,8 @@
         "types": "./dist/testing.d.mts",
         "import": "./dist/testing.mjs"
       }
-    }
+    },
+    "access": "public"
   },
   "scripts": {
     "build": "tsdown",
@@ -71,7 +71,7 @@
   "devDependencies": {
     "@types/node": "26.6.5",
     "loggily": "0.13.0",
-    "oxfmt": "0.38.0",
+    "oxfmt": "0.76.0",
     "tsdown": "0.22.13",
     "typescript": "^5.9.3",
     "vite-plus": "0.2.9",
